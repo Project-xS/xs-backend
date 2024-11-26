@@ -1,0 +1,33 @@
+repos:
+  - repo: https://github.com/doublify/pre-commit-rust
+    rev: v1.0
+    hooks:
+      - id: fmt
+        name: Format
+        description: Format files with rustfmt.
+        entry: rustfmt
+        language: system
+        pass_filenames: false
+
+      - id: cargo-check
+        name: Check
+        description: Check the package for errors.
+        entry: cargo check
+        language: system
+        pass_filenames: false
+
+      - id: clippy
+        name: Clippy
+        description: Lint rust sources
+        entry: cargo clippy
+        language: system
+        args: ["--", "-D", "warnings"]
+        pass_filenames: false
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.3.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
