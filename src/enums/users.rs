@@ -1,7 +1,12 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
-pub struct Test {
-    pub message: String,
-    pub hi: u32
+#[derive(Deserialize)]
+pub struct LoginReq {
+    pub email: String
+}
+
+#[derive(Serialize)]
+pub struct LoginResp {
+    pub status: String,
+    pub error: Option<String>
 }

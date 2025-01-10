@@ -3,9 +3,9 @@ extern crate log;
 extern crate pretty_env_logger;
 
 mod enums;
-mod handlers;
 mod models;
 mod db;
+mod api;
 
 use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
 use crate::db::UserOperations;
@@ -33,10 +33,9 @@ async fn main() -> std::io::Result<()> {
 
     // Database Connection
     info!("Initializing database connection pool...");
-    let pool = db::establish_connection_pool(&database_url)
-        .expect("Failed to create database pool");
+    let pool = db::establish_connection_pool(&database_url);
 
-    let user_ops = UserOperations::new(pool);
+    let user_ops = UserOperations::new(pool.clone());
 
     // Server configuration
     const HOST: &str = "127.0.0.1";
@@ -47,7 +46,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .service(root_endpoint)
-            .configure(handlers::login::config)
+            .configure(api::users::login::config)
             .app_data(web::Data::new(user_ops.clone()))
     })
         .bind((HOST, PORT))?
