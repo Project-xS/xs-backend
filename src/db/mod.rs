@@ -24,10 +24,10 @@ pub struct DbConnection<'a> {
     _lifetime: std::marker::PhantomData<&'a ()>,
 }
 
-impl<'a> DbConnection<'a> {
+impl DbConnection<'_> {
     pub fn new(pool: &DbPool) -> Result<Self, RepositoryError> {
         Ok(Self {
-            conn: pool.get().map_err(|e| RepositoryError::ConnectionPoolError(e))?,
+            conn: pool.get().map_err(RepositoryError::ConnectionPoolError)?,
             _lifetime: std::marker::PhantomData,
         })
     }

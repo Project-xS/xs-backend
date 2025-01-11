@@ -16,3 +16,26 @@ dotenvy = "0.15.7"
 log = "0.4.22"
 pretty_env_logger = "0.5.0"
 thiserror = "2.0.9"
+
+[workspace.lints.clippy]
+# --- Correctness: Catch serious errors ---
+correctness = { level = "deny", priority = -1 }  # Treat correctness lints as errors
+
+# --- Style: Learn and enforce good Rust style ---
+style = "warn"
+# Turn these off later
+redundant_closure = "warn" # Helps you learn when closures can be simplified
+match_bool = "warn"       # Encourages using if/else for booleans (more common in other languages)
+needless_return = "warn"    # Encourages omitting the `return` keyword when it's not needed
+
+# --- Complexity: Keep your code simple ---
+complexity = "warn"
+too_many_arguments = "warn"   # Avoid functions with excessive parameters
+redundant_clone = "warn"      # Learn to use references and borrowing instead of unnecessary cloning
+dead_code = "warn"
+
+# --- Performance: Start with the basics ---
+perf = "warn"
+# Examples of perf lints that are good to be aware of:
+iter_next_loop = "warn"    # Avoid common mistakes with iterators
+inefficient_to_string = "warn" # Learn about the performance implications of `to_string`

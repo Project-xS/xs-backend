@@ -46,7 +46,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .service(root_endpoint)
-            .configure(api::users::login::config)
+            .configure(api::users::account::config)
             .app_data(web::Data::new(user_ops.clone()))
     })
         .bind((HOST, PORT))?

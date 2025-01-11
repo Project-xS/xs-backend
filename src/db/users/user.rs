@@ -22,9 +22,10 @@ impl UserOperations {
         diesel::insert_into(users::table)
             .values(&new_user)
             .get_result(conn.connection())
-            .map_err(|e| RepositoryError::DatabaseError(e))
+            .map_err(RepositoryError::DatabaseError)
     }
 
+    #[allow(dead_code)]
     pub fn get_user_by_rfid(&self, rfid: i32) -> Result<User, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool)?;
 

@@ -10,3 +10,9 @@ pub struct LoginResp {
     pub status: String,
     pub error: Option<String>
 }
+
+#[derive(Serialize)]
+pub struct CreateUserResp {
+    pub status: String,
+    pub error: Option<String>
+}

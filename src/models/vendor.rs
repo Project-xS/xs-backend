@@ -62,4 +62,3 @@ pub struct NewMenuItem {
     pub pic_link: Option<String>,
     pub description: Option<String>,
 }
-
