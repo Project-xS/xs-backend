@@ -18,13 +18,6 @@ diesel::table! {
 }
 
 diesel::table! {
-    cart (user_id) {
-        user_id -> Int4,
-        items -> Array<Nullable<Int4>>,
-    }
-}
-
-diesel::table! {
     item_count (item_id) {
         item_id -> Int4,
         num_ordered -> Int4,
@@ -67,7 +60,6 @@ diesel::table! {
 }
 
 diesel::joinable!(active_orders -> users (user_id));
-diesel::joinable!(cart -> users (user_id));
 diesel::joinable!(item_count -> menu_items (item_id));
 diesel::joinable!(menu_items -> canteens (canteen_id));
 diesel::joinable!(past_orders -> users (user_id));
@@ -75,7 +67,6 @@ diesel::joinable!(past_orders -> users (user_id));
 diesel::allow_tables_to_appear_in_same_query!(
     active_orders,
     canteens,
-    cart,
     item_count,
     menu_items,
     past_orders,

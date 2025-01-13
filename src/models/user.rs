@@ -3,21 +3,6 @@ use diesel::{Identifiable, Insertable, Queryable};
 use serde::{Deserialize, Serialize};
 
 #[derive(Queryable, Debug, Identifiable, Serialize, Deserialize)]
-#[diesel(table_name = crate::db::schema::cart)]
-#[diesel(primary_key(user_id))]
-pub struct Cart {
-    pub user_id: i32,
-    pub items: Vec<i32>,
-}
-
-#[derive(Insertable, Debug, Serialize, Deserialize)]
-#[diesel(table_name = crate::db::schema::cart)]
-pub struct NewCart {
-    pub user_id: i32,
-    pub items: Vec<i32>,
-}
-
-#[derive(Queryable, Debug, Identifiable, Serialize, Deserialize)]
 #[diesel(table_name = crate::db::schema::past_orders)]
 #[diesel(primary_key(order_id))]
 pub struct PastOrder {

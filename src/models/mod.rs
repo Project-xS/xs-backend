@@ -1,2 +1,2 @@
-pub mod vendor;
+pub mod admin;
 pub mod user;

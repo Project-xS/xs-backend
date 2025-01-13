@@ -31,6 +31,7 @@ impl UserOperations {
 
         users::table
             .find(rfid)
+            .limit(1)
             .get_result::<User>(conn.connection())
             .map_err(|e| match e {
                 Error::NotFound => RepositoryError::NotFound(rfid.to_string()),
@@ -43,6 +44,7 @@ impl UserOperations {
 
         users::table
             .filter(email.eq(email_addr))
+            .limit(1)
             .get_result::<User>(conn.connection())
             .map_err(|e| match e {
                 Error::NotFound => RepositoryError::NotFound(email_addr.to_string()),

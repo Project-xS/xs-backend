@@ -8,7 +8,7 @@ mod db;
 mod api;
 
 use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
-use crate::db::UserOperations;
+use crate::db::{MenuOperations, UserOperations};
 use dotenvy::dotenv;
 
 #[get("/")]
@@ -36,6 +36,7 @@ async fn main() -> std::io::Result<()> {
     let pool = db::establish_connection_pool(&database_url);
 
     let user_ops = UserOperations::new(pool.clone());
+    let menu_ops = MenuOperations::new(pool.clone());
 
     // Server configuration
     const HOST: &str = "127.0.0.1";
@@ -46,8 +47,10 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .service(root_endpoint)
-            .configure(api::users::account::config)
+            .configure(api::users::config)
+            .configure(api::admin::config)
             .app_data(web::Data::new(user_ops.clone()))
+            .app_data(web::Data::new(menu_ops.clone()))
     })
         .bind((HOST, PORT))?
         .run()
