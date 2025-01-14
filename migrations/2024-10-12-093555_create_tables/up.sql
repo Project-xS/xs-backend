@@ -18,6 +18,7 @@ CREATE TABLE canteens
     location     VARCHAR NOT NULL
 );
 CREATE INDEX idx_canteens_name ON canteens (canteen_name);
+CREATE UNIQUE INDEX idx_canteens_canteen_name_location ON canteens (canteen_name, location);
 
 -- Create menu_items table
 CREATE TABLE menu_items
