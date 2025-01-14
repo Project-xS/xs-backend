@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use crate::models::admin::MenuItem;
+use crate::models::admin::{Canteen, MenuItem};
 
 #[derive(Serialize)]
 pub struct NewItemResponse {
@@ -47,4 +47,20 @@ impl Default for MenuItem {
 pub struct ReduceStockRequest {
     pub id: i32,
     pub amount: i32
+}
+
+
+// ---------- CANTEEN ---------- //
+
+#[derive(Serialize)]
+pub struct NewCanteenResponse {
+    pub status: String,
+    pub error: Option<String>
+}
+
+#[derive(Serialize)]
+pub struct AllCanteenResponse {
+    pub status: String,
+    pub data: Vec<Canteen>,
+    pub error: Option<String>
 }

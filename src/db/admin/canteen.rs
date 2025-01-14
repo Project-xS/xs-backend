@@ -9,7 +9,6 @@ pub struct CanteenOperations {
     pool: Pool<ConnectionManager<PgConnection>>
 }
 
-#[allow(dead_code)]
 impl CanteenOperations {
     pub fn new(pool: Pool<ConnectionManager<PgConnection>>) -> Self { Self { pool } }
 

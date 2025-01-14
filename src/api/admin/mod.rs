@@ -1,6 +1,7 @@
 use actix_web::{web, HttpResponse};
 
-pub mod menu;
+mod menu;
+mod canteen;
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -21,5 +22,19 @@ pub fn config(cfg: &mut web::ServiceConfig) {
             .route("/enable", web::post().to(menu::enable_menu_item))
             .route("/disable", web::post().to(menu::disable_menu_item))
             .route("/buy", web::post().to(menu::reduce_stock))
+    );
+    cfg.service(
+        web::scope("/canteen")
+            .app_data(web::JsonConfig::default().error_handler(|err, _| {
+                info!("Error in admin menu: {}", err);
+                actix_web::error::InternalError::from_response(
+                    "",
+                    HttpResponse::BadRequest()
+                        .finish(),
+                )
+                    .into()
+            }))
+            .route("/create", web::put().to(canteen::create_canteen))
+            .route("", web::get().to(canteen::get_all_canteens))
     );
 }

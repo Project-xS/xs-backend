@@ -9,6 +9,7 @@ mod admin;
 pub use errors::RepositoryError;
 pub use users::user::UserOperations;
 pub use admin::menu::MenuOperations;
+pub use admin::canteen::CanteenOperations;
 
 pub type DbPool = Pool<ConnectionManager<PgConnection>>;
 
