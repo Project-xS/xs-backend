@@ -25,8 +25,8 @@ CREATE TABLE menu_items
     item_id      SERIAL PRIMARY KEY,
     canteen_id   INTEGER NOT NULL REFERENCES canteens (canteen_id),
     name         VARCHAR NOT NULL,
-    is_veg       BOOLEAN NOT NULL DEFAULT false,
-    price        FLOAT   NOT NULL DEFAULT 0.0,
+    is_veg       BOOLEAN NOT NULL,
+    price        FLOAT   NOT NULL,
     stock        INTEGER NOT NULL DEFAULT 0,
     is_available BOOLEAN NOT NULL DEFAULT false,
     list         BOOLEAN NOT NULL DEFAULT true,
@@ -36,6 +36,7 @@ CREATE TABLE menu_items
 CREATE INDEX idx_menu_items_canteen_id ON menu_items (canteen_id);
 CREATE INDEX idx_menu_items_name ON menu_items (name);
 CREATE INDEX idx_menu_items_is_available ON menu_items (is_available);
+CREATE UNIQUE INDEX idx_menu_items_canteen_id_name ON menu_items (canteen_id, name);
 
 -- Create active_orders table
 CREATE TABLE active_orders
