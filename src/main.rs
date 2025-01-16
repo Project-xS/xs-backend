@@ -19,7 +19,7 @@ async fn root_endpoint() -> impl Responder {
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     if let Err(e) = dotenv() {
-        eprintln!("Failed to load .env file: {}", e);
+        info!("Failed to load .env file: {}. Defaulting to env vars...", e);
     }
 
     // Setup logging
@@ -40,7 +40,11 @@ async fn main() -> std::io::Result<()> {
     let canteen_ops = CanteenOperations::new(pool.clone());
 
     // Server configuration
-    const HOST: &str = "127.0.0.1";
+    const HOST: &str = if cfg!(debug_assertions) {
+        "127.0.0.1"
+    } else {
+        "0.0.0.0"
+    };
     const PORT: u16 = 8080;
 
     info!("Starting server at http://{}:{}", HOST, PORT);
