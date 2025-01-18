@@ -1,17 +1,19 @@
-use diesel::r2d2::{ConnectionManager, Pool};
-use diesel::prelude::*;
-use diesel::result::Error;
-use crate::db::schema::menu_items::dsl::*;
-use crate::db::{DbConnection};
 use crate::db::errors::RepositoryError;
+use crate::db::schema::menu_items::dsl::*;
+use crate::db::DbConnection;
 use crate::models::admin::{MenuItem, NewMenuItem};
+use diesel::prelude::*;
+use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::result::Error;
 
 pub struct MenuOperations {
-    pool: Pool<ConnectionManager<PgConnection>>
+    pool: Pool<ConnectionManager<PgConnection>>,
 }
 
 impl MenuOperations {
-    pub fn new(pool: Pool<ConnectionManager<PgConnection>>) -> Self { Self { pool } }
+    pub fn new(pool: Pool<ConnectionManager<PgConnection>>) -> Self {
+        Self { pool }
+    }
 
     pub fn add_menu_item(&self, menu_item: NewMenuItem) -> Result<usize, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool)?;
@@ -25,16 +27,12 @@ impl MenuOperations {
     pub fn remove_menu_item(&self, id: i32) -> Result<MenuItem, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool)?;
 
-        diesel::delete(
-            menu_items
-                .filter(
-                    item_id.eq(id)
-                )
-        ).get_result(conn.connection())
-        .map_err(|e| match e {
-            Error::NotFound => RepositoryError::NotFound(format!("menu_items: {}", id)),
-            other => RepositoryError::DatabaseError(other)
-        })
+        diesel::delete(menu_items.filter(item_id.eq(id)))
+            .get_result(conn.connection())
+            .map_err(|e| match e {
+                Error::NotFound => RepositoryError::NotFound(format!("menu_items: {}", id)),
+                other => RepositoryError::DatabaseError(other),
+            })
     }
 
     // pub fn edit_menu_item(&self) {
@@ -44,30 +42,25 @@ impl MenuOperations {
     pub fn enable_menu_item(&self, itemid: i32) -> Result<MenuItem, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool)?;
 
-        diesel::update(menu_items.filter(
-                item_id.eq(itemid)
-            ))
+        diesel::update(menu_items.filter(item_id.eq(itemid)))
             .set(is_available.eq(true))
             .get_result(conn.connection())
             .map_err(|e| match e {
                 Error::NotFound => RepositoryError::NotFound(format!("menu_items: {}", itemid)),
-                other => RepositoryError::DatabaseError(other)
+                other => RepositoryError::DatabaseError(other),
             })
-
     }
 
     pub fn disable_menu_item(&self, itemid: i32) -> Result<MenuItem, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool)?;
 
-        diesel::update(menu_items.filter(
-            item_id.eq(itemid)
-        ))
-        .set(is_available.eq(false))
-        .get_result(conn.connection())
-        .map_err(|e| match e {
-            Error::NotFound => RepositoryError::NotFound(format!("menu_items: {}", itemid)),
-            other => RepositoryError::DatabaseError(other)
-        })
+        diesel::update(menu_items.filter(item_id.eq(itemid)))
+            .set(is_available.eq(false))
+            .get_result(conn.connection())
+            .map_err(|e| match e {
+                Error::NotFound => RepositoryError::NotFound(format!("menu_items: {}", itemid)),
+                other => RepositoryError::DatabaseError(other),
+            })
     }
 
     pub fn get_all_menu_items(&self) -> Result<Vec<MenuItem>, RepositoryError> {
@@ -96,7 +89,7 @@ impl MenuOperations {
             .get_result(conn.connection())
             .map_err(|e| match e {
                 Error::NotFound => RepositoryError::NotFound(format!("menu_items: {}", itemid)),
-                other => RepositoryError::DatabaseError(other)
+                other => RepositoryError::DatabaseError(other),
             })
     }
 }

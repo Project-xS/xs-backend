@@ -1,2 +1,2 @@
-pub mod menu;
 pub mod canteen;
+pub mod menu;

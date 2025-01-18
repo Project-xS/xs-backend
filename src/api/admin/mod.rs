@@ -1,8 +1,8 @@
 use crate::api::errors::default_error_handler;
 use actix_web::web;
 
-mod menu;
 mod canteen;
+mod menu;
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -14,12 +14,12 @@ pub fn config(cfg: &mut web::ServiceConfig) {
             .route("/delete", web::delete().to(menu::remove_menu_item))
             .route("/enable", web::post().to(menu::enable_menu_item))
             .route("/disable", web::post().to(menu::disable_menu_item))
-            .route("/buy", web::post().to(menu::reduce_stock))
+            .route("/buy", web::post().to(menu::reduce_stock)),
     );
     cfg.service(
         web::scope("/canteen")
             .app_data(web::JsonConfig::default().error_handler(default_error_handler))
             .route("/create", web::put().to(canteen::create_canteen))
-            .route("", web::get().to(canteen::get_all_canteens))
+            .route("", web::get().to(canteen::get_all_canteens)),
     );
 }

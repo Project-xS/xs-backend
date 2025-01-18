@@ -8,6 +8,6 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         web::scope("/auth")
             .app_data(web::JsonConfig::default().error_handler(default_error_handler))
             .route("/login", web::post().to(account::login))
-            .route("/create_user", web::post().to(account::create_user))
+            .route("/create_user", web::post().to(account::create_user)),
     );
 }

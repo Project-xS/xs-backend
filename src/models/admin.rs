@@ -1,5 +1,5 @@
-use diesel::{Identifiable, Queryable, Insertable};
-use serde::{Serialize, Deserialize};
+use diesel::{Identifiable, Insertable, Queryable};
+use serde::{Deserialize, Serialize};
 
 #[derive(Queryable, Debug, Identifiable, Serialize, Deserialize)]
 #[diesel(table_name = crate::db::schema::canteens)]
@@ -16,7 +16,6 @@ pub struct NewCanteen {
     pub canteen_name: String,
     pub location: String,
 }
-
 
 #[derive(Queryable, Debug, Identifiable, Serialize, Deserialize)]
 #[diesel(table_name = crate::db::schema::item_count)]

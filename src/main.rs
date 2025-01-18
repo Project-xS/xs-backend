@@ -2,13 +2,13 @@
 extern crate log;
 extern crate pretty_env_logger;
 
+mod api;
+mod db;
 mod enums;
 mod models;
-mod db;
-mod api;
 
-use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
 use crate::db::{CanteenOperations, MenuOperations, UserOperations};
+use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
 use dotenvy::dotenv;
 
 #[get("/")]
@@ -28,8 +28,7 @@ async fn main() -> std::io::Result<()> {
     }
     pretty_env_logger::init();
 
-    let database_url = std::env::var("DATABASE_URL")
-        .expect("DATABASE_URL must be set");
+    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
     // Database Connection
     info!("Initializing database connection pool...");
@@ -58,7 +57,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(menu_ops.clone()))
             .app_data(web::Data::new(canteen_ops.clone()))
     })
-        .bind((HOST, PORT))?
-        .run()
-        .await
+    .bind((HOST, PORT))?
+    .run()
+    .await
 }

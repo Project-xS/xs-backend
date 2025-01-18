@@ -1,25 +1,22 @@
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::{r2d2, PgConnection};
 
+mod admin;
+mod errors;
 pub mod schema;
 pub mod users;
-mod errors;
-mod admin;
 
+pub use admin::canteen::CanteenOperations;
+pub use admin::menu::MenuOperations;
 pub use errors::RepositoryError;
 pub use users::user::UserOperations;
-pub use admin::menu::MenuOperations;
-pub use admin::canteen::CanteenOperations;
 
 pub type DbPool = Pool<ConnectionManager<PgConnection>>;
 
 pub fn establish_connection_pool(database_url: &str) -> Pool<ConnectionManager<PgConnection>> {
     let manager = ConnectionManager::<PgConnection>::new(database_url);
 
-    Pool::builder()
-        .max_size(20)
-        .build(manager)
-        .unwrap()
+    Pool::builder().max_size(20).build(manager).unwrap()
 }
 
 // Connection Guard - Manages pool

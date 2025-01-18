@@ -6,11 +6,13 @@ use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 
 pub struct CanteenOperations {
-    pool: Pool<ConnectionManager<PgConnection>>
+    pool: Pool<ConnectionManager<PgConnection>>,
 }
 
 impl CanteenOperations {
-    pub fn new(pool: Pool<ConnectionManager<PgConnection>>) -> Self { Self { pool } }
+    pub fn new(pool: Pool<ConnectionManager<PgConnection>>) -> Self {
+        Self { pool }
+    }
 
     pub fn create_canteen(&self, canteen: NewCanteen) -> Result<usize, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool)?;

@@ -1,14 +1,14 @@
-use diesel::prelude::*;
-use diesel::r2d2::{ConnectionManager, Pool};
-use diesel::result::Error;
-use crate::models::user::{NewUser, User};
 use crate::db::errors::RepositoryError;
 use crate::db::schema::users;
 use crate::db::schema::users::email;
 use crate::db::DbConnection;
+use crate::models::user::{NewUser, User};
+use diesel::prelude::*;
+use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::result::Error;
 
 pub struct UserOperations {
-    pool: Pool<ConnectionManager<PgConnection>>
+    pool: Pool<ConnectionManager<PgConnection>>,
 }
 
 impl UserOperations {
@@ -35,7 +35,7 @@ impl UserOperations {
             .get_result::<User>(conn.connection())
             .map_err(|e| match e {
                 Error::NotFound => RepositoryError::NotFound(rfid.to_string()),
-                other => RepositoryError::DatabaseError(other)
+                other => RepositoryError::DatabaseError(other),
             })
     }
 
@@ -48,7 +48,7 @@ impl UserOperations {
             .get_result::<User>(conn.connection())
             .map_err(|e| match e {
                 Error::NotFound => RepositoryError::NotFound(email_addr.to_string()),
-                other => RepositoryError::DatabaseError(other)
+                other => RepositoryError::DatabaseError(other),
             })
     }
 }
