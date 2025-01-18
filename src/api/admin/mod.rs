@@ -1,4 +1,5 @@
-use actix_web::{web, HttpResponse};
+use crate::api::errors::default_error_handler;
+use actix_web::web;
 
 mod menu;
 mod canteen;
@@ -6,15 +7,7 @@ mod canteen;
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/menu")
-            .app_data(web::JsonConfig::default().error_handler(|err, _| {
-                info!("Error in admin menu: {}", err);
-                actix_web::error::InternalError::from_response(
-                    "",
-                    HttpResponse::BadRequest()
-                        .finish(),
-                )
-                    .into()
-            }))
+            .app_data(web::JsonConfig::default().error_handler(default_error_handler))
             .route("/items", web::get().to(menu::get_all_menu_items))
             .route("/item", web::get().to(menu::get_menu_item))
             .route("/create", web::put().to(menu::create_menu_item))
@@ -25,15 +18,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     );
     cfg.service(
         web::scope("/canteen")
-            .app_data(web::JsonConfig::default().error_handler(|err, _| {
-                info!("Error in admin menu: {}", err);
-                actix_web::error::InternalError::from_response(
-                    "",
-                    HttpResponse::BadRequest()
-                        .finish(),
-                )
-                    .into()
-            }))
+            .app_data(web::JsonConfig::default().error_handler(default_error_handler))
             .route("/create", web::put().to(canteen::create_canteen))
             .route("", web::get().to(canteen::get_all_canteens))
     );
