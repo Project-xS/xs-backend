@@ -4,19 +4,22 @@ name: Fly Deploy
 on:
   push:
     branches:
-      - main
+      - master
 jobs:
   deploy:
     name: Deploy app
-    runs-on: ubuntu-24.04
-    concurrency: deploy-group
+    runs-on: slave
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Startup DIND
+        run: /dockerd-entrypoint.sh dockerd &
+        shell: bash
 
-      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Deploy on Fly
+        uses: https://github.com/superfly/flyctl-actions/setup-flyctl@master
+
       - run: flyctl deploy --local-only
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

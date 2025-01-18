@@ -3,9 +3,9 @@ FROM rust:bookworm as builder
 RUN mkdir /app
 WORKDIR /app
 
-ADD Cargo.toml /app
-ADD Cargo.lock /app
-ADD src /app/src
+COPY Cargo.toml /app/Cargo.toml
+COPY Cargo.lock /app/Cargo.lock
+COPY src /app/src
 
 RUN cargo build --release
 
