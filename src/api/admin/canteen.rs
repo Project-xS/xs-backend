@@ -17,10 +17,13 @@ pub(super) async fn create_canteen(
                 error: None,
             })
         }
-        Err(e) => HttpResponse::InternalServerError().json(NewCanteenResponse {
-            status: "error".to_string(),
-            error: Some(e.to_string()),
-        }),
+        Err(e) => {
+            error!("CANTEEN: create_canteen(): {}", e.to_string());
+            HttpResponse::InternalServerError().json(NewCanteenResponse {
+                status: "error".to_string(),
+                error: Some(e.to_string()),
+            })
+        },
     }
 }
 
@@ -35,10 +38,13 @@ pub(super) async fn get_all_canteens(menu_ops: web::Data<CanteenOperations>) -> 
                 error: None,
             })
         }
-        Err(e) => HttpResponse::InternalServerError().json(AllCanteenResponse {
-            status: "error".to_string(),
-            data: Vec::new(),
-            error: Some(e.to_string()),
-        }),
+        Err(e) => {
+            error!("CANTEEN: get_all_canteens(): {}", e.to_string());
+            HttpResponse::InternalServerError().json(AllCanteenResponse {
+                status: "error".to_string(),
+                data: Vec::new(),
+                error: Some(e.to_string()),
+            })
+        },
     }
 }

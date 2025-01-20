@@ -17,10 +17,13 @@ pub(super) async fn create_user(
                 error: None,
             })
         }
-        Err(e) => HttpResponse::InternalServerError().json(CreateUserResp {
-            status: "error".to_string(),
-            error: Some(e.to_string()),
-        }),
+        Err(e) => {
+            error!("ACCOUNT: create_user(): {}", e.to_string());
+            HttpResponse::InternalServerError().json(CreateUserResp {
+                status: "error".to_string(),
+                error: Some(e.to_string()),
+            })
+        },
     }
 }
 
@@ -32,15 +35,18 @@ pub(super) async fn login(
     let email = req_body.email.clone();
     match user_ops.get_user_by_email(&email) {
         Ok(_) => {
-            info!("User created: {}", email);
+            info!("User logged in: {}", email);
             HttpResponse::Ok().json(LoginResp {
                 status: "valid".to_string(),
                 error: None,
             })
         }
-        Err(e) => HttpResponse::Unauthorized().json(LoginResp {
-            status: "error".to_string(),
-            error: Some(e.to_string()),
-        }),
+        Err(e) => {
+            error!("ACCOUNT: login(): {}", e.to_string());
+            HttpResponse::Unauthorized().json(LoginResp {
+                status: "error".to_string(),
+                error: Some(e.to_string()),
+            })
+        },
     }
 }

@@ -18,10 +18,13 @@ pub(super) async fn create_menu_item(
                 error: None,
             })
         }
-        Err(e) => HttpResponse::InternalServerError().json(NewItemResponse {
-            status: "error".to_string(),
-            error: Some(e.to_string()),
-        }),
+        Err(e) => {
+            error!("MENU: create_menu_item(): {}", e.to_string());
+            HttpResponse::InternalServerError().json(NewItemResponse {
+                status: "error".to_string(),
+                error: Some(e.to_string()),
+            })
+        }
     }
 }
 
@@ -39,10 +42,13 @@ pub(super) async fn remove_menu_item(
                 error: None,
             })
         }
-        Err(e) => HttpResponse::InternalServerError().json(NewItemResponse {
-            status: "error".to_string(),
-            error: Some(e.to_string()),
-        }),
+        Err(e) => {
+            error!("MENU: remove_menu_item(): {}", e.to_string());
+            HttpResponse::InternalServerError().json(NewItemResponse {
+                status: "error".to_string(),
+                error: Some(e.to_string()),
+            })
+        }
     }
 }
 
@@ -61,10 +67,13 @@ pub(super) async fn update_menu_item(
                 error: None,
             })
         }
-        Err(e) => HttpResponse::InternalServerError().json(NewItemResponse {
-            status: "error".to_string(),
-            error: Some(e.to_string()),
-        }),
+        Err(e) => {
+            error!("MENU: update_menu_item(): {}", e.to_string());
+            HttpResponse::InternalServerError().json(NewItemResponse {
+                status: "error".to_string(),
+                error: Some(e.to_string()),
+            })
+        },
     }
 }
 
@@ -79,11 +88,14 @@ pub(super) async fn get_all_menu_items(menu_ops: web::Data<MenuOperations>) -> i
                 error: None,
             })
         }
-        Err(e) => HttpResponse::InternalServerError().json(AllItemsResponse {
-            status: "error".to_string(),
-            data: Vec::new(),
-            error: Some(e.to_string()),
-        }),
+        Err(e) => {
+            error!("MENU: get_all_menu_items(): {}", e.to_string());
+            HttpResponse::InternalServerError().json(AllItemsResponse {
+                status: "error".to_string(),
+                data: Vec::new(),
+                error: Some(e.to_string()),
+            })
+        },
     }
 }
 
@@ -101,10 +113,13 @@ pub(super) async fn get_menu_item(
                 error: None,
             })
         }
-        Err(e) => HttpResponse::InternalServerError().json(ItemResponse {
-            status: "error".to_string(),
-            data: MenuItem::default(),
-            error: Some(e.to_string()),
-        }),
+        Err(e) => {
+            error!("MENU: get_menu_item(): {}", e.to_string());
+            HttpResponse::InternalServerError().json(ItemResponse {
+                status: "error".to_string(),
+                data: MenuItem::default(),
+                error: Some(e.to_string()),
+            })
+        },
     }
 }
