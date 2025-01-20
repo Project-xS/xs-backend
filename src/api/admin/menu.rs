@@ -1,5 +1,5 @@
 use crate::db::MenuOperations;
-use crate::enums::admin::{AllItemsResponse, ItemIdRequest, ItemResponse, NewItemResponse, UpdateItemRequest};
+use crate::enums::admin::{AllItemsResponse, ItemResponse, NewItemResponse, UpdateItemRequest};
 use crate::models::admin::{MenuItem, NewMenuItem};
 use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
 
@@ -28,13 +28,13 @@ pub(super) async fn create_menu_item(
     }
 }
 
-#[delete("/delete")]
+#[delete("/delete/{id}")]
 pub(super) async fn remove_menu_item(
     menu_ops: web::Data<MenuOperations>,
-    req_data: web::Json<ItemIdRequest>,
+    path: web::Path<(i32, )>
 ) -> impl Responder {
-    let req_data = req_data.into_inner();
-    match menu_ops.remove_menu_item(req_data.id) {
+    let req_data = path.into_inner().0;
+    match menu_ops.remove_menu_item(req_data) {
         Ok(x) => {
             info!("Menu item removed: {}", x.name);
             HttpResponse::Ok().json(NewItemResponse {
@@ -99,12 +99,12 @@ pub(super) async fn get_all_menu_items(menu_ops: web::Data<MenuOperations>) -> i
     }
 }
 
-#[get("/item")]
+#[get("/items/{id}")]
 pub(super) async fn get_menu_item(
     menu_ops: web::Data<MenuOperations>,
-    req_data: web::Json<ItemIdRequest>,
+    path: web::Path<(i32, )>
 ) -> impl Responder {
-    match menu_ops.get_menu_item(req_data.id) {
+    match menu_ops.get_menu_item(path.into_inner().0) {
         Ok(x) => {
             info!("Menu item fetched: {}", x.name);
             HttpResponse::Ok().json(ItemResponse {

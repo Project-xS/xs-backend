@@ -7,11 +7,6 @@ pub struct NewItemResponse {
     pub error: Option<String>,
 }
 
-#[derive(Deserialize)]
-pub struct ItemIdRequest {
-    pub id: i32,
-}
-
 #[derive(Serialize)]
 pub struct AllItemsResponse {
     pub status: String,
