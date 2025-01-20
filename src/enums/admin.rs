@@ -1,4 +1,4 @@
-use crate::models::admin::{Canteen, MenuItem};
+use crate::models::admin::{Canteen, MenuItem, UpdateMenuItem};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
@@ -44,9 +44,9 @@ impl Default for MenuItem {
 }
 
 #[derive(Deserialize)]
-pub struct ReduceStockRequest {
-    pub id: i32,
-    pub amount: i32,
+pub struct UpdateItemRequest {
+    pub item_id: i32,
+    pub update: UpdateMenuItem,
 }
 
 // ---------- CANTEEN ---------- //

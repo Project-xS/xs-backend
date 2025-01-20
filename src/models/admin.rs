@@ -1,4 +1,4 @@
-use diesel::{Identifiable, Insertable, Queryable};
+use diesel::{AsChangeset, Identifiable, Insertable, Queryable};
 use serde::{Deserialize, Serialize};
 
 #[derive(Queryable, Debug, Identifiable, Serialize, Deserialize)]
@@ -58,6 +58,19 @@ pub struct NewMenuItem {
     pub stock: i32,
     pub is_available: bool,
     pub list: bool,
+    pub pic_link: Option<String>,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, AsChangeset)]
+#[diesel(table_name = crate::db::schema::menu_items)]
+pub struct UpdateMenuItem {
+    pub name: Option<String>,
+    pub is_veg: Option<bool>,
+    pub price: Option<f64>,
+    pub stock: Option<i32>,
+    pub is_available: Option<bool>,
+    pub list: Option<bool>,
     pub pic_link: Option<String>,
     pub description: Option<String>,
 }

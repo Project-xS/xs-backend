@@ -1,7 +1,7 @@
 use crate::db::errors::RepositoryError;
 use crate::db::schema::menu_items::dsl::*;
 use crate::db::DbConnection;
-use crate::models::admin::{MenuItem, NewMenuItem};
+use crate::models::admin::{MenuItem, NewMenuItem, UpdateMenuItem};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::result::Error;
@@ -35,27 +35,11 @@ impl MenuOperations {
             })
     }
 
-    // pub fn edit_menu_item(&self) {
-    //     todo!()
-    // }
-
-    pub fn enable_menu_item(&self, itemid: i32) -> Result<MenuItem, RepositoryError> {
+    pub fn update_menu_item(&self, itemid: i32, changed_menu_item: UpdateMenuItem) -> Result<MenuItem, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool)?;
 
         diesel::update(menu_items.filter(item_id.eq(itemid)))
-            .set(is_available.eq(true))
-            .get_result(conn.connection())
-            .map_err(|e| match e {
-                Error::NotFound => RepositoryError::NotFound(format!("menu_items: {}", itemid)),
-                other => RepositoryError::DatabaseError(other),
-            })
-    }
-
-    pub fn disable_menu_item(&self, itemid: i32) -> Result<MenuItem, RepositoryError> {
-        let mut conn = DbConnection::new(&self.pool)?;
-
-        diesel::update(menu_items.filter(item_id.eq(itemid)))
-            .set(is_available.eq(false))
+            .set(&changed_menu_item)
             .get_result(conn.connection())
             .map_err(|e| match e {
                 Error::NotFound => RepositoryError::NotFound(format!("menu_items: {}", itemid)),
@@ -79,18 +63,6 @@ impl MenuOperations {
             .limit(1)
             .get_result(conn.connection())
             .map_err(RepositoryError::DatabaseError)
-    }
-
-    pub fn reduce_stock(&self, itemid: i32, amount: u32) -> Result<MenuItem, RepositoryError> {
-        let mut conn = DbConnection::new(&self.pool)?;
-
-        diesel::update(menu_items.filter(item_id.eq(itemid)))
-            .set(stock.eq(stock - amount as i32))
-            .get_result(conn.connection())
-            .map_err(|e| match e {
-                Error::NotFound => RepositoryError::NotFound(format!("menu_items: {}", itemid)),
-                other => RepositoryError::DatabaseError(other),
-            })
     }
 }
 

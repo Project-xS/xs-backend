@@ -32,7 +32,7 @@ impl AppState {
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     if let Err(e) = dotenv() {
-        info!("Failed to load .env file: {}. Defaulting to env vars...", e);
+        error!("Failed to load .env file: {}. Defaulting to env vars...", e);
     }
 
     // Setup logging

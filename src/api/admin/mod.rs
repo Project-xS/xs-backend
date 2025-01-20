@@ -15,9 +15,7 @@ pub fn config(cfg: &mut web::ServiceConfig, menu_ops: &MenuOperations, canteen_o
             .service(get_menu_item)
             .service(create_menu_item)
             .service(remove_menu_item)
-            .service(enable_menu_item)
-            .service(disable_menu_item)
-            .service(reduce_stock)
+            .service(update_menu_item)
     )
     .service(
         web::scope("/canteen")
