@@ -1,25 +1,28 @@
-use crate::api::errors::default_error_handler;
 use actix_web::web;
+use actix_web::web::Data;
+use canteen::*;
+use menu::*;
+use crate::db::{CanteenOperations, MenuOperations};
 
 mod canteen;
 mod menu;
 
-pub fn config(cfg: &mut web::ServiceConfig) {
+pub fn config(cfg: &mut web::ServiceConfig, menu_ops: &MenuOperations, canteen_ops: &CanteenOperations) {
     cfg.service(
         web::scope("/menu")
-            .app_data(web::JsonConfig::default().error_handler(default_error_handler))
-            .route("/items", web::get().to(menu::get_all_menu_items))
-            .route("/item", web::get().to(menu::get_menu_item))
-            .route("/create", web::put().to(menu::create_menu_item))
-            .route("/delete", web::delete().to(menu::remove_menu_item))
-            .route("/enable", web::post().to(menu::enable_menu_item))
-            .route("/disable", web::post().to(menu::disable_menu_item))
-            .route("/buy", web::post().to(menu::reduce_stock)),
-    );
-    cfg.service(
+            .app_data(Data::new(menu_ops.clone()))
+            .service(get_all_menu_items)
+            .service(get_menu_item)
+            .service(create_menu_item)
+            .service(remove_menu_item)
+            .service(enable_menu_item)
+            .service(disable_menu_item)
+            .service(reduce_stock)
+    )
+    .service(
         web::scope("/canteen")
-            .app_data(web::JsonConfig::default().error_handler(default_error_handler))
-            .route("/create", web::put().to(canteen::create_canteen))
-            .route("", web::get().to(canteen::get_all_canteens)),
+            .app_data(Data::new(canteen_ops.clone()))
+            .service(create_canteen)
+            .service(get_all_canteens)
     );
 }

@@ -3,8 +3,9 @@ use crate::enums::admin::{
     AllItemsResponse, ItemIdRequest, ItemResponse, NewItemResponse, ReduceStockRequest,
 };
 use crate::models::admin::{MenuItem, NewMenuItem};
-use actix_web::{web, HttpResponse, Responder};
+use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
 
+#[put("/create")]
 pub(super) async fn create_menu_item(
     menu_ops: web::Data<MenuOperations>,
     req_data: web::Json<NewMenuItem>,
@@ -25,6 +26,7 @@ pub(super) async fn create_menu_item(
     }
 }
 
+#[delete("/delete")]
 pub(super) async fn remove_menu_item(
     menu_ops: web::Data<MenuOperations>,
     req_data: web::Json<ItemIdRequest>,
@@ -44,6 +46,7 @@ pub(super) async fn remove_menu_item(
     }
 }
 
+#[post("/enable")]
 pub(super) async fn enable_menu_item(
     menu_ops: web::Data<MenuOperations>,
     req_data: web::Json<ItemIdRequest>,
@@ -63,6 +66,7 @@ pub(super) async fn enable_menu_item(
     }
 }
 
+#[post("/disable")]
 pub(super) async fn disable_menu_item(
     menu_ops: web::Data<MenuOperations>,
     req_data: web::Json<ItemIdRequest>,
@@ -82,6 +86,7 @@ pub(super) async fn disable_menu_item(
     }
 }
 
+#[get("/items")]
 pub(super) async fn get_all_menu_items(menu_ops: web::Data<MenuOperations>) -> impl Responder {
     match menu_ops.get_all_menu_items() {
         Ok(x) => {
@@ -100,6 +105,7 @@ pub(super) async fn get_all_menu_items(menu_ops: web::Data<MenuOperations>) -> i
     }
 }
 
+#[get("/item")]
 pub(super) async fn get_menu_item(
     menu_ops: web::Data<MenuOperations>,
     req_data: web::Json<ItemIdRequest>,
@@ -121,6 +127,7 @@ pub(super) async fn get_menu_item(
     }
 }
 
+#[post("/buy")]
 pub(super) async fn reduce_stock(
     menu_ops: web::Data<MenuOperations>,
     req_data: web::Json<ReduceStockRequest>,

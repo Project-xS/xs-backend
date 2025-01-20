@@ -11,8 +11,6 @@ pub use admin::menu::MenuOperations;
 pub use errors::RepositoryError;
 pub use users::user::UserOperations;
 
-pub type DbPool = Pool<ConnectionManager<PgConnection>>;
-
 pub fn establish_connection_pool(database_url: &str) -> Pool<ConnectionManager<PgConnection>> {
     let manager = ConnectionManager::<PgConnection>::new(database_url);
 
@@ -26,7 +24,7 @@ pub struct DbConnection<'a> {
 }
 
 impl DbConnection<'_> {
-    pub fn new(pool: &DbPool) -> Result<Self, RepositoryError> {
+    pub fn new(pool: &Pool<ConnectionManager<PgConnection>>) -> Result<Self, RepositoryError> {
         Ok(Self {
             conn: pool.get().map_err(RepositoryError::ConnectionPoolError)?,
             _lifetime: std::marker::PhantomData,

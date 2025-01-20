@@ -7,13 +7,26 @@ mod db;
 mod enums;
 mod models;
 
-use crate::db::{CanteenOperations, MenuOperations, UserOperations};
-use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
+use crate::api::default_error_handler;
+use crate::db::{establish_connection_pool, CanteenOperations, MenuOperations, UserOperations};
+use actix_web::{web, App, HttpServer};
 use dotenvy::dotenv;
 
-#[get("/")]
-async fn root_endpoint() -> impl Responder {
-    HttpResponse::Ok().body("Server up!")
+#[derive(Clone)]
+pub(crate) struct AppState {
+    pub user_ops: UserOperations,
+    pub menu_ops: MenuOperations,
+    pub canteen_ops: CanteenOperations
+}
+
+impl AppState {
+    pub(crate) fn new(url: &str) -> Self {
+        let db = establish_connection_pool(url);
+        let user_ops = UserOperations::new(db.clone());
+        let menu_ops = MenuOperations::new(db.clone());
+        let canteen_ops = CanteenOperations::new(db.clone());
+        AppState { user_ops, menu_ops, canteen_ops }
+    }
 }
 
 #[actix_web::main]
@@ -32,11 +45,7 @@ async fn main() -> std::io::Result<()> {
 
     // Database Connection
     info!("Initializing database connection pool...");
-    let pool = db::establish_connection_pool(&database_url);
-
-    let user_ops = UserOperations::new(pool.clone());
-    let menu_ops = MenuOperations::new(pool.clone());
-    let canteen_ops = CanteenOperations::new(pool.clone());
+    let state = AppState::new(database_url.as_str());
 
     // Server configuration
     const HOST: &str = if cfg!(debug_assertions) {
@@ -50,12 +59,10 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         App::new()
-            .service(root_endpoint)
-            .configure(api::users::config)
-            .configure(api::admin::config)
-            .app_data(web::Data::new(user_ops.clone()))
-            .app_data(web::Data::new(menu_ops.clone()))
-            .app_data(web::Data::new(canteen_ops.clone()))
+            .configure(|cfg| {
+                api::configure(cfg, &state);
+            })
+            .app_data(web::JsonConfig::default().error_handler(default_error_handler))
     })
     .bind((HOST, PORT))?
     .run()

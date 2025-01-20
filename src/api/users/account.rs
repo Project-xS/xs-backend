@@ -1,8 +1,9 @@
 use crate::db::UserOperations;
 use crate::enums::users::{CreateUserResp, LoginReq, LoginResp};
 use crate::models::user::NewUser;
-use actix_web::{web, HttpResponse, Responder};
+use actix_web::{post, put, web, HttpResponse, Responder};
 
+#[put("/create")]
 pub(super) async fn create_user(
     user_ops: web::Data<UserOperations>,
     req_data: web::Json<NewUser>,
@@ -23,6 +24,7 @@ pub(super) async fn create_user(
     }
 }
 
+#[post("/login")]
 pub(super) async fn login(
     user_ops: web::Data<UserOperations>,
     req_body: web::Json<LoginReq>,
