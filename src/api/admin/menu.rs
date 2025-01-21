@@ -4,7 +4,7 @@ use crate::models::admin::{MenuItem, NewMenuItem};
 use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
 
 #[utoipa::path(
-    put,
+    post,
     tag = "Menu",
     path = "/create",
     request_body = NewMenuItem,
@@ -13,7 +13,7 @@ use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
     ),
     summary = "Create a new menu item"
 )]
-#[put("/create")]
+#[post("/create")]
 pub(super) async fn create_menu_item(
     menu_ops: web::Data<MenuOperations>,
     req_data: web::Json<NewMenuItem>,
@@ -75,7 +75,7 @@ pub(super) async fn remove_menu_item(
 }
 
 #[utoipa::path(
-    post,
+    put,
     tag = "Menu",
     path = "/update",
     request_body = UpdateItemRequest,
@@ -84,7 +84,7 @@ pub(super) async fn remove_menu_item(
     ),
     summary = "Update an item in menu"
 )]
-#[post("/update")]
+#[put("/update")]
 pub(super) async fn update_menu_item(
     menu_ops: web::Data<MenuOperations>,
     req_data: web::Json<UpdateItemRequest>,

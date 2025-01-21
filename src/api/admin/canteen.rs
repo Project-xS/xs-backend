@@ -1,10 +1,10 @@
 use crate::db::CanteenOperations;
 use crate::enums::admin::{AllCanteenResponse, NewCanteenResponse};
 use crate::models::admin::NewCanteen;
-use actix_web::{get, put, web, HttpResponse, Responder};
+use actix_web::{get, post, web, HttpResponse, Responder};
 
 #[utoipa::path(
-    put,
+    post,
     tag = "Canteen",
     path = "/create",
     request_body = NewCanteen,
@@ -13,7 +13,7 @@ use actix_web::{get, put, web, HttpResponse, Responder};
     ),
     summary = "Create a new canteen"
 )]
-#[put("/create")]
+#[post("/create")]
 pub(super) async fn create_canteen(
     canteen_ops: web::Data<CanteenOperations>,
     req_data: web::Json<NewCanteen>,
