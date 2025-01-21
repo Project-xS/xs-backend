@@ -5,6 +5,9 @@ edition = "2021"
 
 [dependencies]
 actix-web = "4.9.0"
+utoipa-actix-web = "0.1"
+utoipa = { version = "5.3.1", features = ["actix_extras"] }
+utoipa-swagger-ui = { version = "9.0.0", features = ["actix-web"] }
 tokio = "1.40.0"
 serde = {version = "1.0.210", features = ["derive"]}
 serde_json = "1.0.128"

@@ -3,6 +3,16 @@ use crate::enums::users::{CreateUserResp, LoginReq, LoginResp};
 use crate::models::user::NewUser;
 use actix_web::{post, put, web, HttpResponse, Responder};
 
+#[utoipa::path(
+    put,
+    tag = "User",
+    path = "/create",
+    request_body = NewUser,
+    responses(
+        (status = 200, description = "New user account created", body = CreateUserResp)
+    ),
+    summary = "Create new user account"
+)]
 #[put("/create")]
 pub(super) async fn create_user(
     user_ops: web::Data<UserOperations>,
@@ -27,6 +37,15 @@ pub(super) async fn create_user(
     }
 }
 
+#[utoipa::path(
+    get,
+    tag = "User",
+    path = "/login",
+    responses(
+        (status = 200, description = "Valid user", body = LoginResp)
+    ),
+    summary = "Validate a user account"
+)]
 #[post("/login")]
 pub(super) async fn login(
     user_ops: web::Data<UserOperations>,

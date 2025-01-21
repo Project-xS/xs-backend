@@ -11,6 +11,9 @@ use crate::api::default_error_handler;
 use crate::db::{establish_connection_pool, CanteenOperations, MenuOperations, UserOperations};
 use actix_web::{web, App, HttpServer};
 use dotenvy::dotenv;
+use utoipa::OpenApi;
+use utoipa_actix_web::AppExt;
+use utoipa_swagger_ui::SwaggerUi;
 
 #[derive(Clone)]
 pub(crate) struct AppState {
@@ -28,6 +31,14 @@ impl AppState {
         AppState { user_ops, menu_ops, canteen_ops }
     }
 }
+
+#[derive(OpenApi)]
+#[openapi(
+    tags(
+        (name = "Proj-xS", description = "endpoints.")
+    )
+)]
+struct ApiDoc;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -59,10 +70,14 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         App::new()
+            .into_utoipa_app()
+            .openapi(ApiDoc::openapi())
             .configure(|cfg| {
                 api::configure(cfg, &state);
             })
             .app_data(web::JsonConfig::default().error_handler(default_error_handler))
+            .openapi_service(|api| SwaggerUi::new("/swagger-ui/{_:.*}").url("/api-docs/openapi.json", api))
+            .into_app()
     })
     .bind((HOST, PORT))?
     .run()

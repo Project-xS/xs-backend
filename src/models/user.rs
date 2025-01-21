@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use diesel::{Identifiable, Insertable, Queryable};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 #[derive(Queryable, Debug, Identifiable, Serialize, Deserialize)]
 #[diesel(table_name = crate::db::schema::past_orders)]
@@ -34,7 +35,7 @@ pub struct User {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Insertable, Debug, Serialize, Deserialize)]
+#[derive(Insertable, Debug, Serialize, Deserialize, ToSchema)]
 #[diesel(table_name = crate::db::schema::users)]
 pub struct NewUser {
     pub rfid: String,

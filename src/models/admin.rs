@@ -1,7 +1,8 @@
 use diesel::{AsChangeset, Identifiable, Insertable, Queryable};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
-#[derive(Queryable, Debug, Identifiable, Serialize, Deserialize)]
+#[derive(Queryable, Debug, Identifiable, Serialize, Deserialize, ToSchema)]
 #[diesel(table_name = crate::db::schema::canteens)]
 #[diesel(primary_key(canteen_id))]
 pub struct Canteen {
@@ -10,7 +11,7 @@ pub struct Canteen {
     pub location: String,
 }
 
-#[derive(Insertable, Debug, Serialize, Deserialize)]
+#[derive(Insertable, Debug, Serialize, Deserialize, ToSchema)]
 #[diesel(table_name = crate::db::schema::canteens)]
 pub struct NewCanteen {
     pub canteen_name: String,
@@ -32,7 +33,7 @@ pub struct NewItemCount {
     pub num_ordered: i32,
 }
 
-#[derive(Queryable, Debug, Identifiable, Serialize, Deserialize)]
+#[derive(Queryable, Debug, Identifiable, Serialize, Deserialize, ToSchema)]
 #[diesel(table_name = crate::db::schema::menu_items)]
 #[diesel(primary_key(item_id))]
 pub struct MenuItem {
@@ -48,7 +49,7 @@ pub struct MenuItem {
     pub description: Option<String>,
 }
 
-#[derive(Insertable, Debug, Serialize, Deserialize)]
+#[derive(Insertable, Debug, Serialize, Deserialize, ToSchema)]
 #[diesel(table_name = crate::db::schema::menu_items)]
 pub struct NewMenuItem {
     pub canteen_id: i32,
@@ -62,7 +63,7 @@ pub struct NewMenuItem {
     pub description: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, AsChangeset)]
+#[derive(Debug, Clone, Serialize, Deserialize, AsChangeset, ToSchema)]
 #[diesel(table_name = crate::db::schema::menu_items)]
 pub struct UpdateMenuItem {
     pub name: Option<String>,

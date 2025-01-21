@@ -3,6 +3,16 @@ use crate::enums::admin::{AllCanteenResponse, NewCanteenResponse};
 use crate::models::admin::NewCanteen;
 use actix_web::{get, put, web, HttpResponse, Responder};
 
+#[utoipa::path(
+    put,
+    tag = "Canteen",
+    path = "/create",
+    request_body = NewCanteen,
+    responses(
+        (status = 200, description = "Canteen created", body = NewCanteenResponse)
+    ),
+    summary = "Create a new canteen"
+)]
 #[put("/create")]
 pub(super) async fn create_canteen(
     canteen_ops: web::Data<CanteenOperations>,
@@ -27,6 +37,15 @@ pub(super) async fn create_canteen(
     }
 }
 
+#[utoipa::path(
+    get,
+    tag = "Canteen",
+    path = "/",
+    responses(
+        (status = 200, description = "Fetched all available canteens", body = AllCanteenResponse)
+    ),
+    summary = "Fetch all available canteens"
+)]
 #[get("")]
 pub(super) async fn get_all_canteens(menu_ops: web::Data<CanteenOperations>) -> impl Responder {
     match menu_ops.get_all_canteens() {
