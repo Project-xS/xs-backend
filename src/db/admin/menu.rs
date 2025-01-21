@@ -35,7 +35,11 @@ impl MenuOperations {
             })
     }
 
-    pub fn update_menu_item(&self, itemid: i32, changed_menu_item: UpdateMenuItem) -> Result<MenuItem, RepositoryError> {
+    pub fn update_menu_item(
+        &self,
+        itemid: i32,
+        changed_menu_item: UpdateMenuItem,
+    ) -> Result<MenuItem, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool)?;
 
         diesel::update(menu_items.filter(item_id.eq(itemid)))

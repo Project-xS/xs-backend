@@ -2,10 +2,10 @@ pub mod admin;
 mod errors;
 pub mod users;
 
-use actix_web::{get, HttpResponse, Responder};
-use utoipa_actix_web::service_config::ServiceConfig;
-pub(crate) use errors::default_error_handler;
 use crate::AppState;
+use actix_web::{get, HttpResponse, Responder};
+pub(crate) use errors::default_error_handler;
+use utoipa_actix_web::service_config::ServiceConfig;
 
 #[utoipa::path(
     get,

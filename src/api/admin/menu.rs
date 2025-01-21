@@ -1,5 +1,5 @@
 use crate::db::MenuOperations;
-use crate::enums::admin::{AllItemsResponse, ItemResponse, GeneralMenuResponse, UpdateItemRequest};
+use crate::enums::admin::{AllItemsResponse, GeneralMenuResponse, ItemResponse, UpdateItemRequest};
 use crate::models::admin::{MenuItem, NewMenuItem};
 use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
 
@@ -22,7 +22,7 @@ pub(super) async fn create_menu_item(
     let item_name = req_data.name.clone();
     match menu_ops.add_menu_item(req_data) {
         Ok(_) => {
-            info!("New menu item created: {}", item_name);
+            debug!("New menu item created: {}", item_name);
             HttpResponse::Ok().json(GeneralMenuResponse {
                 status: "ok".to_string(),
                 error: None,
@@ -53,12 +53,12 @@ pub(super) async fn create_menu_item(
 #[delete("/delete/{id}")]
 pub(super) async fn remove_menu_item(
     menu_ops: web::Data<MenuOperations>,
-    path: web::Path<(i32, )>
+    path: web::Path<(i32,)>,
 ) -> impl Responder {
     let req_data = path.into_inner().0;
     match menu_ops.remove_menu_item(req_data) {
         Ok(x) => {
-            info!("Menu item removed: {}", x.name);
+            debug!("Menu item removed: {}", x.name);
             HttpResponse::Ok().json(GeneralMenuResponse {
                 status: "ok".to_string(),
                 error: None,
@@ -93,7 +93,7 @@ pub(super) async fn update_menu_item(
     let update_data = req_data.update.clone();
     match menu_ops.update_menu_item(req_data.item_id, update_data.clone()) {
         Ok(x) => {
-            info!("Menu item updated: {}.\nChanges: {:?}", x.name, update_data);
+            debug!("Menu item updated: {}.\nChanges: {:?}", x.name, update_data);
             HttpResponse::Ok().json(GeneralMenuResponse {
                 status: "ok".to_string(),
                 error: None,
@@ -105,7 +105,7 @@ pub(super) async fn update_menu_item(
                 status: "error".to_string(),
                 error: Some(e.to_string()),
             })
-        },
+        }
     }
 }
 
@@ -122,7 +122,7 @@ pub(super) async fn update_menu_item(
 pub(super) async fn get_all_menu_items(menu_ops: web::Data<MenuOperations>) -> impl Responder {
     match menu_ops.get_all_menu_items() {
         Ok(x) => {
-            info!("Menu items fetched!");
+            debug!("Menu items fetched!");
             HttpResponse::Ok().json(AllItemsResponse {
                 status: "ok".to_string(),
                 data: x,
@@ -136,7 +136,7 @@ pub(super) async fn get_all_menu_items(menu_ops: web::Data<MenuOperations>) -> i
                 data: Vec::new(),
                 error: Some(e.to_string()),
             })
-        },
+        }
     }
 }
 
@@ -155,11 +155,11 @@ pub(super) async fn get_all_menu_items(menu_ops: web::Data<MenuOperations>) -> i
 #[get("/items/{id}")]
 pub(super) async fn get_menu_item(
     menu_ops: web::Data<MenuOperations>,
-    path: web::Path<(i32, )>
+    path: web::Path<(i32,)>,
 ) -> impl Responder {
     match menu_ops.get_menu_item(path.into_inner().0) {
         Ok(x) => {
-            info!("Menu item fetched: {}", x.name);
+            debug!("Menu item fetched: {}", x.name);
             HttpResponse::Ok().json(ItemResponse {
                 status: "ok".to_string(),
                 data: x,
@@ -173,6 +173,6 @@ pub(super) async fn get_menu_item(
                 data: MenuItem::default(),
                 error: Some(e.to_string()),
             })
-        },
+        }
     }
 }

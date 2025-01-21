@@ -9,7 +9,7 @@ mod models;
 
 use crate::api::default_error_handler;
 use crate::db::{establish_connection_pool, CanteenOperations, MenuOperations, UserOperations};
-use actix_web::{web, App, HttpServer};
+use actix_web::{middleware, web, App, HttpServer};
 use dotenvy::dotenv;
 use utoipa::OpenApi;
 use utoipa_actix_web::AppExt;
@@ -19,7 +19,7 @@ use utoipa_swagger_ui::SwaggerUi;
 pub(crate) struct AppState {
     pub user_ops: UserOperations,
     pub menu_ops: MenuOperations,
-    pub canteen_ops: CanteenOperations
+    pub canteen_ops: CanteenOperations,
 }
 
 impl AppState {
@@ -28,7 +28,11 @@ impl AppState {
         let user_ops = UserOperations::new(db.clone());
         let menu_ops = MenuOperations::new(db.clone());
         let canteen_ops = CanteenOperations::new(db.clone());
-        AppState { user_ops, menu_ops, canteen_ops }
+        AppState {
+            user_ops,
+            menu_ops,
+            canteen_ops,
+        }
     }
 }
 
@@ -75,8 +79,11 @@ async fn main() -> std::io::Result<()> {
             .configure(|cfg| {
                 api::configure(cfg, &state);
             })
+            .map(|app| app.wrap(middleware::Logger::new("%r - %s - %Dms")))
             .app_data(web::JsonConfig::default().error_handler(default_error_handler))
-            .openapi_service(|api| SwaggerUi::new("/swagger-ui/{_:.*}").url("/api-docs/openapi.json", api))
+            .openapi_service(|api| {
+                SwaggerUi::new("/swagger-ui/{_:.*}").url("/api-docs/openapi.json", api)
+            })
             .into_app()
     })
     .bind((HOST, PORT))?
