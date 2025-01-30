@@ -1,10 +1,10 @@
-use std::collections::HashMap;
 use crate::db::{DbConnection, RepositoryError};
 use crate::models::admin::{ActiveItemCount, MenuItemCheck};
 use diesel::prelude::*;
-use diesel::{PgConnection};
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::result::Error;
+use diesel::PgConnection;
+use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct OrderOperations {
@@ -16,11 +16,7 @@ impl OrderOperations {
         Self { pool }
     }
 
-    pub fn create_order(
-        &self,
-        userid: i32,
-        itemids: Vec<i32>,
-    ) -> Result<(), RepositoryError> {
+    pub fn create_order(&self, userid: i32, itemids: Vec<i32>) -> Result<(), RepositoryError> {
         let mut conn = DbConnection::new(&self.pool)?;
         let mut ordered_qty: HashMap<i32, i32> = HashMap::new();
         for &item in &itemids {
@@ -36,18 +32,32 @@ impl OrderOperations {
                 .select(MenuItemCheck::as_select())
                 .load::<MenuItemCheck>(conn.connection())
                 .map_err(|e| match e {
-                    Error::NotFound => RepositoryError::NotFound(format!("menu_items: No menu item matched for {:?}", &itemids)),
+                    Error::NotFound => RepositoryError::NotFound(format!(
+                        "menu_items: No menu item matched for {:?}",
+                        &itemids
+                    )),
                     other => RepositoryError::DatabaseError(other),
                 })?;
 
             if ordered_qty.len() != items_in_order.len() {
-                return Err(RepositoryError::NotFound(format!("menu_items: Contains missing menu items: {:?}", &itemids)))
+                return Err(RepositoryError::NotFound(format!(
+                    "menu_items: Contains missing menu items: {:?}",
+                    &itemids
+                )));
             }
             for item in items_in_order {
                 if !item.is_available || !item.list {
-                    return Err(RepositoryError::NotAvailable(item.item_id, item.name, "Not available".to_string()));
+                    return Err(RepositoryError::NotAvailable(
+                        item.item_id,
+                        item.name,
+                        "Not available".to_string(),
+                    ));
                 } else if item.stock != -1 && item.stock < 1 {
-                    return Err(RepositoryError::NotAvailable(item.item_id, item.name, "Out of stock".to_string()));
+                    return Err(RepositoryError::NotAvailable(
+                        item.item_id,
+                        item.name,
+                        "Out of stock".to_string(),
+                    ));
                 }
             }
         }
@@ -58,10 +68,7 @@ impl OrderOperations {
                 use crate::db::schema::active_orders::dsl::*;
 
                 diesel::insert_into(active_orders)
-                    .values((
-                        user_id.eq(&userid),
-                        items.eq(&itemids)
-                    ))
+                    .values((user_id.eq(&userid), items.eq(&itemids)))
                     .execute(connection)
                     .map_err(RepositoryError::DatabaseError)?;
             }
@@ -75,15 +82,17 @@ impl OrderOperations {
                         .set(num_ordered.eq(num_ordered + qty))
                         .execute(connection)
                         .map_err(|e| match e {
-                            Error::NotFound => RepositoryError::NotFound(format!("active_item_count: Can't find item id to update: {}", food)),
-                            other => RepositoryError::DatabaseError(other)
+                            Error::NotFound => RepositoryError::NotFound(format!(
+                                "active_item_count: Can't find item id to update: {}",
+                                food
+                            )),
+                            other => RepositoryError::DatabaseError(other),
                         })?;
                 }
 
                 Ok(())
             }
         })
-
     }
 
     pub fn get_all_orders_by_count(&self) -> Result<Vec<ActiveItemCount>, RepositoryError> {

@@ -9,5 +9,5 @@ pub enum RepositoryError {
     #[error("Connection pool error: {0}")]
     ConnectionPoolError(#[from] diesel::r2d2::PoolError),
     #[error("Entity {0} cannot be ordered: {1} - Reason: {2}")]
-    NotAvailable(i32, String, String)
+    NotAvailable(i32, String, String),
 }

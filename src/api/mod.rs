@@ -1,7 +1,7 @@
 mod admin;
+mod common;
 mod errors;
 mod users;
-mod common;
 
 use crate::AppState;
 use actix_web::{get, HttpResponse, Responder};

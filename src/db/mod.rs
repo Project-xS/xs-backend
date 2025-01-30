@@ -2,16 +2,16 @@ use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::{r2d2, PgConnection};
 
 mod admin;
-mod users;
 mod common;
 mod errors;
 pub mod schema;
+mod users;
 
 pub use admin::canteen::CanteenOperations;
 pub use admin::menu::MenuOperations;
+pub use common::orders::OrderOperations;
 pub use errors::RepositoryError;
 pub use users::user::UserOperations;
-pub use common::orders::OrderOperations;
 
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 

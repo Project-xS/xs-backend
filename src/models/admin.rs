@@ -71,7 +71,7 @@ pub struct MenuItemCheck {
     pub name: String,
     pub stock: i32,
     pub is_available: bool,
-    pub list: bool
+    pub list: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, AsChangeset, ToSchema)]
@@ -91,5 +91,5 @@ pub struct UpdateMenuItem {
 #[diesel(table_name = crate::db::schema::active_item_count)]
 pub struct ActiveItemCount {
     pub item_id: i32,
-    pub num_ordered: i32
+    pub num_ordered: i32,
 }

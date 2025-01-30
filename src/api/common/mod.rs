@@ -1,16 +1,13 @@
-use actix_web::{guard, web};
+use crate::db::OrderOperations;
 use actix_web::middleware::NormalizePath;
+use actix_web::{guard, web};
+use orders::{create_order, get_all_orders};
 use utoipa_actix_web::scope;
 use utoipa_actix_web::service_config::ServiceConfig;
-use orders::{get_all_orders, create_order};
-use crate::db::{OrderOperations};
 
 mod orders;
 
-pub(super) fn config(
-    cfg: &mut ServiceConfig,
-    order_ops: &OrderOperations,
-) {
+pub(super) fn config(cfg: &mut ServiceConfig, order_ops: &OrderOperations) {
     cfg.service(
         scope::scope("/orders")
             .wrap(NormalizePath::trim())
@@ -18,11 +15,8 @@ pub(super) fn config(
             .service(
                 scope::scope("")
                     .guard(guard::Header("content-type", "application/json"))
-                    .service(create_order)
+                    .service(create_order),
             )
-            .service(
-                scope::scope("")
-                    .service(get_all_orders)
-            )
+            .service(scope::scope("").service(get_all_orders)),
     );
 }

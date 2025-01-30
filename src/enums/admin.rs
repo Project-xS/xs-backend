@@ -64,5 +64,5 @@ pub struct AllCanteenResponse {
 pub struct ActiveItemCountResponse {
     pub status: String,
     pub data: Vec<ActiveItemCount>,
-    pub error: Option<String>
+    pub error: Option<String>,
 }
