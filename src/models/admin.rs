@@ -1,4 +1,4 @@
-use diesel::{AsChangeset, Identifiable, Insertable, Queryable};
+use diesel::{AsChangeset, Identifiable, Insertable, Queryable, Selectable};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -19,7 +19,7 @@ pub struct NewCanteen {
 }
 
 #[derive(Queryable, Debug, Identifiable, Serialize, Deserialize)]
-#[diesel(table_name = crate::db::schema::item_count)]
+#[diesel(table_name = crate::db::schema::active_item_count)]
 #[diesel(primary_key(item_id))]
 pub struct ItemCount {
     pub item_id: i32,
@@ -27,13 +27,13 @@ pub struct ItemCount {
 }
 
 #[derive(Insertable, Debug, Serialize, Deserialize)]
-#[diesel(table_name = crate::db::schema::item_count)]
+#[diesel(table_name = crate::db::schema::active_item_count)]
 pub struct NewItemCount {
     pub item_id: i32,
     pub num_ordered: i32,
 }
 
-#[derive(Queryable, Debug, Identifiable, Serialize, Deserialize, ToSchema)]
+#[derive(Queryable, Debug, Identifiable, Serialize, Deserialize, ToSchema, Selectable)]
 #[diesel(table_name = crate::db::schema::menu_items)]
 #[diesel(primary_key(item_id))]
 pub struct MenuItem {
@@ -49,7 +49,7 @@ pub struct MenuItem {
     pub description: Option<String>,
 }
 
-#[derive(Insertable, Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Insertable, Debug, Serialize, Deserialize, ToSchema, Selectable)]
 #[diesel(table_name = crate::db::schema::menu_items)]
 pub struct NewMenuItem {
     pub canteen_id: i32,
@@ -63,6 +63,17 @@ pub struct NewMenuItem {
     pub description: Option<String>,
 }
 
+#[derive(Debug, Selectable, Queryable)]
+#[diesel(table_name = crate::db::schema::menu_items)]
+#[diesel(primary_key(item_id))]
+pub struct MenuItemCheck {
+    pub item_id: i32,
+    pub name: String,
+    pub stock: i32,
+    pub is_available: bool,
+    pub list: bool
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, AsChangeset, ToSchema)]
 #[diesel(table_name = crate::db::schema::menu_items)]
 pub struct UpdateMenuItem {
@@ -74,4 +85,11 @@ pub struct UpdateMenuItem {
     pub list: Option<bool>,
     pub pic_link: Option<String>,
     pub description: Option<String>,
+}
+
+#[derive(Queryable, Selectable, Debug, ToSchema, Serialize)]
+#[diesel(table_name = crate::db::schema::active_item_count)]
+pub struct ActiveItemCount {
+    pub item_id: i32,
+    pub num_ordered: i32
 }

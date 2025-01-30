@@ -40,7 +40,7 @@ pub(super) async fn create_canteen(
 #[utoipa::path(
     get,
     tag = "Canteen",
-    path = "/",
+    path = "",
     responses(
         (status = 200, description = "Fetched all available canteens", body = AllCanteenResponse)
     ),

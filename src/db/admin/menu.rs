@@ -18,10 +18,18 @@ impl MenuOperations {
     pub fn add_menu_item(&self, menu_item: NewMenuItem) -> Result<usize, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool)?;
 
-        diesel::insert_into(menu_items)
+        let added_item = diesel::insert_into(menu_items)
             .values(&menu_item)
-            .execute(conn.connection())
-            .map_err(RepositoryError::DatabaseError)
+            .get_result::<MenuItem>(conn.connection())
+            .map_err(RepositoryError::DatabaseError)?;
+
+        {
+            use crate::db::schema::active_item_count::dsl::*;
+            diesel::insert_into(active_item_count)
+                .values(item_id.eq(added_item.item_id))
+                .execute(conn.connection())
+                .map_err(RepositoryError::DatabaseError)
+        }
     }
 
     pub fn remove_menu_item(&self, id: i32) -> Result<MenuItem, RepositoryError> {
@@ -66,7 +74,10 @@ impl MenuOperations {
             .filter(item_id.eq(itemid))
             .limit(1)
             .get_result(conn.connection())
-            .map_err(RepositoryError::DatabaseError)
+            .map_err(|e| match e {
+                Error::NotFound => RepositoryError::NotFound(format!("menu_items: {}", itemid)),
+                other => RepositoryError::DatabaseError(other),
+            })
     }
 }
 

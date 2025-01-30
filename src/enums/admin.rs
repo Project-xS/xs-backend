@@ -1,4 +1,4 @@
-use crate::models::admin::{Canteen, MenuItem, UpdateMenuItem};
+use crate::models::admin::{ActiveItemCount, Canteen, MenuItem, UpdateMenuItem};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -58,4 +58,11 @@ pub struct AllCanteenResponse {
     pub status: String,
     pub data: Vec<Canteen>,
     pub error: Option<String>,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct ActiveItemCountResponse {
+    pub status: String,
+    pub data: Vec<ActiveItemCount>,
+    pub error: Option<String>
 }

@@ -1,2 +1,2 @@
-pub mod canteen;
-pub mod menu;
+pub(super) mod canteen;
+pub(super) mod menu;

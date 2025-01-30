@@ -42,7 +42,7 @@ CREATE UNIQUE INDEX idx_menu_items_canteen_id_name ON menu_items (canteen_id, na
 -- Create active_orders table
 CREATE TABLE active_orders
 (
-    order_id   VARCHAR PRIMARY KEY,
+    order_id   SERIAL PRIMARY KEY,
     user_id    INTEGER NOT NULL REFERENCES users (user_id),
     items      INTEGER[] NOT NULL CHECK (array_length(items, 1) > 0),
     ordered_at TIMESTAMP(0) WITH TIME ZONE NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC')
@@ -62,16 +62,9 @@ CREATE TABLE past_orders
 CREATE INDEX idx_past_orders_user_id ON past_orders (user_id);
 CREATE INDEX idx_past_orders_ordered_at ON past_orders (ordered_at);
 
--- Create item_count table
-CREATE TABLE item_count
+-- Create item_count table -> Stores active order item count
+CREATE TABLE active_item_count
 (
     item_id     INTEGER PRIMARY KEY REFERENCES menu_items (item_id),
     num_ordered INTEGER NOT NULL DEFAULT 0
-);
-
--- Create cart table
-CREATE TABLE cart
-(
-    user_id INTEGER PRIMARY KEY REFERENCES users (user_id),
-    items   INTEGER[] NOT NULL CHECK (array_length(items, 1) > 0)
 );
