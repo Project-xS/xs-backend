@@ -10,13 +10,13 @@ use utoipa_actix_web::service_config::ServiceConfig;
 
 #[utoipa::path(
     get,
-    path = "",
+    path = "/",
     responses(
         (status = 200, description = "Health check successful")
     ),
     summary = "Is the server up?"
 )]
-#[get("")]
+#[get("/")]
 async fn root_endpoint() -> impl Responder {
     HttpResponse::Ok().body("Server up!")
 }

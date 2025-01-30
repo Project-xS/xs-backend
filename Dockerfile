@@ -18,7 +18,7 @@ RUN touch src/main.rs
 RUN cargo build --release
 
 # Stage 3: Runtime image
-FROM debian:bookworm as runtime
+FROM gcr.io/distroless/cc-debian12:nonroot as runtime
 COPY --from=app-builder /app/target/release/proj-xs ./proj-xs
 EXPOSE 8080
 CMD ["./proj-xs"]
