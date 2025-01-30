@@ -13,10 +13,20 @@ pub use errors::RepositoryError;
 pub use users::user::UserOperations;
 pub use common::orders::OrderOperations;
 
+use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+
 pub fn establish_connection_pool(database_url: &str) -> Pool<ConnectionManager<PgConnection>> {
     let manager = ConnectionManager::<PgConnection>::new(database_url);
-
+    info!("Initializing database connection pool...");
     Pool::builder().max_size(20).build(manager).unwrap()
+}
+
+pub fn run_db_migrations(db: Pool<ConnectionManager<PgConnection>>) -> Result<(), RepositoryError> {
+    let mut conn = DbConnection::new(&db)?.conn;
+    info!("Running database migrations...");
+    const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
+    conn.run_pending_migrations(MIGRATIONS).unwrap();
+    Ok(())
 }
 
 // Connection Guard - Manages pool

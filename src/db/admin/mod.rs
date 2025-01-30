@@ -1,2 +1,2 @@
-pub(super) mod canteen;
-pub(super) mod menu;
+pub(crate) mod canteen;
+pub(crate) mod menu;

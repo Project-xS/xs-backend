@@ -1,15 +1,24 @@
-FROM rust:bookworm as builder
+# Cache deps
+FROM rust:bookworm as deps-builder
 
-RUN mkdir /app
 WORKDIR /app
 
-COPY Cargo.toml /app/Cargo.toml
-COPY Cargo.lock /app/Cargo.lock
-COPY src /app/src
+COPY Cargo.toml Cargo.lock ./
 
-RUN cargo build --release --locked
+# Dummy source to cache deps
+RUN mkdir -p src && echo "fn main() {}" > src/main.rs
+RUN cargo build --release
 
-FROM gcr.io/distroless/cc-debian12:nonroot
-COPY --from=builder /app/target/release/proj-xs ./proj-xs
+# Build app
+FROM deps-builder as app-builder
+
+COPY src ./src
+COPY migrations ./migrations
+RUN touch src/main.rs
+RUN cargo build --release
+
+# Stage 3: Runtime image
+FROM debian:bookworm as runtime
+COPY --from=app-builder /app/target/release/proj-xs ./proj-xs
 EXPOSE 8080
 CMD ["./proj-xs"]

@@ -3,6 +3,10 @@ name = "proj-xs"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "proj-xs"
+path = "src/main.rs"
+
 [dependencies]
 actix-web = "4.9.0"
 utoipa-actix-web = "0.1"
@@ -14,6 +18,7 @@ serde_json = "1.0.128"
 diesel = {version = "2.2.4", features = ["postgres", "r2d2", "chrono"]}
 pq-sys = { version = "0.6", features = ["bundled"] }
 openssl-sys = { version = "0.9.100", features = ["vendored"] }
+diesel_migrations = { version = "2.2.0", features = ["postgres"] }
 chrono = {version = "0.4.38", features = ["serde"]}
 dotenvy = "0.15.7"
 log = "0.4.22"

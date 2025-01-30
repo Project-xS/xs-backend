@@ -8,7 +8,7 @@ mod enums;
 mod models;
 
 use crate::api::default_error_handler;
-use crate::db::{establish_connection_pool, CanteenOperations, MenuOperations, OrderOperations, UserOperations};
+use crate::db::{establish_connection_pool, run_db_migrations, CanteenOperations, MenuOperations, OrderOperations, UserOperations};
 use actix_web::{middleware, web, App, HttpServer};
 use dotenvy::dotenv;
 use utoipa::OpenApi;
@@ -26,6 +26,7 @@ pub(crate) struct AppState {
 impl AppState {
     pub(crate) fn new(url: &str) -> Self {
         let db = establish_connection_pool(url);
+        run_db_migrations(db.clone()).expect("Unable to run migrations");
         let user_ops = UserOperations::new(db.clone());
         let menu_ops = MenuOperations::new(db.clone());
         let canteen_ops = CanteenOperations::new(db.clone());
@@ -61,8 +62,7 @@ async fn main() -> std::io::Result<()> {
 
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
-    // Database Connection
-    info!("Initializing database connection pool...");
+    // App State initialization & App Connection
     let state = AppState::new(database_url.as_str());
 
     // Server configuration
