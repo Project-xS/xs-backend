@@ -18,21 +18,6 @@ pub struct NewCanteen {
     pub location: String,
 }
 
-#[derive(Queryable, Debug, Identifiable, Serialize, Deserialize)]
-#[diesel(table_name = crate::db::schema::active_item_count)]
-#[diesel(primary_key(item_id))]
-pub struct ItemCount {
-    pub item_id: i32,
-    pub num_ordered: i32,
-}
-
-#[derive(Insertable, Debug, Serialize, Deserialize)]
-#[diesel(table_name = crate::db::schema::active_item_count)]
-pub struct NewItemCount {
-    pub item_id: i32,
-    pub num_ordered: i32,
-}
-
 #[derive(Queryable, Debug, Identifiable, Serialize, Deserialize, ToSchema, Selectable)]
 #[diesel(table_name = crate::db::schema::menu_items)]
 #[diesel(primary_key(item_id))]
@@ -85,11 +70,4 @@ pub struct UpdateMenuItem {
     pub list: Option<bool>,
     pub pic_link: Option<String>,
     pub description: Option<String>,
-}
-
-#[derive(Queryable, Selectable, Debug, ToSchema, Serialize)]
-#[diesel(table_name = crate::db::schema::active_item_count)]
-pub struct ActiveItemCount {
-    pub item_id: i32,
-    pub num_ordered: i32,
 }

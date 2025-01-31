@@ -1,4 +1,4 @@
--- This file should undo anything in `up.sql`wwx
+-- This file should undo anything in `up.sql`
 DROP TABLE IF EXISTS active_item_count;
 DROP TABLE IF EXISTS past_orders;
 DROP TABLE IF EXISTS active_orders;

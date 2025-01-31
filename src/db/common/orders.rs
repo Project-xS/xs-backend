@@ -1,19 +1,45 @@
 use crate::db::{DbConnection, RepositoryError};
-use crate::models::admin::{ActiveItemCount, MenuItemCheck};
+use crate::models::admin::MenuItemCheck;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::result::Error;
 use diesel::PgConnection;
 use std::collections::HashMap;
+use dashmap::DashMap;
+use crate::enums::admin::ActiveItemCount;
 
 #[derive(Clone)]
 pub struct OrderOperations {
     pool: Pool<ConnectionManager<PgConnection>>,
+    active_item_counts: DashMap<i32, i32>
 }
 
 impl OrderOperations {
     pub fn new(pool: Pool<ConnectionManager<PgConnection>>) -> Self {
-        Self { pool }
+        let active_item_counts = DashMap::<i32, i32>::new();
+        {
+            use crate::db::schema::active_orders::dsl::*;
+            let mut conn = DbConnection::new(&pool).unwrap();
+
+            debug!("Pulling active order item counts from table...");
+            let orders = active_orders
+                .select(items)
+                .load::<Vec<Option<i32>>>(conn.connection())
+                .unwrap();
+
+            for order in orders {
+                for item in order {
+                    if let Some(mut val) = active_item_counts.get_mut(&item.unwrap_or(-1)) {
+                        *val += 1;
+                    } else {
+                        active_item_counts.insert(item.unwrap_or(-1), 1);
+                    }
+                }
+            }
+        }
+        debug!("Updated active item counts: {:?}", &active_item_counts);
+
+        Self { pool, active_item_counts }
     }
 
     pub fn create_order(&self, userid: i32, itemids: Vec<i32>) -> Result<(), RepositoryError> {
@@ -61,46 +87,35 @@ impl OrderOperations {
                 }
             }
         }
-
-        conn.connection().transaction(|connection| {
-            // Add to active common
-            {
-                use crate::db::schema::active_orders::dsl::*;
-
-                diesel::insert_into(active_orders)
-                    .values((user_id.eq(&userid), items.eq(&itemids)))
-                    .execute(connection)
-                    .map_err(RepositoryError::DatabaseError)?;
-            }
-            // Add to item counts
-            {
-                use crate::db::schema::active_item_count::dsl::*;
-
-                for (food, qty) in ordered_qty.iter() {
-                    diesel::update(active_item_count)
-                        .filter(item_id.eq(food))
-                        .set(num_ordered.eq(num_ordered + qty))
-                        .execute(connection)
-                        .map_err(|e| match e {
-                            Error::NotFound => RepositoryError::NotFound(format!(
-                                "active_item_count: Can't find item id to update: {}",
-                                food
-                            )),
-                            other => RepositoryError::DatabaseError(other),
-                        })?;
+        // Add to item counts
+        {
+            for (food, qty) in ordered_qty.iter() {
+                if let Some(mut val) = self.active_item_counts.get_mut(food) {
+                    *val += qty;
+                } else {
+                    self.active_item_counts.insert(*food, *qty);
                 }
-
-                Ok(())
             }
-        })
+        }
+
+        // Add to active common
+        {
+            use crate::db::schema::active_orders::dsl::*;
+
+            diesel::insert_into(active_orders)
+                .values((user_id.eq(&userid), items.eq(&itemids)))
+                .execute(conn.connection())
+                .map_err(RepositoryError::DatabaseError)?;
+        }
+        Ok(())
     }
 
-    pub fn get_all_orders_by_count(&self) -> Result<Vec<ActiveItemCount>, RepositoryError> {
-        use crate::db::schema::active_item_count::dsl::*;
-
-        let mut conn = DbConnection::new(&self.pool)?;
-        active_item_count
-            .load::<ActiveItemCount>(conn.connection())
-            .map_err(RepositoryError::DatabaseError)
+    pub fn get_all_orders_by_count(&self) -> Vec<ActiveItemCount> {
+        let mut response: Vec<ActiveItemCount> = Vec::with_capacity(self.active_item_counts.len());
+        debug!("Fetched item counts from map: {:?}", &self.active_item_counts);
+        for element in self.active_item_counts.iter() {
+            response.push(ActiveItemCount {item_id: *element.key(), num_ordered: *element.value()});
+        }
+        response
     }
 }

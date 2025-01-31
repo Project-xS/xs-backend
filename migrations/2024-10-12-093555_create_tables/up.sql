@@ -61,10 +61,3 @@ CREATE TABLE past_orders
 );
 CREATE INDEX idx_past_orders_user_id ON past_orders (user_id);
 CREATE INDEX idx_past_orders_ordered_at ON past_orders (ordered_at);
-
--- Create item_count table -> Stores active order item count
-CREATE TABLE active_item_count
-(
-    item_id     INTEGER PRIMARY KEY REFERENCES menu_items (item_id),
-    num_ordered INTEGER NOT NULL DEFAULT 0
-);

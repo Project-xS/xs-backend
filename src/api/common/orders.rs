@@ -48,22 +48,10 @@ pub(super) async fn create_order(
 )]
 #[get("")]
 pub(super) async fn get_all_orders(order_ops: web::Data<OrderOperations>) -> impl Responder {
-    match order_ops.get_all_orders_by_count() {
-        Ok(res) => {
-            debug!("Orders fetched");
-            HttpResponse::Ok().json(ActiveItemCountResponse {
-                status: "ok".to_string(),
-                data: res,
-                error: None,
-            })
-        }
-        Err(e) => {
-            error!("ORDER: get_all_orders(): {}", e.to_string());
-            HttpResponse::BadRequest().json(ActiveItemCountResponse {
-                status: "error".to_string(),
-                data: Vec::new(),
-                error: Some(e.to_string()),
-            })
-        }
-    }
+    let resp = order_ops.get_all_orders_by_count();
+    HttpResponse::Ok().json(ActiveItemCountResponse {
+        status: "ok".to_string(),
+        data: resp,
+        error: None
+    })
 }
