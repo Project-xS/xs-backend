@@ -9,7 +9,8 @@ use actix_web::{get, post, web, HttpResponse, Responder};
     path = "",
     request_body = OrderRequest,
     responses(
-        (status = 200, description = "Order created successfully", body = OrderResponse)
+        (status = 200, description = "Order created successfully", body = OrderResponse),
+        (status = 409, description = "Order cannot be created", body = OrderResponse)
     ),
     summary = "Create a new order"
 )]
@@ -29,7 +30,7 @@ pub(super) async fn create_order(
         }
         Err(e) => {
             error!("ORDER: create_order(): {}", e.to_string());
-            HttpResponse::BadRequest().json(OrderResponse {
+            HttpResponse::Conflict().json(OrderResponse {
                 status: "error".to_string(),
                 error: Some(e.to_string()),
             })
@@ -42,7 +43,7 @@ pub(super) async fn create_order(
     tag = "Orders",
     path = "",
     responses(
-        (status = 200, description = "Active common", body = ActiveItemCountResponse)
+        (status = 200, description = "Orders to count fetched", body = ActiveItemCountResponse)
     ),
     summary = "Returns order -> count"
 )]

@@ -9,7 +9,8 @@ use actix_web::{post, web, HttpResponse, Responder};
     path = "/create",
     request_body = NewUser,
     responses(
-        (status = 200, description = "New user account created", body = CreateUserResp)
+        (status = 200, description = "New user account created", body = CreateUserResp),
+        (status = 409, description = "User cannot be created", body = CreateUserResp)
     ),
     summary = "Create new user account"
 )]
@@ -29,7 +30,7 @@ pub(super) async fn create_user(
         }
         Err(e) => {
             error!("ACCOUNT: create_user(): {}", e.to_string());
-            HttpResponse::InternalServerError().json(CreateUserResp {
+            HttpResponse::Conflict().json(CreateUserResp {
                 status: "error".to_string(),
                 error: Some(e.to_string()),
             })
@@ -42,7 +43,8 @@ pub(super) async fn create_user(
     tag = "User",
     path = "/login",
     responses(
-        (status = 200, description = "Valid user", body = LoginResp)
+        (status = 200, description = "Valid user", body = LoginResp),
+        (status = 400, description = "Invalid user", body = LoginResp)
     ),
     summary = "Validate a user account"
 )]
@@ -62,7 +64,7 @@ pub(super) async fn login(
         }
         Err(e) => {
             error!("ACCOUNT: login(): {}", e.to_string());
-            HttpResponse::Unauthorized().json(LoginResp {
+            HttpResponse::BadRequest().json(LoginResp {
                 status: "error".to_string(),
                 error: Some(e.to_string()),
             })

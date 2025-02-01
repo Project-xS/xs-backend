@@ -17,13 +17,13 @@ pub fn config(cfg: &mut ServiceConfig, menu_ops: &MenuOperations, canteen_ops: &
                 scope::scope("")
                     .guard(guard::Header("content-type", "application/json"))
                     .service(create_menu_item)
-                    .service(remove_menu_item)
-                    .service(update_menu_item),
+                    .service(update_menu_item)
             )
             .service(
                 scope::scope("")
                     .service(get_all_menu_items)
-                    .service(get_menu_item),
+                    .service(get_menu_item)
+                    .service(remove_menu_item)
             ),
     )
     .service(

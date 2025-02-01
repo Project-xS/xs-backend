@@ -9,7 +9,8 @@ use actix_web::{get, post, web, HttpResponse, Responder};
     path = "/create",
     request_body = NewCanteen,
     responses(
-        (status = 200, description = "Canteen created", body = NewCanteenResponse)
+        (status = 200, description = "Canteen created", body = NewCanteenResponse),
+        (status = 400, description = "Unable to create canteen due to error in request", body = NewCanteenResponse)
     ),
     summary = "Create a new canteen"
 )]
@@ -29,7 +30,7 @@ pub(super) async fn create_canteen(
         }
         Err(e) => {
             error!("CANTEEN: create_canteen(): {}", e.to_string());
-            HttpResponse::InternalServerError().json(NewCanteenResponse {
+            HttpResponse::BadRequest().json(NewCanteenResponse {
                 status: "error".to_string(),
                 error: Some(e.to_string()),
             })
@@ -42,7 +43,8 @@ pub(super) async fn create_canteen(
     tag = "Canteen",
     path = "",
     responses(
-        (status = 200, description = "Fetched all available canteens", body = AllCanteenResponse)
+        (status = 200, description = "Fetched all available canteens", body = AllCanteenResponse),
+        (status = 500, description = "Unable to fetch canteens", body = AllCanteenResponse)
     ),
     summary = "Fetch all available canteens"
 )]

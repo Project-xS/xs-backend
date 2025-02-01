@@ -9,7 +9,8 @@ use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
     path = "/create",
     request_body = NewMenuItem,
     responses(
-        (status = 200, description = "Menu item created", body = GeneralMenuResponse)
+        (status = 200, description = "Menu item created", body = GeneralMenuResponse),
+        (status = 409, description = "Menu item could not be created", body = GeneralMenuResponse)
     ),
     summary = "Create a new menu item"
 )]
@@ -30,7 +31,7 @@ pub(super) async fn create_menu_item(
         }
         Err(e) => {
             error!("MENU: create_menu_item(): {}", e.to_string());
-            HttpResponse::InternalServerError().json(GeneralMenuResponse {
+            HttpResponse::Conflict().json(GeneralMenuResponse {
                 status: "error".to_string(),
                 error: Some(e.to_string()),
             })
@@ -46,7 +47,8 @@ pub(super) async fn create_menu_item(
         ("id", description = "Unique id of the item to delete"),
     ),
     responses(
-        (status = 200, description = "Menu item deleted", body = GeneralMenuResponse)
+        (status = 200, description = "Menu item deleted", body = GeneralMenuResponse),
+        (status = 409, description = "Unable to delete menu item", body = GeneralMenuResponse)
     ),
     summary = "Delete an item from menu"
 )]
@@ -66,7 +68,7 @@ pub(super) async fn remove_menu_item(
         }
         Err(e) => {
             error!("MENU: remove_menu_item(): {}", e.to_string());
-            HttpResponse::InternalServerError().json(GeneralMenuResponse {
+            HttpResponse::Conflict().json(GeneralMenuResponse {
                 status: "error".to_string(),
                 error: Some(e.to_string()),
             })
@@ -80,7 +82,8 @@ pub(super) async fn remove_menu_item(
     path = "/update",
     request_body = UpdateItemRequest,
     responses(
-        (status = 200, description = "Menu item updated", body = GeneralMenuResponse)
+        (status = 200, description = "Menu item updated", body = GeneralMenuResponse),
+        (status = 409, description = "Menu item cannot be updated", body = GeneralMenuResponse)
     ),
     summary = "Update an item in menu"
 )]
@@ -101,7 +104,7 @@ pub(super) async fn update_menu_item(
         }
         Err(e) => {
             error!("MENU: update_menu_item(): {}", e.to_string());
-            HttpResponse::InternalServerError().json(GeneralMenuResponse {
+            HttpResponse::Conflict().json(GeneralMenuResponse {
                 status: "error".to_string(),
                 error: Some(e.to_string()),
             })
@@ -114,7 +117,8 @@ pub(super) async fn update_menu_item(
     tag = "Menu",
     path = "/items",
     responses(
-        (status = 200, description = "All menu items fetched", body = AllItemsResponse)
+        (status = 200, description = "All menu items fetched", body = AllItemsResponse),
+        (status = 500, description = "Menu items couldn't be fetched", body = AllItemsResponse)
     ),
     summary = "Fetch all menu items"
 )]
@@ -148,7 +152,8 @@ pub(super) async fn get_all_menu_items(menu_ops: web::Data<MenuOperations>) -> i
         ("id", description = "Unique id of the item to fetch"),
     ),
     responses(
-        (status = 200, description = "Specified menu item fetched", body = GeneralMenuResponse)
+        (status = 200, description = "Specified menu item fetched", body = GeneralMenuResponse),
+        (status = 409, description = "Specified menu item does not exist", body = GeneralMenuResponse)
     ),
     summary = "Fetch specified item from menu"
 )]
@@ -168,7 +173,7 @@ pub(super) async fn get_menu_item(
         }
         Err(e) => {
             error!("MENU: get_menu_item(): {}", e.to_string());
-            HttpResponse::InternalServerError().json(ItemResponse {
+            HttpResponse::BadRequest().json(ItemResponse {
                 status: "error".to_string(),
                 data: MenuItem::default(),
                 error: Some(e.to_string()),
