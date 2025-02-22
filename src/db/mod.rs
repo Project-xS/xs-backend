@@ -12,6 +12,7 @@ pub use admin::menu::MenuOperations;
 pub use common::orders::OrderOperations;
 pub use errors::RepositoryError;
 pub use users::user::UserOperations;
+pub use common::search::SearchOperations;
 
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 

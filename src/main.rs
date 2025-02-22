@@ -8,10 +8,7 @@ mod enums;
 mod models;
 
 use crate::api::default_error_handler;
-use crate::db::{
-    establish_connection_pool, run_db_migrations, CanteenOperations, MenuOperations,
-    OrderOperations, UserOperations,
-};
+use crate::db::{establish_connection_pool, run_db_migrations, CanteenOperations, MenuOperations, OrderOperations, SearchOperations, UserOperations};
 use actix_web::{middleware, web, App, HttpServer};
 use dotenvy::dotenv;
 use utoipa::OpenApi;
@@ -20,10 +17,11 @@ use utoipa_swagger_ui::SwaggerUi;
 
 #[derive(Clone)]
 pub(crate) struct AppState {
-    pub user_ops: UserOperations,
-    pub menu_ops: MenuOperations,
-    pub canteen_ops: CanteenOperations,
+    user_ops: UserOperations,
+    menu_ops: MenuOperations,
+    canteen_ops: CanteenOperations,
     order_ops: OrderOperations,
+    search_ops: SearchOperations
 }
 
 impl AppState {
@@ -34,11 +32,13 @@ impl AppState {
         let menu_ops = MenuOperations::new(db.clone());
         let canteen_ops = CanteenOperations::new(db.clone());
         let order_ops = OrderOperations::new(db.clone());
+        let search_ops = SearchOperations::new(db.clone());
         AppState {
             user_ops,
             menu_ops,
             canteen_ops,
             order_ops,
+            search_ops
         }
     }
 }

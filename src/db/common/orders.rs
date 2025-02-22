@@ -6,7 +6,7 @@ use diesel::result::Error;
 use diesel::PgConnection;
 use std::collections::HashMap;
 use dashmap::DashMap;
-use crate::enums::admin::ActiveItemCount;
+use crate::enums::common::ActiveItemCount;
 
 #[derive(Clone)]
 pub struct OrderOperations {
