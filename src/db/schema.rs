@@ -26,7 +26,6 @@ diesel::table! {
         price -> Float8,
         stock -> Int4,
         is_available -> Bool,
-        list -> Bool,
         pic_link -> Nullable<Varchar>,
         description -> Nullable<Varchar>,
     }

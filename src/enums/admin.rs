@@ -39,7 +39,6 @@ impl Default for MenuItem {
             price: -1.0,
             stock: -1,
             is_available: false,
-            list: false,
             pic_link: None,
             description: None,
         }

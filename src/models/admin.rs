@@ -29,7 +29,6 @@ pub struct MenuItem {
     pub price: f64,
     pub stock: i32,
     pub is_available: bool,
-    pub list: bool,
     pub pic_link: Option<String>,
     pub description: Option<String>,
 }
@@ -43,7 +42,6 @@ pub struct NewMenuItem {
     pub price: f64,
     pub stock: i32,
     pub is_available: bool,
-    pub list: bool,
     pub pic_link: Option<String>,
     pub description: Option<String>,
 }
@@ -56,7 +54,6 @@ pub struct MenuItemCheck {
     pub name: String,
     pub stock: i32,
     pub is_available: bool,
-    pub list: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, AsChangeset, ToSchema)]
@@ -67,7 +64,6 @@ pub struct UpdateMenuItem {
     pub price: Option<f64>,
     pub stock: Option<i32>,
     pub is_available: Option<bool>,
-    pub list: Option<bool>,
     pub pic_link: Option<String>,
     pub description: Option<String>,
 }

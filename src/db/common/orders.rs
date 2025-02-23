@@ -75,13 +75,13 @@ impl OrderOperations {
                 )));
             }
             for item in items_in_order {
-                if !item.is_available || !item.list {
+                if !item.is_available {
                     return Err(RepositoryError::NotAvailable(
                         item.item_id,
                         item.name,
                         "Not available".to_string(),
                     ));
-                } else if item.stock != -1 && item.stock < 1 {
+                } else if item.stock != -1 && item.stock < *ordered_qty.get(&item.item_id).unwrap_or(&1) { // -1 -> unlimited stock
                     return Err(RepositoryError::NotAvailable(
                         item.item_id,
                         item.name,
