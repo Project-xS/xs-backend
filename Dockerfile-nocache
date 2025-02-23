@@ -1,0 +1,15 @@
+FROM public.ecr.aws/docker/library/rust:bookworm as builder
+
+WORKDIR /app
+
+COPY Cargo.toml Cargo.lock ./
+COPY src ./src
+COPY migrations ./migrations
+
+RUN cargo build --release
+
+# Stage 2: Runtime image
+FROM gcr.io/distroless/cc-debian12:nonroot as runtime
+COPY --from=builder /app/target/release/proj-xs ./proj-xs
+EXPOSE 8080
+CMD ["./proj-xs"]

@@ -8,18 +8,15 @@ on:
 jobs:
   deploy:
     name: Deploy app
-    runs-on: slave
+    runs-on: ubuntu-latest
+    concurrency: deploy-group
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Startup DIND
-        run: /dockerd-entrypoint.sh dockerd &
-        shell: bash
-
       - name: Deploy on Fly
-        uses: https://github.com/superfly/flyctl-actions/setup-flyctl@master
+        uses: superfly/flyctl-actions/setup-flyctl@master
 
-      - run: flyctl deploy --local-only --dockerfile Dockerfile-nocache
+      - run: flyctl deploy --local-only --dockerfile Dockerfile
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

@@ -1,5 +1,5 @@
 # Cache deps
-FROM rust:bookworm as deps-builder
+FROM public.ecr.aws/docker/library/rust:bookworm as deps-builder
 
 WORKDIR /app
 
