@@ -76,7 +76,7 @@ async fn main() -> std::io::Result<()> {
     };
     const PORT: u16 = 8080;
 
-    info!("Starting server at http://{}:{}", HOST, PORT);
+    info!("Starting server at {}:{}", HOST, PORT);
 
     HttpServer::new(move || {
         App::new()
