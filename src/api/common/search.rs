@@ -15,7 +15,10 @@ use actix_web::{get, web, HttpResponse, Responder};
     summary = "Search for items on menu"
 )]
 #[get("/{query}")]
-pub(super) async fn get_search_query_results(search_ops: web::Data<SearchOperations>, path: web::Path<(String,)>) -> impl Responder {
+pub(super) async fn get_search_query_results(
+    search_ops: web::Data<SearchOperations>,
+    path: web::Path<(String,)>,
+) -> impl Responder {
     let search_query = &path.into_inner().0;
     match search_ops.search_menu_items(&search_query.clone()) {
         Ok(x) => {

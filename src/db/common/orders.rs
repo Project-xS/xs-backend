@@ -1,17 +1,17 @@
 use crate::db::{DbConnection, RepositoryError};
+use crate::enums::common::ActiveItemCount;
 use crate::models::admin::MenuItemCheck;
+use dashmap::DashMap;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::result::Error;
 use diesel::PgConnection;
 use std::collections::HashMap;
-use dashmap::DashMap;
-use crate::enums::common::ActiveItemCount;
 
 #[derive(Clone)]
 pub struct OrderOperations {
     pool: Pool<ConnectionManager<PgConnection>>,
-    active_item_counts: DashMap<i32, i32>
+    active_item_counts: DashMap<i32, i32>,
 }
 
 impl OrderOperations {
@@ -39,7 +39,10 @@ impl OrderOperations {
         }
         debug!("Updated active item counts: {:?}", &active_item_counts);
 
-        Self { pool, active_item_counts }
+        Self {
+            pool,
+            active_item_counts,
+        }
     }
 
     pub fn create_order(&self, userid: i32, itemids: Vec<i32>) -> Result<(), RepositoryError> {
@@ -112,9 +115,15 @@ impl OrderOperations {
 
     pub fn get_all_orders_by_count(&self) -> Vec<ActiveItemCount> {
         let mut response: Vec<ActiveItemCount> = Vec::with_capacity(self.active_item_counts.len());
-        debug!("Fetched item counts from map: {:?}", &self.active_item_counts);
+        debug!(
+            "Fetched item counts from map: {:?}",
+            &self.active_item_counts
+        );
         for element in self.active_item_counts.iter() {
-            response.push(ActiveItemCount {item_id: *element.key(), num_ordered: *element.value()});
+            response.push(ActiveItemCount {
+                item_id: *element.key(),
+                num_ordered: *element.value(),
+            });
         }
         response
     }

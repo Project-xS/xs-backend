@@ -10,9 +10,9 @@ mod users;
 pub use admin::canteen::CanteenOperations;
 pub use admin::menu::MenuOperations;
 pub use common::orders::OrderOperations;
+pub use common::search::SearchOperations;
 pub use errors::RepositoryError;
 pub use users::user::UserOperations;
-pub use common::search::SearchOperations;
 
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 

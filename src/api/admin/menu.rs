@@ -1,5 +1,7 @@
 use crate::db::MenuOperations;
-use crate::enums::admin::{AllItemsResponse, GeneralMenuResponse, ItemResponse, CreateMenuItemResponse, UpdateItemRequest};
+use crate::enums::admin::{
+    AllItemsResponse, CreateMenuItemResponse, GeneralMenuResponse, ItemResponse, UpdateItemRequest,
+};
 use crate::models::admin::{MenuItem, NewMenuItem};
 use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
 
@@ -23,7 +25,10 @@ pub(super) async fn create_menu_item(
     let item_name = req_data.name.clone();
     match menu_ops.add_menu_item(req_data) {
         Ok(res) => {
-            debug!("New menu item created: {} with id: {}", item_name, res.item_id);
+            debug!(
+                "New menu item created: {} with id: {}",
+                item_name, res.item_id
+            );
             HttpResponse::Ok().json(CreateMenuItemResponse {
                 status: "ok".to_string(),
                 item_id: res.item_id,

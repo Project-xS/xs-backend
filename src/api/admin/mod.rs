@@ -1,10 +1,10 @@
+use crate::api::ContentTypeHeader;
 use crate::db::{CanteenOperations, MenuOperations};
 use actix_web::middleware::NormalizePath;
 use actix_web::web;
 use canteen::*;
 use menu::*;
 use utoipa_actix_web::{scope, service_config::ServiceConfig};
-use crate::api::ContentTypeHeader;
 
 mod canteen;
 mod menu;
@@ -18,13 +18,13 @@ pub fn config(cfg: &mut ServiceConfig, menu_ops: &MenuOperations, canteen_ops: &
                 scope::scope("")
                     .guard(ContentTypeHeader)
                     .service(create_menu_item)
-                    .service(update_menu_item)
+                    .service(update_menu_item),
             )
             .service(
                 scope::scope("")
                     .service(get_all_menu_items)
                     .service(get_menu_item)
-                    .service(remove_menu_item)
+                    .service(remove_menu_item),
             ),
     )
     .service(

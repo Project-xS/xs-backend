@@ -4,8 +4,8 @@ mod errors;
 mod users;
 
 use crate::AppState;
-use actix_web::{get, HttpResponse, Responder};
 use actix_web::guard::{Guard, GuardContext};
+use actix_web::{get, HttpResponse, Responder};
 pub(crate) use errors::default_error_handler;
 use utoipa_actix_web::service_config::ServiceConfig;
 
@@ -31,14 +31,15 @@ impl Guard for ContentTypeHeader {
             .headers()
             .get(actix_web::http::header::CONTENT_TYPE)
             .and_then(|hv| hv.to_str().ok())
-            .map(|ct| matches!(ct.to_lowercase().trim(),
-                "application/json" |
-                "application/json; charset=utf-8"
-            ))
+            .map(|ct| {
+                matches!(
+                    ct.to_lowercase().trim(),
+                    "application/json" | "application/json; charset=utf-8"
+                )
+            })
             .unwrap_or(false)
     }
 }
-
 
 pub(crate) fn configure(cfg: &mut ServiceConfig, state: &AppState) {
     cfg.service(root_endpoint)

@@ -1,5 +1,5 @@
 use crate::db::{DbConnection, RepositoryError};
-use crate::models::admin::{MenuItem};
+use crate::models::admin::MenuItem;
 use diesel::dsl::sql;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
@@ -28,16 +28,12 @@ impl SearchOperations {
         //            ORDER BY similarity(name, $1) DESC
         //            LIMIT 500;
         menu_items
-            .filter(
-                sql::<Bool>("name % ")
-                    .bind::<Text, _>(search_query)
-
-            )
+            .filter(sql::<Bool>("name % ").bind::<Text, _>(search_query))
             .order_by(
                 sql::<Text>("similarity (name, ")
                     .bind::<Text, _>(search_query)
                     .sql(")")
-                    .desc()
+                    .desc(),
             )
             .limit(10)
             .load::<MenuItem>(conn.connection())

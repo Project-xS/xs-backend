@@ -53,6 +53,6 @@ pub(super) async fn get_all_orders(order_ops: web::Data<OrderOperations>) -> imp
     HttpResponse::Ok().json(ActiveItemCountResponse {
         status: "ok".to_string(),
         data: resp,
-        error: None
+        error: None,
     })
 }
