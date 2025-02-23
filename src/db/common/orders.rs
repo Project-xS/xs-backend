@@ -48,6 +48,7 @@ impl OrderOperations {
     pub fn create_order(&self, userid: i32, itemids: Vec<i32>) -> Result<(), RepositoryError> {
         let mut conn = DbConnection::new(&self.pool)?;
         let mut ordered_qty: HashMap<i32, i32> = HashMap::new();
+        let items_in_order: Vec<MenuItemCheck>;
         for &item in &itemids {
             let qty = ordered_qty.entry(item).or_insert(0);
             *qty += 1;
@@ -56,7 +57,7 @@ impl OrderOperations {
         // Check item availability
         {
             use crate::db::schema::menu_items::dsl::*;
-            let items_in_order = menu_items
+            items_in_order = menu_items
                 .filter(item_id.eq_any(itemids.clone()))
                 .select(MenuItemCheck::as_select())
                 .load::<MenuItemCheck>(conn.connection())
@@ -74,17 +75,17 @@ impl OrderOperations {
                     &itemids
                 )));
             }
-            for item in items_in_order {
+            for item in &items_in_order {
                 if !item.is_available {
                     return Err(RepositoryError::NotAvailable(
                         item.item_id,
-                        item.name,
+                        item.name.clone(),
                         "Not available".to_string(),
                     ));
                 } else if item.stock != -1 && item.stock < *ordered_qty.get(&item.item_id).unwrap_or(&1) { // -1 -> unlimited stock
                     return Err(RepositoryError::NotAvailable(
                         item.item_id,
-                        item.name,
+                        item.name.clone(),
                         "Out of stock".to_string(),
                     ));
                 }
@@ -110,7 +111,36 @@ impl OrderOperations {
                 .execute(conn.connection())
                 .map_err(RepositoryError::DatabaseError)?;
         }
-        Ok(())
+
+        // Decrement stock and is_available
+
+        let mut updated_stock: HashMap<i32, i32> = HashMap::new();
+        for item in items_in_order {
+            updated_stock.insert(item.item_id, item.stock - *ordered_qty.get(&item.item_id).unwrap_or(&1));
+        }
+
+        conn.connection().transaction(|conn| {
+            use crate::db::schema::menu_items::dsl::*;
+
+            for (item, new_stock) in updated_stock {
+                diesel::update(
+                    menu_items
+                        .filter(item_id.eq(item))
+                ).set((
+                    stock.eq(new_stock),
+                    is_available.eq(new_stock > 0)
+                ))
+                    .execute(conn)
+                    .map_err(|e| match e {
+                        Error::NotFound => RepositoryError::NotFound(format!(
+                            "menu_items: Can't find item id to update stock: {}",
+                            item
+                        )),
+                        other => RepositoryError::DatabaseError(other),
+                    })?;
+            }
+            Ok(())
+        })
     }
 
     pub fn get_all_orders_by_count(&self) -> Vec<ActiveItemCount> {
