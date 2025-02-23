@@ -15,12 +15,12 @@ impl MenuOperations {
         Self { pool }
     }
 
-    pub fn add_menu_item(&self, menu_item: NewMenuItem) -> Result<usize, RepositoryError> {
+    pub fn add_menu_item(&self, menu_item: NewMenuItem) -> Result<MenuItem, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool)?;
 
         diesel::insert_into(menu_items)
             .values(&menu_item)
-            .execute(conn.connection())
+            .get_result(conn.connection())
             .map_err(RepositoryError::DatabaseError)
     }
 

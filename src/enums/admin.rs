@@ -9,6 +9,13 @@ pub struct GeneralMenuResponse {
 }
 
 #[derive(Serialize, ToSchema)]
+pub struct CreateMenuItemResponse {
+    pub status: String,
+    pub item_id: i32,
+    pub error: Option<String>,
+}
+
+#[derive(Serialize, ToSchema)]
 pub struct AllItemsResponse {
     pub status: String,
     pub data: Vec<MenuItem>,

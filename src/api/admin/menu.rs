@@ -1,5 +1,5 @@
 use crate::db::MenuOperations;
-use crate::enums::admin::{AllItemsResponse, GeneralMenuResponse, ItemResponse, UpdateItemRequest};
+use crate::enums::admin::{AllItemsResponse, GeneralMenuResponse, ItemResponse, CreateMenuItemResponse, UpdateItemRequest};
 use crate::models::admin::{MenuItem, NewMenuItem};
 use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
 
@@ -9,7 +9,7 @@ use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
     path = "/create",
     request_body = NewMenuItem,
     responses(
-        (status = 200, description = "Menu item created", body = GeneralMenuResponse),
+        (status = 200, description = "Menu item created", body = CreateMenuItemResponse),
         (status = 409, description = "Menu item could not be created", body = GeneralMenuResponse)
     ),
     summary = "Create a new menu item"
@@ -22,10 +22,11 @@ pub(super) async fn create_menu_item(
     let req_data = req_data.into_inner();
     let item_name = req_data.name.clone();
     match menu_ops.add_menu_item(req_data) {
-        Ok(_) => {
-            debug!("New menu item created: {}", item_name);
-            HttpResponse::Ok().json(GeneralMenuResponse {
+        Ok(res) => {
+            debug!("New menu item created: {} with id: {}", item_name, res.item_id);
+            HttpResponse::Ok().json(CreateMenuItemResponse {
                 status: "ok".to_string(),
+                item_id: res.item_id,
                 error: None,
             })
         }
