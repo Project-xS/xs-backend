@@ -1,5 +1,5 @@
 use crate::db::{DbConnection, RepositoryError};
-use crate::enums::common::ActiveItemCount;
+use crate::enums::common::{ActiveItemCount};
 use crate::models::admin::MenuItemCheck;
 use dashmap::DashMap;
 use diesel::prelude::*;
@@ -7,6 +7,7 @@ use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::result::Error;
 use diesel::PgConnection;
 use std::collections::HashMap;
+use crate::models::common::OrderItems;
 
 #[derive(Clone)]
 pub struct OrderOperations {
@@ -156,5 +157,15 @@ impl OrderOperations {
             });
         }
         response
+    }
+
+    #[allow(dead_code)]
+    pub fn get_orders_by_rfid(&self) -> Vec<OrderItems> {
+        todo!();
+    }
+
+    #[allow(dead_code)]
+    pub fn get_orders_by_userid(&self) -> Vec<OrderItems> {
+        todo!();
     }
 }
