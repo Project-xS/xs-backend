@@ -28,6 +28,5 @@ pub struct ActiveOrder {
 #[derive(Insertable, Debug, Serialize, Deserialize)]
 #[diesel(table_name = crate::db::schema::active_orders)]
 pub struct NewActiveOrder {
-    pub user_id: i32,
-    pub items: Vec<i32>,
+    pub user_id: i32
 }

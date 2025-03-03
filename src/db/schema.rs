@@ -1,10 +1,17 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
+    active_order_items (order_id, item_id) {
+        order_id -> Int4,
+        item_id -> Int4,
+        quantity -> Int2,
+    }
+}
+
+diesel::table! {
     active_orders (order_id) {
         order_id -> Int4,
         user_id -> Int4,
-        items -> Array<Nullable<Int4>>,
         ordered_at -> Timestamptz,
     }
 }
@@ -51,11 +58,14 @@ diesel::table! {
     }
 }
 
+diesel::joinable!(active_order_items -> active_orders (order_id));
+diesel::joinable!(active_order_items -> menu_items (item_id));
 diesel::joinable!(active_orders -> users (user_id));
 diesel::joinable!(menu_items -> canteens (canteen_id));
 diesel::joinable!(past_orders -> users (user_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
+    active_order_items,
     active_orders,
     canteens,
     menu_items,

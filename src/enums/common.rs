@@ -5,7 +5,7 @@ use crate::models::common::OrderItems;
 #[derive(Serialize, ToSchema)]
 pub struct ActiveItemCount {
     pub item_id: i32,
-    pub num_ordered: i32,
+    pub num_ordered: i64,
 }
 
 #[derive(Serialize, ToSchema)]
