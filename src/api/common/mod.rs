@@ -1,9 +1,9 @@
-use search::get_search_query_results;
 use crate::api::ContentTypeHeader;
 use crate::db::{OrderOperations, SearchOperations};
 use actix_web::middleware::NormalizePath;
 use actix_web::web;
-use orders::{create_order, get_all_orders, get_orders_by_user, get_order_by_orderid};
+use orders::{create_order, get_all_orders, get_order_by_orderid, get_orders_by_user};
+use search::get_search_query_results;
 use utoipa_actix_web::scope;
 use utoipa_actix_web::service_config::ServiceConfig;
 
@@ -26,12 +26,12 @@ pub(super) fn config(
             )
             .service(
                 scope::scope("")
-                .service(get_all_orders)
+                    .service(get_all_orders)
                     .service(get_orders_by_user)
-                    .service(get_order_by_orderid)
-            )
+                    .service(get_order_by_orderid),
+            ),
     )
-        // Search Routes
+    // Search Routes
     .service(
         scope::scope("/search")
             .wrap(NormalizePath::trim())

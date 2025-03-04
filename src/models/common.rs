@@ -1,7 +1,7 @@
-use diesel::{Queryable, Selectable, Identifiable, Insertable, Associations};
+use chrono::{DateTime, Utc};
+use diesel::{Associations, Identifiable, Insertable, Queryable, Selectable};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use chrono::{DateTime, Utc};
 
 #[derive(Queryable, Selectable, Serialize, Deserialize, ToSchema, Associations, Debug)]
 #[diesel(table_name = crate::db::schema::active_order_items)]
@@ -24,7 +24,7 @@ pub struct ActiveOrder {
 #[derive(Insertable, Debug, Serialize, Deserialize)]
 #[diesel(table_name = crate::db::schema::active_orders)]
 pub struct NewActiveOrder {
-    pub user_id: i32
+    pub user_id: i32,
 }
 
 #[derive(Queryable, Serialize, ToSchema)]

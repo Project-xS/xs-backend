@@ -17,3 +17,5 @@ CREATE TABLE active_order_items
     CONSTRAINT active_order_items_pk
         PRIMARY KEY (order_id, item_id)
 );
+
+CREATE INDEX ON active_order_items USING btree (item_id);

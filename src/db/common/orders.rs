@@ -1,6 +1,6 @@
 use crate::db::{DbConnection, RepositoryError};
-use crate::enums::common::{ActiveItemCount, OrderItemContainer, ItemContainer};
-use crate::models::{common::OrderItems, admin::MenuItemCheck};
+use crate::enums::common::{ActiveItemCount, ItemContainer, OrderItemContainer};
+use crate::models::{admin::MenuItemCheck, common::OrderItems};
 use dashmap::DashMap;
 use diesel::dsl::sum;
 use diesel::prelude::*;
@@ -38,7 +38,9 @@ impl OrderOperations {
 
             debug!("Pulling active order item counts from table...");
             let orders = active_order_items::table
-                .inner_join(menu_items::table.on(active_order_items::item_id.eq(menu_items::item_id)))
+                .inner_join(
+                    menu_items::table.on(active_order_items::item_id.eq(menu_items::item_id)),
+                )
                 .group_by((active_order_items::item_id, menu_items::name))
                 .select((
                     active_order_items::item_id,
@@ -50,7 +52,13 @@ impl OrderOperations {
 
             for (item_id, name, qty_opt) in orders {
                 let qty = qty_opt.unwrap_or(1);
-                active_item_counts.insert(item_id, ItemNameQty { item_name: name, quantity: qty });
+                active_item_counts.insert(
+                    item_id,
+                    ItemNameQty {
+                        item_name: name,
+                        quantity: qty,
+                    },
+                );
             }
         }
         debug!("Updated active item counts: {:?}", &active_item_counts);
@@ -116,10 +124,13 @@ impl OrderOperations {
                 if let Some(mut val) = self.active_item_counts.get_mut(food) {
                     val.value_mut().quantity += qty;
                 } else {
-                    self.active_item_counts.insert(*food, ItemNameQty {
-                        item_name: "".to_string(),
-                        quantity: *qty
-                    });
+                    self.active_item_counts.insert(
+                        *food,
+                        ItemNameQty {
+                            item_name: "".to_string(),
+                            quantity: *qty,
+                        },
+                    );
                 }
             }
         }
@@ -204,7 +215,8 @@ impl OrderOperations {
         let mut grouped = HashMap::new();
 
         for item in items {
-            grouped.entry(item.order_id)
+            grouped
+                .entry(item.order_id)
                 .or_insert_with(Vec::new)
                 .push(ItemContainer {
                     canteen_name: item.canteen_name,
@@ -212,41 +224,32 @@ impl OrderOperations {
                     quantity: item.quantity,
                     is_veg: item.is_veg,
                     pic_link: item.pic_link,
-                    description: item.description
+                    description: item.description,
                 });
         }
 
-        grouped.into_iter()
+        grouped
+            .into_iter()
             .map(|(order_id, items)| OrderItemContainer { order_id, items })
             .collect()
     }
 
-    pub fn get_orders_by_rfid(&self, search_rfid: &str) -> Result<Vec<OrderItemContainer>, RepositoryError> {
+    pub fn get_orders_by_rfid(
+        &self,
+        search_rfid: &str,
+    ) -> Result<Vec<OrderItemContainer>, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool)?;
         use crate::db::schema::*;
         let order_items = users::table
+            .inner_join(active_orders::table.on(users::user_id.eq(active_orders::user_id)))
             .inner_join(
-                active_orders::table.on(
-                    users::user_id.eq(active_orders::user_id)
-                )
-            )
-            .inner_join(
-                active_order_items::table.on(
-                    active_orders::order_id.eq(active_order_items::order_id)
-                )
+                active_order_items::table
+                    .on(active_orders::order_id.eq(active_order_items::order_id)),
             )
             // Then menu items
-            .inner_join(
-                menu_items::table.on(
-                    active_order_items::item_id.eq(menu_items::item_id)
-                )
-            )
+            .inner_join(menu_items::table.on(active_order_items::item_id.eq(menu_items::item_id)))
             // Finally canteen info
-            .inner_join(
-                canteens::table.on(
-                    menu_items::canteen_id.eq(canteens::canteen_id)
-                )
-            )
+            .inner_join(canteens::table.on(menu_items::canteen_id.eq(canteens::canteen_id)))
             .filter(users::rfid.eq(&search_rfid))
             .select((
                 active_orders::order_id,
@@ -255,39 +258,35 @@ impl OrderOperations {
                 active_order_items::quantity,
                 menu_items::is_veg,
                 menu_items::pic_link,
-                menu_items::description
+                menu_items::description,
             ))
             .order_by(active_orders::ordered_at.desc())
             .load::<OrderItems>(conn.connection())
             .map_err(|e| match e {
-                Error::NotFound => RepositoryError::NotFound(format!("get_user_by_rfid: {}", search_rfid)),
+                Error::NotFound => {
+                    RepositoryError::NotFound(format!("get_user_by_rfid: {}", search_rfid))
+                }
                 other => RepositoryError::DatabaseError(other),
             })?;
 
         Ok(Self::group_order_items(order_items))
     }
 
-    pub fn get_orders_by_userid(&self, search_user_id: &i32) -> Result<Vec<OrderItemContainer>, RepositoryError> {
+    pub fn get_orders_by_userid(
+        &self,
+        search_user_id: &i32,
+    ) -> Result<Vec<OrderItemContainer>, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool)?;
         use crate::db::schema::*;
         let order_items = active_orders::table
             .inner_join(
-                active_order_items::table.on(
-                    active_orders::order_id.eq(active_order_items::order_id)
-                )
+                active_order_items::table
+                    .on(active_orders::order_id.eq(active_order_items::order_id)),
             )
             // Then menu items
-            .inner_join(
-                menu_items::table.on(
-                    active_order_items::item_id.eq(menu_items::item_id)
-                )
-            )
+            .inner_join(menu_items::table.on(active_order_items::item_id.eq(menu_items::item_id)))
             // Finally canteen info
-            .inner_join(
-                canteens::table.on(
-                    menu_items::canteen_id.eq(canteens::canteen_id)
-                )
-            )
+            .inner_join(canteens::table.on(menu_items::canteen_id.eq(canteens::canteen_id)))
             .filter(active_orders::user_id.eq(search_user_id))
             .select((
                 active_orders::order_id,
@@ -296,32 +295,29 @@ impl OrderOperations {
                 active_order_items::quantity,
                 menu_items::is_veg,
                 menu_items::pic_link,
-                menu_items::description
+                menu_items::description,
             ))
             .order_by(active_orders::ordered_at.desc())
             .load::<OrderItems>(conn.connection())
             .map_err(|e| match e {
-                Error::NotFound => RepositoryError::NotFound(format!("get_user_by_userid: {}", search_user_id)),
+                Error::NotFound => {
+                    RepositoryError::NotFound(format!("get_user_by_userid: {}", search_user_id))
+                }
                 other => RepositoryError::DatabaseError(other),
             })?;
 
         Ok(Self::group_order_items(order_items))
     }
-    pub fn get_orders_by_orderid(&self, search_order_id: &i32) -> Result<OrderItemContainer, RepositoryError> {
+    pub fn get_orders_by_orderid(
+        &self,
+        search_order_id: &i32,
+    ) -> Result<OrderItemContainer, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool)?;
         use crate::db::schema::*;
         let order_items = active_order_items::table
-            .inner_join(
-                menu_items::table.on(
-                    active_order_items::item_id.eq(menu_items::item_id)
-                )
-            )
+            .inner_join(menu_items::table.on(active_order_items::item_id.eq(menu_items::item_id)))
             // Finally canteen info
-            .inner_join(
-                canteens::table.on(
-                    menu_items::canteen_id.eq(canteens::canteen_id)
-                )
-            )
+            .inner_join(canteens::table.on(menu_items::canteen_id.eq(canteens::canteen_id)))
             .filter(active_order_items::order_id.eq(search_order_id))
             .select((
                 active_order_items::order_id,
@@ -330,18 +326,20 @@ impl OrderOperations {
                 active_order_items::quantity,
                 menu_items::is_veg,
                 menu_items::pic_link,
-                menu_items::description
+                menu_items::description,
             ))
             .load::<OrderItems>(conn.connection())
             .map_err(|e| match e {
-                Error::NotFound => RepositoryError::NotFound(format!("get_user_by_orderid: {}", search_order_id)),
+                Error::NotFound => {
+                    RepositoryError::NotFound(format!("get_user_by_orderid: {}", search_order_id))
+                }
                 other => RepositoryError::DatabaseError(other),
             })?;
 
         let resp = Self::group_order_items(order_items);
         Ok(resp.into_iter().next().unwrap_or(OrderItemContainer {
             order_id: *search_order_id,
-            items: Vec::new()
+            items: Vec::new(),
         }))
     }
 }

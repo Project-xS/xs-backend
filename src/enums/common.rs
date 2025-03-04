@@ -28,7 +28,7 @@ pub struct ItemContainer {
 #[derive(Serialize, ToSchema)]
 pub struct OrderItemContainer {
     pub order_id: i32,
-    pub items: Vec<ItemContainer>
+    pub items: Vec<ItemContainer>,
 }
 
 #[derive(Serialize, ToSchema)]

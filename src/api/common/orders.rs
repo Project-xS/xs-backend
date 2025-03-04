@@ -1,5 +1,7 @@
 use crate::db::OrderOperations;
-use crate::enums::common::{ActiveItemCountResponse, OrderItemContainer, OrderItemsResponse, OrdersItemsResponse};
+use crate::enums::common::{
+    ActiveItemCountResponse, OrderItemContainer, OrderItemsResponse, OrdersItemsResponse,
+};
 use crate::enums::users::{OrderRequest, OrderResponse};
 use actix_web::{get, post, web, HttpResponse, Responder};
 use serde::Deserialize;
@@ -76,7 +78,10 @@ pub(super) async fn get_all_orders(order_ops: web::Data<OrderOperations>) -> imp
     summary = "Returns the items in an order"
 )]
 #[get("/{id}")]
-pub(super) async fn get_order_by_orderid(order_ops: web::Data<OrderOperations>, path: web::Path<(i32,)>,) -> impl Responder {
+pub(super) async fn get_order_by_orderid(
+    order_ops: web::Data<OrderOperations>,
+    path: web::Path<(i32,)>,
+) -> impl Responder {
     let search_order_id = path.into_inner().0;
     match order_ops.get_orders_by_orderid(&search_order_id) {
         Ok(data) => HttpResponse::Ok().json(OrderItemsResponse {
@@ -91,7 +96,7 @@ pub(super) async fn get_order_by_orderid(order_ops: web::Data<OrderOperations>, 
                 items: Vec::new(),
             },
             error: Option::from(e.to_string()),
-        })
+        }),
     }
 }
 
@@ -107,12 +112,15 @@ pub(super) async fn get_order_by_orderid(order_ops: web::Data<OrderOperations>, 
     summary = "Returns order items involved in all active orders of a specified user or rfid."
 )]
 #[get("/by_user")]
-pub(super) async fn get_orders_by_user(order_ops: web::Data<OrderOperations>, params: web::Query<UserOrderQuery>) -> impl Responder {
+pub(super) async fn get_orders_by_user(
+    order_ops: web::Data<OrderOperations>,
+    params: web::Query<UserOrderQuery>,
+) -> impl Responder {
     if params.user_id.is_some() && params.rfid.is_some() {
         return HttpResponse::BadRequest().json(OrdersItemsResponse {
             status: "error".to_string(),
             error: Option::from("Cannot provide both user_id and rfid parameters".to_string()),
-            data: Vec::new()
+            data: Vec::new(),
         });
     }
     if let Some(search_user_id) = &params.user_id {
@@ -125,11 +133,10 @@ pub(super) async fn get_orders_by_user(order_ops: web::Data<OrderOperations>, pa
             Err(e) => HttpResponse::InternalServerError().json(OrdersItemsResponse {
                 status: "error".to_string(),
                 data: Vec::new(),
-                error: Some(e.to_string())
-            })
+                error: Some(e.to_string()),
+            }),
         }
-    }
-    else if let Some(search_rfid) = &params.rfid {
+    } else if let Some(search_rfid) = &params.rfid {
         match order_ops.get_orders_by_rfid(search_rfid) {
             Ok(data) => HttpResponse::Ok().json(OrdersItemsResponse {
                 status: "ok".to_string(),
@@ -139,15 +146,14 @@ pub(super) async fn get_orders_by_user(order_ops: web::Data<OrderOperations>, pa
             Err(e) => HttpResponse::InternalServerError().json(OrdersItemsResponse {
                 status: "error".to_string(),
                 data: Vec::new(),
-                error: Some(e.to_string())
-            })
+                error: Some(e.to_string()),
+            }),
         }
-    }
-    else {
+    } else {
         HttpResponse::BadRequest().json(OrdersItemsResponse {
             status: "error".to_string(),
             error: Option::from("Either user_id or rfid must be provided".to_string()),
-            data: Vec::new()
+            data: Vec::new(),
         })
     }
 }
