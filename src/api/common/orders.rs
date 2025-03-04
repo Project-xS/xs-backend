@@ -71,9 +71,10 @@ pub(super) async fn get_all_orders(order_ops: web::Data<OrderOperations>) -> imp
         UserOrderQuery,
     ),
     responses(
-        (status = 200, description = "Menu items in all active orders of a user", body = OrderItemsResponse)
+        (status = 200, description = "Menu items in all active orders of a user", body = OrderItemsResponse),
+        (status = 500, description = "Error", body = OrderItemsResponse)
     ),
-    summary = "Returns order items involved in all active orders of a specified user."
+    summary = "Returns order items involved in all active orders of a specified user or rfid."
 )]
 #[get("/by_user")]
 pub(super) async fn get_orders_by_user(order_ops: web::Data<OrderOperations>, params: web::Query<UserOrderQuery>) -> impl Responder {

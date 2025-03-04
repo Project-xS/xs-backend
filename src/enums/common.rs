@@ -4,6 +4,7 @@ use utoipa::ToSchema;
 #[derive(Serialize, ToSchema)]
 pub struct ActiveItemCount {
     pub item_id: i32,
+    pub item_name: String,
     pub num_ordered: i64,
 }
 

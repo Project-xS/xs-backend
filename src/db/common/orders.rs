@@ -18,32 +18,40 @@ struct OrderItem {
     quantity: i16,
 }
 
+#[derive(Clone, Debug)]
+struct ItemNameQty {
+    item_name: String,
+    quantity: i64,
+}
+
 #[derive(Clone)]
 pub struct OrderOperations {
     pool: Pool<ConnectionManager<PgConnection>>,
-    active_item_counts: DashMap<i32, i64>,
+    active_item_counts: DashMap<i32, ItemNameQty>,
 }
 
 impl OrderOperations {
     pub fn new(pool: Pool<ConnectionManager<PgConnection>>) -> Self {
-        let active_item_counts = DashMap::<i32, i64>::new();
+        let active_item_counts = DashMap::<i32, ItemNameQty>::new();
         {
-            use crate::db::schema::active_order_items::dsl::*;
+            use crate::db::schema::*;
             let mut conn = DbConnection::new(&pool).unwrap();
 
             debug!("Pulling active order item counts from table...");
-            let orders = active_order_items
-                .group_by(item_id)
-                .select((item_id, sum(quantity)))
-                .load::<(i32, Option<i64>)>(conn.connection())
+            let orders = active_order_items::table
+                .inner_join(menu_items::table.on(active_order_items::item_id.eq(menu_items::item_id)))
+                .group_by((active_order_items::item_id, menu_items::name))
+                .select((
+                    active_order_items::item_id,
+                    menu_items::name,
+                    sum(active_order_items::quantity),
+                ))
+                .load::<(i32, String, Option<i64>)>(conn.connection())
                 .unwrap();
 
-            for (item, qty) in orders {
-                if let Some(mut val) = active_item_counts.get_mut(&item) {
-                    *val += qty.unwrap_or(1);
-                } else {
-                    active_item_counts.insert(item, qty.unwrap_or(1));
-                }
+            for (item_id, name, qty_opt) in orders {
+                let qty = qty_opt.unwrap_or(1);
+                active_item_counts.insert(item_id, ItemNameQty { item_name: name, quantity: qty });
             }
         }
         debug!("Updated active item counts: {:?}", &active_item_counts);
@@ -107,9 +115,12 @@ impl OrderOperations {
         {
             for (food, qty) in ordered_qty.iter() {
                 if let Some(mut val) = self.active_item_counts.get_mut(food) {
-                    *val += qty;
+                    val.value_mut().quantity += qty;
                 } else {
-                    self.active_item_counts.insert(*food, *qty);
+                    self.active_item_counts.insert(*food, ItemNameQty {
+                        item_name: "".to_string(),
+                        quantity: *qty
+                    });
                 }
             }
         }
@@ -183,7 +194,8 @@ impl OrderOperations {
         for element in self.active_item_counts.iter() {
             response.push(ActiveItemCount {
                 item_id: *element.key(),
-                num_ordered: *element.value(),
+                item_name: (*element.value().item_name).parse().unwrap(),
+                num_ordered: element.value().quantity,
             });
         }
         response

@@ -72,3 +72,4 @@ diesel::allow_tables_to_appear_in_same_query!(
     past_orders,
     users,
 );
+diesel::allow_columns_to_appear_in_same_group_by_clause!(menu_items::name, active_order_items::item_id);
