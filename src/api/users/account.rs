@@ -1,18 +1,17 @@
+use log::{debug, error};
 use crate::db::UserOperations;
 use crate::enums::users::{CreateUserResp, LoginReq, LoginResp};
 use crate::models::user::NewUser;
 use actix_web::{post, web, HttpResponse, Responder};
 
 #[utoipa::path(
-    post,
     tag = "User",
-    path = "/create",
     request_body = NewUser,
     responses(
-        (status = 200, description = "New user account created", body = CreateUserResp),
-        (status = 409, description = "User cannot be created", body = CreateUserResp)
+        (status = 200, description = "User account successfully created", body = CreateUserResp),
+        (status = 409, description = "Failed to create user account", body = CreateUserResp)
     ),
-    summary = "Create new user account"
+    summary = "Register a new user account"
 )]
 #[post("/create")]
 pub(super) async fn create_user(
@@ -22,14 +21,14 @@ pub(super) async fn create_user(
     let email = req_data.email.clone();
     match user_ops.create_user(req_data.into_inner()) {
         Ok(_) => {
-            debug!("User created: {}", email);
+            debug!("create_user: successfully created user account with email '{}'", email);
             HttpResponse::Ok().json(CreateUserResp {
                 status: "ok".to_string(),
                 error: None,
             })
         }
         Err(e) => {
-            error!("ACCOUNT: create_user(): {}", e.to_string());
+            error!("create_user: failed to create user account for email '{}': {}", email, e);
             HttpResponse::Conflict().json(CreateUserResp {
                 status: "error".to_string(),
                 error: Some(e.to_string()),
@@ -39,14 +38,12 @@ pub(super) async fn create_user(
 }
 
 #[utoipa::path(
-    post,
     tag = "User",
-    path = "/login",
     responses(
-        (status = 200, description = "Valid user", body = LoginResp),
-        (status = 400, description = "Invalid user", body = LoginResp)
+        (status = 200, description = "User authenticated successfully", body = LoginResp),
+        (status = 400, description = "Authentication failed: invalid credentials or user not found", body = LoginResp)
     ),
-    summary = "Validate a user account"
+    summary = "Authenticate a user account"
 )]
 #[post("/login")]
 pub(super) async fn login(
@@ -56,14 +53,14 @@ pub(super) async fn login(
     let email = req_body.email.clone();
     match user_ops.get_user_by_email(&email) {
         Ok(_) => {
-            debug!("User logged in: {}", email);
+            debug!("login: user authenticated successfully for email '{}'", email);
             HttpResponse::Ok().json(LoginResp {
                 status: "valid".to_string(),
                 error: None,
             })
         }
         Err(e) => {
-            error!("ACCOUNT: login(): {}", e.to_string());
+            error!("login: authentication failed for email '{}': {}", email, e);
             HttpResponse::BadRequest().json(LoginResp {
                 status: "error".to_string(),
                 error: Some(e.to_string()),

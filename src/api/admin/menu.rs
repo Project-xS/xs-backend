@@ -1,3 +1,4 @@
+use log::{debug, error};
 use crate::db::MenuOperations;
 use crate::enums::admin::{
     AllItemsResponse, CreateMenuItemResponse, GeneralMenuResponse, ItemResponse, UpdateItemRequest,
@@ -6,15 +7,13 @@ use crate::models::admin::{MenuItem, NewMenuItem};
 use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
 
 #[utoipa::path(
-    post,
     tag = "Menu",
-    path = "/create",
     request_body = NewMenuItem,
     responses(
-        (status = 200, description = "Menu item created", body = CreateMenuItemResponse),
-        (status = 409, description = "Menu item could not be created", body = GeneralMenuResponse)
+        (status = 200, description = "Menu item successfully created", body = CreateMenuItemResponse),
+        (status = 409, description = "Failed to create menu item due to conflict", body = GeneralMenuResponse)
     ),
-    summary = "Create a new menu item"
+    summary = "Add a new menu item to the menu"
 )]
 #[post("/create")]
 pub(super) async fn create_menu_item(
@@ -26,7 +25,7 @@ pub(super) async fn create_menu_item(
     match menu_ops.add_menu_item(req_data) {
         Ok(res) => {
             debug!(
-                "New menu item created: {} with id: {}",
+                "create_menu_item: successfully created menu item with item_name '{}' and id {}",
                 item_name, res.item_id
             );
             HttpResponse::Ok().json(CreateMenuItemResponse {
@@ -36,7 +35,7 @@ pub(super) async fn create_menu_item(
             })
         }
         Err(e) => {
-            error!("MENU: create_menu_item(): {}", e.to_string());
+            error!("create_menu_item: failed to create menu item '{}' due to error: {}", item_name, e);
             HttpResponse::Conflict().json(GeneralMenuResponse {
                 status: "error".to_string(),
                 error: Some(e.to_string()),
@@ -46,17 +45,15 @@ pub(super) async fn create_menu_item(
 }
 
 #[utoipa::path(
-    delete,
     tag = "Menu",
-    path = "/delete/{id}",
     params(
-        ("id", description = "Unique id of the item to delete"),
+        ("id", description = "The unique identifier of the menu item to delete"),
     ),
     responses(
-        (status = 200, description = "Menu item deleted", body = GeneralMenuResponse),
-        (status = 409, description = "Unable to delete menu item", body = GeneralMenuResponse)
+        (status = 200, description = "Menu item successfully deleted", body = GeneralMenuResponse),
+        (status = 409, description = "Failed to delete menu item due to conflict", body = GeneralMenuResponse)
     ),
-    summary = "Delete an item from menu"
+    summary = "Remove a menu item from the menu"
 )]
 #[delete("/delete/{id}")]
 pub(super) async fn remove_menu_item(
@@ -66,14 +63,14 @@ pub(super) async fn remove_menu_item(
     let req_data = path.into_inner().0;
     match menu_ops.remove_menu_item(req_data) {
         Ok(x) => {
-            debug!("Menu item removed: {}", x.name);
+            debug!("remove_menu_item: successfully removed menu item '{}'", x.name);
             HttpResponse::Ok().json(GeneralMenuResponse {
                 status: "ok".to_string(),
                 error: None,
             })
         }
         Err(e) => {
-            error!("MENU: remove_menu_item(): {}", e.to_string());
+            error!("remove_menu_item: failed to remove menu item with id {}: {}", req_data, e);
             HttpResponse::Conflict().json(GeneralMenuResponse {
                 status: "error".to_string(),
                 error: Some(e.to_string()),
@@ -83,15 +80,13 @@ pub(super) async fn remove_menu_item(
 }
 
 #[utoipa::path(
-    put,
     tag = "Menu",
-    path = "/update",
     request_body = UpdateItemRequest,
     responses(
-        (status = 200, description = "Menu item updated", body = GeneralMenuResponse),
-        (status = 409, description = "Menu item cannot be updated", body = GeneralMenuResponse)
+        (status = 200, description = "Menu item updated successfully", body = GeneralMenuResponse),
+        (status = 409, description = "Failed to update menu item due to conflict", body = GeneralMenuResponse)
     ),
-    summary = "Update an item in menu"
+    summary = "Modify an existing menu item"
 )]
 #[put("/update")]
 pub(super) async fn update_menu_item(
@@ -102,14 +97,14 @@ pub(super) async fn update_menu_item(
     let update_data = req_data.update.clone();
     match menu_ops.update_menu_item(req_data.item_id, update_data.clone()) {
         Ok(x) => {
-            debug!("Menu item updated: {}.\nChanges: {:?}", x.name, update_data);
+            debug!("update_menu_item: successfully updated menu item '{}' with changes: {:?}", x.name, update_data);
             HttpResponse::Ok().json(GeneralMenuResponse {
                 status: "ok".to_string(),
                 error: None,
             })
         }
         Err(e) => {
-            error!("MENU: update_menu_item(): {}", e.to_string());
+            error!("update_menu_item: failed to update menu item with id {}: {}", req_data.item_id, e);
             HttpResponse::Conflict().json(GeneralMenuResponse {
                 status: "error".to_string(),
                 error: Some(e.to_string()),
@@ -119,20 +114,18 @@ pub(super) async fn update_menu_item(
 }
 
 #[utoipa::path(
-    get,
     tag = "Menu",
-    path = "/items",
     responses(
-        (status = 200, description = "All menu items fetched", body = AllItemsResponse),
-        (status = 500, description = "Menu items couldn't be fetched", body = AllItemsResponse)
+        (status = 200, description = "Successfully retrieved all menu items", body = AllItemsResponse),
+        (status = 500, description = "Failed to retrieve menu items due to server error", body = AllItemsResponse)
     ),
-    summary = "Fetch all menu items"
+    summary = "Retrieve the complete list of menu items"
 )]
 #[get("/items")]
 pub(super) async fn get_all_menu_items(menu_ops: web::Data<MenuOperations>) -> impl Responder {
     match menu_ops.get_all_menu_items() {
         Ok(x) => {
-            debug!("Menu items fetched!");
+            debug!("get_all_menu_items: successfully fetched {} menu items", x.len());
             HttpResponse::Ok().json(AllItemsResponse {
                 status: "ok".to_string(),
                 data: x,
@@ -140,7 +133,7 @@ pub(super) async fn get_all_menu_items(menu_ops: web::Data<MenuOperations>) -> i
             })
         }
         Err(e) => {
-            error!("MENU: get_all_menu_items(): {}", e.to_string());
+            error!("get_all_menu_items: error retrieving menu items: {}", e);
             HttpResponse::InternalServerError().json(AllItemsResponse {
                 status: "error".to_string(),
                 data: Vec::new(),
@@ -151,26 +144,25 @@ pub(super) async fn get_all_menu_items(menu_ops: web::Data<MenuOperations>) -> i
 }
 
 #[utoipa::path(
-    get,
     tag = "Menu",
-    path = "/items/{id}",
     params(
-        ("id", description = "Unique id of the item to fetch"),
+        ("id", description = "Unique identifier of the menu item to retrieve"),
     ),
     responses(
-        (status = 200, description = "Specified menu item fetched", body = GeneralMenuResponse),
-        (status = 409, description = "Specified menu item does not exist", body = GeneralMenuResponse)
+        (status = 200, description = "Successfully fetched the specified menu item", body = GeneralMenuResponse),
+        (status = 409, description = "Menu item not found", body = GeneralMenuResponse)
     ),
-    summary = "Fetch specified item from menu"
+    summary = "Retrieve a specific menu item"
 )]
 #[get("/items/{id}")]
 pub(super) async fn get_menu_item(
     menu_ops: web::Data<MenuOperations>,
     path: web::Path<(i32,)>,
 ) -> impl Responder {
-    match menu_ops.get_menu_item(path.into_inner().0) {
+    let req_data = path.into_inner().0;
+    match menu_ops.get_menu_item(req_data) {
         Ok(x) => {
-            debug!("Menu item fetched: {}", x.name);
+            debug!("get_menu_item: successfully fetched menu item '{}'", x.name);
             HttpResponse::Ok().json(ItemResponse {
                 status: "ok".to_string(),
                 data: x,
@@ -178,7 +170,7 @@ pub(super) async fn get_menu_item(
             })
         }
         Err(e) => {
-            error!("MENU: get_menu_item(): {}", e.to_string());
+            error!("get_menu_item: failed to fetch menu item with id {}: {}", req_data, e);
             HttpResponse::BadRequest().json(ItemResponse {
                 status: "error".to_string(),
                 data: MenuItem::default(),

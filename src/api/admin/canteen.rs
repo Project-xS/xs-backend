@@ -1,18 +1,17 @@
+use log::{debug, error};
 use crate::db::CanteenOperations;
 use crate::enums::admin::{AllCanteenResponse, NewCanteenResponse};
 use crate::models::admin::NewCanteen;
 use actix_web::{get, post, web, HttpResponse, Responder};
 
 #[utoipa::path(
-    post,
     tag = "Canteen",
-    path = "/create",
     request_body = NewCanteen,
     responses(
-        (status = 200, description = "Canteen created", body = NewCanteenResponse),
-        (status = 400, description = "Unable to create canteen due to error in request", body = NewCanteenResponse)
+        (status = 200, description = "Canteen successfully created", body = NewCanteenResponse),
+        (status = 400, description = "Failed to create canteen: invalid request or data error", body = NewCanteenResponse)
     ),
-    summary = "Create a new canteen"
+    summary = "Add a new canteen"
 )]
 #[post("/create")]
 pub(super) async fn create_canteen(
@@ -22,14 +21,14 @@ pub(super) async fn create_canteen(
     let item_name = req_data.canteen_name.clone();
     match canteen_ops.create_canteen(req_data.into_inner()) {
         Ok(_) => {
-            debug!("New canteen created: {}", item_name);
+            debug!("create_canteen: successfully created new canteen '{}'", item_name);
             HttpResponse::Ok().json(NewCanteenResponse {
                 status: "ok".to_string(),
                 error: None,
             })
         }
         Err(e) => {
-            error!("CANTEEN: create_canteen(): {}", e.to_string());
+            error!("create_canteen: failed to create canteen '{}': {}", item_name, e);
             HttpResponse::BadRequest().json(NewCanteenResponse {
                 status: "error".to_string(),
                 error: Some(e.to_string()),
@@ -39,20 +38,18 @@ pub(super) async fn create_canteen(
 }
 
 #[utoipa::path(
-    get,
     tag = "Canteen",
-    path = "",
     responses(
-        (status = 200, description = "Fetched all available canteens", body = AllCanteenResponse),
-        (status = 500, description = "Unable to fetch canteens", body = AllCanteenResponse)
+        (status = 200, description = "Successfully retrieved all canteens", body = AllCanteenResponse),
+        (status = 500, description = "Failed to retrieve canteens due to server error", body = AllCanteenResponse)
     ),
-    summary = "Fetch all available canteens"
+    summary = "Retrieve a list of all available canteens"
 )]
 #[get("")]
 pub(super) async fn get_all_canteens(menu_ops: web::Data<CanteenOperations>) -> impl Responder {
     match menu_ops.get_all_canteens() {
         Ok(x) => {
-            debug!("Canteens fetched!");
+            debug!("get_all_canteens: successfully fetched {} canteens", x.len());
             HttpResponse::Ok().json(AllCanteenResponse {
                 status: "ok".to_string(),
                 data: x,
@@ -60,7 +57,7 @@ pub(super) async fn get_all_canteens(menu_ops: web::Data<CanteenOperations>) -> 
             })
         }
         Err(e) => {
-            error!("CANTEEN: get_all_canteens(): {}", e.to_string());
+            error!("get_all_canteens: failed to retrieve canteens: {}", e);
             HttpResponse::InternalServerError().json(AllCanteenResponse {
                 status: "error".to_string(),
                 data: Vec::new(),

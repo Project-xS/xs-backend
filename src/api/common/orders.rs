@@ -1,3 +1,4 @@
+use log::{debug, error};
 use crate::db::OrderOperations;
 use crate::enums::common::{
     ActiveItemCountResponse, OrderItemContainer, OrderItemsResponse, OrdersItemsResponse,
@@ -14,15 +15,13 @@ struct UserOrderQuery {
 }
 
 #[utoipa::path(
-    post,
     tag = "Orders",
-    path = "",
     request_body = OrderRequest,
     responses(
-        (status = 200, description = "Order created successfully", body = OrderResponse),
-        (status = 409, description = "Order cannot be created", body = OrderResponse)
+        (status = 200, description = "Order successfully created", body = OrderResponse),
+        (status = 409, description = "Failed to create order due to conflict or invalid items", body = OrderResponse)
     ),
-    summary = "Create a new order"
+    summary = "Place a new order"
 )]
 #[post("")]
 pub(super) async fn create_order(
@@ -32,14 +31,14 @@ pub(super) async fn create_order(
     let OrderRequest { user_id, item_ids } = req_data.into_inner();
     match order_ops.create_order(user_id, item_ids.clone()) {
         Ok(_) => {
-            debug!("Order created for user: {}, item: {:?}", user_id, item_ids);
+            debug!("create_order: successfully created order for user {} with item_ids {:?}", user_id, item_ids);
             HttpResponse::Ok().json(OrderResponse {
                 status: "ok".to_string(),
                 error: None,
             })
         }
         Err(e) => {
-            error!("ORDER: create_order(): {}", e.to_string());
+            error!("create_order: failed to create order for user {} with item_ids {:?}: {}", user_id, item_ids, e);
             HttpResponse::Conflict().json(OrderResponse {
                 status: "error".to_string(),
                 error: Some(e.to_string()),
@@ -49,13 +48,11 @@ pub(super) async fn create_order(
 }
 
 #[utoipa::path(
-    get,
     tag = "Orders",
-    path = "",
     responses(
-        (status = 200, description = "Orders to count fetched", body = ActiveItemCountResponse)
+        (status = 200, description = "Successfully fetched aggregated counts of active ordered items", body = ActiveItemCountResponse)
     ),
-    summary = "Returns order -> count"
+    summary = "Get aggregated active order item counts"
 )]
 #[get("")]
 pub(super) async fn get_all_orders(order_ops: web::Data<OrderOperations>) -> impl Responder {
@@ -70,12 +67,12 @@ pub(super) async fn get_all_orders(order_ops: web::Data<OrderOperations>) -> imp
 #[utoipa::path(
     tag = "Orders",
     params(
-        ("id", description = "Unique id of the order"),
+        ("id", description = "Unique identifier for the order"),
     ),
     responses(
-        (status = 200, description = "The order items in an order", body = ActiveItemCountResponse)
+        (status = 200, description = "Successfully retrieved items for the specified order", body = OrderItemsResponse)
     ),
-    summary = "Returns the items in an order"
+    summary = "Get items for a specific order"
 )]
 #[get("/{id}")]
 pub(super) async fn get_order_by_orderid(
@@ -84,11 +81,14 @@ pub(super) async fn get_order_by_orderid(
 ) -> impl Responder {
     let search_order_id = path.into_inner().0;
     match order_ops.get_orders_by_orderid(&search_order_id) {
-        Ok(data) => HttpResponse::Ok().json(OrderItemsResponse {
-            status: "ok".to_string(),
-            data,
-            error: None,
-        }),
+        Ok(data) => {
+            debug!("get_order_by_orderid: retrieved {} items for order_id {}", data.items.len(), search_order_id);
+            HttpResponse::Ok().json(OrderItemsResponse {
+                status: "ok".to_string(),
+                data,
+                error: None,
+            })
+        },
         Err(e) => HttpResponse::InternalServerError().json(OrderItemsResponse {
             status: "error".to_string(),
             data: OrderItemContainer {
@@ -106,10 +106,10 @@ pub(super) async fn get_order_by_orderid(
         UserOrderQuery,
     ),
     responses(
-        (status = 200, description = "Menu items in all active orders of a user", body = OrderItemsResponse),
-        (status = 500, description = "Error", body = OrderItemsResponse)
+        (status = 200, description = "Successfully retrieved order items for the specified user or RFID", body = OrderItemsResponse),
+        (status = 500, description = "Failed to retrieve order items due to server error", body = OrderItemsResponse)
     ),
-    summary = "Returns order items involved in all active orders of a specified user or rfid."
+    summary = "Get active order items for a specified user or RFID"
 )]
 #[get("/by_user")]
 pub(super) async fn get_orders_by_user(
@@ -125,29 +125,41 @@ pub(super) async fn get_orders_by_user(
     }
     if let Some(search_user_id) = &params.user_id {
         match order_ops.get_orders_by_userid(search_user_id) {
-            Ok(data) => HttpResponse::Ok().json(OrdersItemsResponse {
-                status: "ok".to_string(),
-                data,
-                error: None,
-            }),
-            Err(e) => HttpResponse::InternalServerError().json(OrdersItemsResponse {
-                status: "error".to_string(),
-                data: Vec::new(),
-                error: Some(e.to_string()),
-            }),
+            Ok(data) => {
+                debug!("get_orders_by_user: retrieved {} orders for user_id {}", data.len(), search_user_id);
+                HttpResponse::Ok().json(OrdersItemsResponse {
+                    status: "ok".to_string(),
+                    data,
+                    error: None,
+                })
+            },
+            Err(e) => {
+                error!("get_orders_by_user: error retrieving orders for user_id {}: {}", search_user_id, e);
+                HttpResponse::InternalServerError().json(OrdersItemsResponse {
+                    status: "error".to_string(),
+                    data: Vec::new(),
+                    error: Some(e.to_string()),
+                })
+            }
         }
     } else if let Some(search_rfid) = &params.rfid {
         match order_ops.get_orders_by_rfid(search_rfid) {
-            Ok(data) => HttpResponse::Ok().json(OrdersItemsResponse {
-                status: "ok".to_string(),
-                data,
-                error: None,
-            }),
-            Err(e) => HttpResponse::InternalServerError().json(OrdersItemsResponse {
-                status: "error".to_string(),
-                data: Vec::new(),
-                error: Some(e.to_string()),
-            }),
+            Ok(data) => {
+                debug!("get_orders_by_user: retrieved {} orders for rfid '{}'", data.len(), search_rfid);
+                HttpResponse::Ok().json(OrdersItemsResponse {
+                    status: "ok".to_string(),
+                    data,
+                    error: None,
+                })
+            },
+            Err(e) => {
+                error!("get_orders_by_user: error retrieving orders for rfid '{}': {}", search_rfid, e);
+                HttpResponse::InternalServerError().json(OrdersItemsResponse {
+                    status: "error".to_string(),
+                    data: Vec::new(),
+                    error: Some(e.to_string()),
+                })
+            },
         }
     } else {
         HttpResponse::BadRequest().json(OrdersItemsResponse {

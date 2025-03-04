@@ -40,7 +40,7 @@ impl AppState {
             user_ops,
             menu_ops,
             canteen_ops,
-            order_ops,
+            order_ops: order_ops.expect("Unable to initialize order_ops."),
             search_ops,
         }
     }
