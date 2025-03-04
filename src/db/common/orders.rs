@@ -1,7 +1,6 @@
 use crate::db::{DbConnection, RepositoryError};
 use crate::enums::common::{ActiveItemCount, OrderItemContainer, ItemContainer};
-use crate::models::common::OrderItems;
-use crate::models::admin::MenuItemCheck;
+use crate::models::{common::OrderItems, admin::MenuItemCheck};
 use dashmap::DashMap;
 use diesel::dsl::sum;
 use diesel::prelude::*;
@@ -307,5 +306,42 @@ impl OrderOperations {
             })?;
 
         Ok(Self::group_order_items(order_items))
+    }
+    pub fn get_orders_by_orderid(&self, search_order_id: &i32) -> Result<OrderItemContainer, RepositoryError> {
+        let mut conn = DbConnection::new(&self.pool)?;
+        use crate::db::schema::*;
+        let order_items = active_order_items::table
+            .inner_join(
+                menu_items::table.on(
+                    active_order_items::item_id.eq(menu_items::item_id)
+                )
+            )
+            // Finally canteen info
+            .inner_join(
+                canteens::table.on(
+                    menu_items::canteen_id.eq(canteens::canteen_id)
+                )
+            )
+            .filter(active_order_items::order_id.eq(search_order_id))
+            .select((
+                active_order_items::order_id,
+                canteens::canteen_name,
+                menu_items::name,
+                active_order_items::quantity,
+                menu_items::is_veg,
+                menu_items::pic_link,
+                menu_items::description
+            ))
+            .load::<OrderItems>(conn.connection())
+            .map_err(|e| match e {
+                Error::NotFound => RepositoryError::NotFound(format!("get_user_by_orderid: {}", search_order_id)),
+                other => RepositoryError::DatabaseError(other),
+            })?;
+
+        let resp = Self::group_order_items(order_items);
+        Ok(resp.into_iter().next().unwrap_or(OrderItemContainer {
+            order_id: *search_order_id,
+            items: Vec::new()
+        }))
     }
 }

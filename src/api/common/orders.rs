@@ -1,5 +1,5 @@
 use crate::db::OrderOperations;
-use crate::enums::common::{ActiveItemCountResponse, OrderItemsResponse};
+use crate::enums::common::{ActiveItemCountResponse, OrderItemContainer, OrderItemsResponse, OrdersItemsResponse};
 use crate::enums::users::{OrderRequest, OrderResponse};
 use actix_web::{get, post, web, HttpResponse, Responder};
 use serde::Deserialize;
@@ -68,6 +68,36 @@ pub(super) async fn get_all_orders(order_ops: web::Data<OrderOperations>) -> imp
 #[utoipa::path(
     tag = "Orders",
     params(
+        ("id", description = "Unique id of the order"),
+    ),
+    responses(
+        (status = 200, description = "The order items in an order", body = ActiveItemCountResponse)
+    ),
+    summary = "Returns the items in an order"
+)]
+#[get("/{id}")]
+pub(super) async fn get_order_by_orderid(order_ops: web::Data<OrderOperations>, path: web::Path<(i32,)>,) -> impl Responder {
+    let search_order_id = path.into_inner().0;
+    match order_ops.get_orders_by_orderid(&search_order_id) {
+        Ok(data) => HttpResponse::Ok().json(OrderItemsResponse {
+            status: "ok".to_string(),
+            data,
+            error: None,
+        }),
+        Err(e) => HttpResponse::InternalServerError().json(OrderItemsResponse {
+            status: "error".to_string(),
+            data: OrderItemContainer {
+                order_id: search_order_id,
+                items: Vec::new(),
+            },
+            error: Option::from(e.to_string()),
+        })
+    }
+}
+
+#[utoipa::path(
+    tag = "Orders",
+    params(
         UserOrderQuery,
     ),
     responses(
@@ -79,7 +109,7 @@ pub(super) async fn get_all_orders(order_ops: web::Data<OrderOperations>) -> imp
 #[get("/by_user")]
 pub(super) async fn get_orders_by_user(order_ops: web::Data<OrderOperations>, params: web::Query<UserOrderQuery>) -> impl Responder {
     if params.user_id.is_some() && params.rfid.is_some() {
-        return HttpResponse::BadRequest().json(OrderItemsResponse {
+        return HttpResponse::BadRequest().json(OrdersItemsResponse {
             status: "error".to_string(),
             error: Option::from("Cannot provide both user_id and rfid parameters".to_string()),
             data: Vec::new()
@@ -87,12 +117,12 @@ pub(super) async fn get_orders_by_user(order_ops: web::Data<OrderOperations>, pa
     }
     if let Some(search_user_id) = &params.user_id {
         match order_ops.get_orders_by_userid(search_user_id) {
-            Ok(data) => HttpResponse::Ok().json(OrderItemsResponse {
+            Ok(data) => HttpResponse::Ok().json(OrdersItemsResponse {
                 status: "ok".to_string(),
                 data,
                 error: None,
             }),
-            Err(e) => HttpResponse::InternalServerError().json(OrderItemsResponse {
+            Err(e) => HttpResponse::InternalServerError().json(OrdersItemsResponse {
                 status: "error".to_string(),
                 data: Vec::new(),
                 error: Some(e.to_string())
@@ -101,12 +131,12 @@ pub(super) async fn get_orders_by_user(order_ops: web::Data<OrderOperations>, pa
     }
     else if let Some(search_rfid) = &params.rfid {
         match order_ops.get_orders_by_rfid(search_rfid) {
-            Ok(data) => HttpResponse::Ok().json(OrderItemsResponse {
+            Ok(data) => HttpResponse::Ok().json(OrdersItemsResponse {
                 status: "ok".to_string(),
                 data,
                 error: None,
             }),
-            Err(e) => HttpResponse::InternalServerError().json(OrderItemsResponse {
+            Err(e) => HttpResponse::InternalServerError().json(OrdersItemsResponse {
                 status: "error".to_string(),
                 data: Vec::new(),
                 error: Some(e.to_string())
@@ -114,7 +144,7 @@ pub(super) async fn get_orders_by_user(order_ops: web::Data<OrderOperations>, pa
         }
     }
     else {
-        HttpResponse::BadRequest().json(OrderItemsResponse {
+        HttpResponse::BadRequest().json(OrdersItemsResponse {
             status: "error".to_string(),
             error: Option::from("Either user_id or rfid must be provided".to_string()),
             data: Vec::new()

@@ -3,7 +3,7 @@ use crate::api::ContentTypeHeader;
 use crate::db::{OrderOperations, SearchOperations};
 use actix_web::middleware::NormalizePath;
 use actix_web::web;
-use orders::{create_order, get_all_orders, get_orders_by_user};
+use orders::{create_order, get_all_orders, get_orders_by_user, get_order_by_orderid};
 use utoipa_actix_web::scope;
 use utoipa_actix_web::service_config::ServiceConfig;
 
@@ -24,10 +24,12 @@ pub(super) fn config(
                     .guard(ContentTypeHeader)
                     .service(create_order),
             )
-            .service(get_all_orders)
-            .service(get_orders_by_user)
-
-
+            .service(
+                scope::scope("")
+                .service(get_all_orders)
+                    .service(get_orders_by_user)
+                    .service(get_order_by_orderid)
+            )
     )
         // Search Routes
     .service(

@@ -32,8 +32,15 @@ pub struct OrderItemContainer {
 }
 
 #[derive(Serialize, ToSchema)]
-pub struct OrderItemsResponse {
+pub struct OrdersItemsResponse {
     pub status: String,
     pub data: Vec<OrderItemContainer>,
+    pub error: Option<String>,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct OrderItemsResponse {
+    pub status: String,
+    pub data: OrderItemContainer,
     pub error: Option<String>,
 }
