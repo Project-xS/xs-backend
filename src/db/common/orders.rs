@@ -1,7 +1,7 @@
 use crate::db::{DbConnection, RepositoryError};
-use crate::enums::common::ActiveItemCount;
-use crate::models::admin::MenuItemCheck;
+use crate::enums::common::{ActiveItemCount, OrderItemContainer, ItemContainer};
 use crate::models::common::OrderItems;
+use crate::models::admin::MenuItemCheck;
 use dashmap::DashMap;
 use diesel::dsl::sum;
 use diesel::prelude::*;
@@ -189,13 +189,111 @@ impl OrderOperations {
         response
     }
 
-    #[allow(dead_code)]
-    pub fn get_orders_by_rfid(&self) -> Vec<OrderItems> {
-        todo!();
+    fn group_order_items(items: Vec<OrderItems>) -> Vec<OrderItemContainer> {
+        let mut grouped = HashMap::new();
+
+        for item in items {
+            grouped.entry(item.order_id)
+                .or_insert_with(Vec::new)
+                .push(ItemContainer {
+                    canteen_name: item.canteen_name,
+                    name: item.name,
+                    quantity: item.quantity,
+                    is_veg: item.is_veg,
+                    pic_link: item.pic_link,
+                    description: item.description
+                });
+        }
+
+        grouped.into_iter()
+            .map(|(order_id, items)| OrderItemContainer { order_id, items })
+            .collect()
     }
 
-    #[allow(dead_code)]
-    pub fn get_orders_by_userid(&self) -> Vec<OrderItems> {
-        todo!();
+    pub fn get_orders_by_rfid(&self, search_rfid: &str) -> Result<Vec<OrderItemContainer>, RepositoryError> {
+        let mut conn = DbConnection::new(&self.pool)?;
+        use crate::db::schema::*;
+        let order_items = users::table
+            .inner_join(
+                active_orders::table.on(
+                    users::user_id.eq(active_orders::user_id)
+                )
+            )
+            .inner_join(
+                active_order_items::table.on(
+                    active_orders::order_id.eq(active_order_items::order_id)
+                )
+            )
+            // Then menu items
+            .inner_join(
+                menu_items::table.on(
+                    active_order_items::item_id.eq(menu_items::item_id)
+                )
+            )
+            // Finally canteen info
+            .inner_join(
+                canteens::table.on(
+                    menu_items::canteen_id.eq(canteens::canteen_id)
+                )
+            )
+            .filter(users::rfid.eq(&search_rfid))
+            .select((
+                active_orders::order_id,
+                canteens::canteen_name,
+                menu_items::name,
+                active_order_items::quantity,
+                menu_items::is_veg,
+                menu_items::pic_link,
+                menu_items::description
+            ))
+            .order_by(active_orders::ordered_at.desc())
+            .load::<OrderItems>(conn.connection())
+            .map_err(|e| match e {
+                Error::NotFound => RepositoryError::NotFound(format!("get_user_by_rfid: {}", search_rfid)),
+                other => RepositoryError::DatabaseError(other),
+            })?;
+
+        Ok(Self::group_order_items(order_items))
+    }
+
+    pub fn get_orders_by_userid(&self, search_user_id: &i32) -> Result<Vec<OrderItemContainer>, RepositoryError> {
+        let mut conn = DbConnection::new(&self.pool)?;
+        use crate::db::schema::*;
+        let order_items = active_orders::table
+            .inner_join(
+                active_order_items::table.on(
+                    active_orders::order_id.eq(active_order_items::order_id)
+                )
+            )
+            // Then menu items
+            .inner_join(
+                menu_items::table.on(
+                    active_order_items::item_id.eq(menu_items::item_id)
+                )
+            )
+            // Finally canteen info
+            .inner_join(
+                canteens::table.on(
+                    menu_items::canteen_id.eq(canteens::canteen_id)
+                )
+            )
+            .filter(active_orders::user_id.eq(search_user_id))
+            .select((
+                active_orders::order_id,
+                canteens::canteen_name,
+                menu_items::name,
+                active_order_items::quantity,
+                menu_items::is_veg,
+                menu_items::pic_link,
+                menu_items::description
+            ))
+            .order_by(active_orders::ordered_at.desc())
+            .load::<OrderItems>(conn.connection())
+            .map_err(|e| match e {
+                Error::NotFound => RepositoryError::NotFound(format!("get_user_by_userid: {}", search_user_id)),
+                other => RepositoryError::DatabaseError(other),
+            })?;
+
+        Ok(Self::group_order_items(order_items))
     }
 }

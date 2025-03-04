@@ -1,6 +1,5 @@
 use serde::Serialize;
 use utoipa::ToSchema;
-use crate::models::common::OrderItems;
 
 #[derive(Serialize, ToSchema)]
 pub struct ActiveItemCount {
@@ -16,8 +15,24 @@ pub struct ActiveItemCountResponse {
 }
 
 #[derive(Serialize, ToSchema)]
-pub struct OrdersResponse {
+pub struct ItemContainer {
+    pub canteen_name: String,
+    pub name: String,
+    pub quantity: i16,
+    pub is_veg: bool,
+    pub pic_link: Option<String>,
+    pub description: Option<String>,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct OrderItemContainer {
+    pub order_id: i32,
+    pub items: Vec<ItemContainer>
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct OrderItemsResponse {
     pub status: String,
-    pub data: Vec<OrderItems>,
+    pub data: Vec<OrderItemContainer>,
     pub error: Option<String>,
 }
