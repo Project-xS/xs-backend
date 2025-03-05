@@ -1,6 +1,6 @@
 use crate::db::{DbConnection, RepositoryError};
 use crate::enums::common::{ActiveItemCount, ItemContainer, OrderItemContainer};
-use crate::models::{admin::MenuItemCheck, common::OrderItems};
+use crate::models::{admin::MenuItemCheck, common::OrderItems, user::NewPastOrder};
 use dashmap::DashMap;
 use diesel::dsl::sum;
 use diesel::prelude::*;
@@ -8,8 +8,9 @@ use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::result::Error;
 use diesel::PgConnection;
 use std::collections::HashMap;
-
+use chrono::{DateTime, Utc};
 use log::{debug, error};
+use std::sync::Arc;
 
 #[derive(Insertable, Debug)]
 #[diesel(table_name = crate::db::schema::active_order_items)]
@@ -28,12 +29,12 @@ struct ItemNameQty {
 #[derive(Clone)]
 pub struct OrderOperations {
     pool: Pool<ConnectionManager<PgConnection>>,
-    active_item_counts: DashMap<i32, ItemNameQty>,
+    active_item_counts: Arc<DashMap<i32, ItemNameQty>>,
 }
 
 impl OrderOperations {
     pub fn new(pool: Pool<ConnectionManager<PgConnection>>) -> Result<Self, RepositoryError> {
-        let active_item_counts = DashMap::<i32, ItemNameQty>::new();
+        let active_item_counts = Arc::new(DashMap::<i32, ItemNameQty>::new());
         {
             use crate::db::schema::*;
             let mut conn = DbConnection::new(&pool)
@@ -126,6 +127,11 @@ impl OrderOperations {
         }
         // Add to item counts
         {
+            let item_name_map: HashMap<i32, String> = items_in_order
+                .iter()
+                .map(|item| (item.item_id, item.name.clone()))
+                .collect();
+
             for (food, qty) in ordered_qty.iter() {
                 if let Some(mut val) = self.active_item_counts.get_mut(food) {
                     val.value_mut().quantity += qty;
@@ -133,12 +139,13 @@ impl OrderOperations {
                     self.active_item_counts.insert(
                         *food,
                         ItemNameQty {
-                            item_name: "".to_string(),
+                            item_name: item_name_map.get(food).unwrap().clone(),
                             quantity: *qty,
                         },
                     );
                 }
             }
+            debug!("updated_item_counts: {:?}", &self.active_item_counts);
         }
 
         conn.connection().transaction(|conn| {
@@ -210,7 +217,7 @@ impl OrderOperations {
         for element in self.active_item_counts.iter() {
             response.push(ActiveItemCount {
                 item_id: *element.key(),
-                item_name: (*element.value().item_name).parse().unwrap(),
+                item_name: element.value().item_name.clone(),
                 num_ordered: element.value().quantity,
             });
         }
@@ -359,5 +366,73 @@ impl OrderOperations {
             order_id: *search_order_id,
             items: Vec::new(),
         }))
+    }
+
+    pub fn deliver_order(&self, search_order_id: &i32) -> Result<(), RepositoryError> {
+        let mut conn = DbConnection::new(&self.pool).map_err(|e| {
+            error!("get_orders_by_orderid: failed to acquire DB connection for order_id {}: {}", search_order_id, e);
+            e
+        })?;
+
+        conn.connection().transaction(|conn| {
+            let order_items: Vec<(i32, i32, i16, DateTime<Utc>)>;
+            {
+                use crate::db::schema::*;
+                order_items = active_orders::table
+                    .inner_join(active_order_items::table.on(
+                        active_orders::order_id.eq(active_order_items::order_id)
+                    ))
+                    .select((active_orders::user_id, active_order_items::item_id, active_order_items::quantity, active_orders::ordered_at))
+                    .filter(active_orders::order_id.eq(search_order_id))
+                    .load::<(i32, i32, i16, DateTime<Utc>)>(conn)
+                    .map_err(|e| {
+                        error!("deliver_order: error fetching order items for order_id {}: {}", search_order_id, e);
+                        match e {
+                            Error::NotFound => RepositoryError::NotFound(format!("deliver_order: {}", search_order_id)),
+                            other => RepositoryError::DatabaseError(other),
+                        }
+                    })?;
+            }
+            let items_in_order: Vec<i32> = order_items
+                .iter().flat_map(|&(_, item_id, quantity, _)| {
+                    std::iter::repeat(item_id).take(quantity as usize)
+                })
+                .collect();
+            let (order_user_id, _, _, ordered_time) = *order_items.first().unwrap();
+            for (_, item_id, quantity, _) in order_items {
+                if let Some(mut val) = self.active_item_counts.get_mut(&item_id) {
+                    val.value_mut().quantity -= quantity as i64;
+                }
+            }
+
+            {
+                use crate::db::schema::past_orders::dsl::*;
+                diesel::insert_into(past_orders)
+                    .values(&NewPastOrder {
+                        order_id: search_order_id.to_string(),
+                        user_id: order_user_id,
+                        items: items_in_order,
+                        order_status: true,
+                        ordered_at: ordered_time
+                    })
+                    .execute(conn)
+                    .map_err(RepositoryError::DatabaseError)?;
+            }
+
+            {
+                use crate::db::schema::*;
+                diesel::delete(active_orders::table
+                    .filter(active_orders::order_id.eq(search_order_id)))
+                    .execute(conn)
+                    .map_err(|e| {
+                        error!("deliver_order: error fetching order items for order_id during delete: {}: {}", search_order_id, e);
+                        match e {
+                            Error::NotFound => RepositoryError::NotFound(format!("deliver_order: {}", search_order_id)),
+                            other => RepositoryError::DatabaseError(other),
+                        }
+                    })?;
+            }
+            Ok(())
+        })
     }
 }

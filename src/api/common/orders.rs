@@ -1,9 +1,6 @@
 use log::{debug, error};
 use crate::db::OrderOperations;
-use crate::enums::common::{
-    ActiveItemCountResponse, OrderItemContainer, OrderItemsResponse, OrdersItemsResponse,
-};
-use crate::enums::users::{OrderRequest, OrderResponse};
+use crate::enums::common::{ActiveItemCountResponse, DeliverOrderRequest, OrderItemContainer, OrderItemsResponse, OrderRequest, OrderResponse, OrdersItemsResponse};
 use actix_web::{get, post, web, HttpResponse, Responder};
 use serde::Deserialize;
 use utoipa::IntoParams;
@@ -167,5 +164,38 @@ pub(super) async fn get_orders_by_user(
             error: Option::from("Either user_id or rfid must be provided".to_string()),
             data: Vec::new(),
         })
+    }
+}
+
+#[utoipa::path(
+    tag = "Orders",
+    request_body = OrderRequest,
+    responses(
+        (status = 200, description = "Order delivered created", body = OrderResponse),
+        (status = 409, description = "Failed to deliver order due to conflict or invalid items", body = OrderResponse)
+    ),
+    summary = "Deliver an existing order"
+)]
+#[post("/deliver")]
+pub(super) async fn deliver_order(
+    order_ops: web::Data<OrderOperations>,
+    req_data: web::Json<DeliverOrderRequest>,
+) -> impl Responder {
+    let DeliverOrderRequest { order_id } = req_data.into_inner();
+    match order_ops.deliver_order(&order_id) {
+        Ok(_) => {
+            debug!("deliver_order: successfully delivered order with order_id {:?}", order_id);
+            HttpResponse::Ok().json(OrderResponse {
+                status: "ok".to_string(),
+                error: None,
+            })
+        }
+        Err(e) => {
+            error!("create_order: failed to deliver order with order_id {:?}: {}", order_id, e);
+            HttpResponse::Conflict().json(OrderResponse {
+                status: "error".to_string(),
+                error: Some(e.to_string()),
+            })
+        }
     }
 }

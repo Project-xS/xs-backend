@@ -17,15 +17,3 @@ pub struct CreateUserResp {
     pub status: String,
     pub error: Option<String>,
 }
-
-#[derive(Deserialize, ToSchema)]
-pub struct OrderRequest {
-    pub user_id: i32,
-    pub item_ids: Vec<i32>,
-}
-
-#[derive(Serialize, ToSchema)]
-pub struct OrderResponse {
-    pub status: String,
-    pub error: Option<String>,
-}

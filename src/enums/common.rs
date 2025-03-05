@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 #[derive(Serialize, ToSchema)]
@@ -42,5 +42,22 @@ pub struct OrdersItemsResponse {
 pub struct OrderItemsResponse {
     pub status: String,
     pub data: OrderItemContainer,
+    pub error: Option<String>,
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct DeliverOrderRequest {
+    pub order_id: i32
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct OrderRequest {
+    pub user_id: i32,
+    pub item_ids: Vec<i32>,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct OrderResponse {
+    pub status: String,
     pub error: Option<String>,
 }
