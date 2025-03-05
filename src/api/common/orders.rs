@@ -169,9 +169,9 @@ pub(super) async fn get_orders_by_user(
 
 #[utoipa::path(
     tag = "Orders",
-    request_body = OrderRequest,
+    request_body = DeliverOrderRequest,
     responses(
-        (status = 200, description = "Order delivered created", body = OrderResponse),
+        (status = 200, description = "Order delivered successfully", body = OrderResponse),
         (status = 409, description = "Failed to deliver order due to conflict or invalid items", body = OrderResponse)
     ),
     summary = "Deliver an existing order"
@@ -191,7 +191,7 @@ pub(super) async fn deliver_order(
             })
         }
         Err(e) => {
-            error!("create_order: failed to deliver order with order_id {:?}: {}", order_id, e);
+            error!("deliver_order: failed to deliver order with order_id {:?}: {}", order_id, e);
             HttpResponse::Conflict().json(OrderResponse {
                 status: "error".to_string(),
                 error: Some(e.to_string()),
