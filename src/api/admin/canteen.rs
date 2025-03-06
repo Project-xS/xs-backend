@@ -1,6 +1,6 @@
 use log::{debug, error};
 use crate::db::CanteenOperations;
-use crate::enums::admin::{AllCanteenResponse, NewCanteenResponse};
+use crate::enums::admin::{AllCanteenResponse, AllItemsResponse, NewCanteenResponse};
 use crate::models::admin::NewCanteen;
 use actix_web::{get, post, web, HttpResponse, Responder};
 
@@ -58,6 +58,37 @@ pub(super) async fn get_all_canteens(menu_ops: web::Data<CanteenOperations>) -> 
         }
         Err(e) => {
             error!("get_all_canteens: failed to retrieve canteens: {}", e);
+            HttpResponse::InternalServerError().json(AllCanteenResponse {
+                status: "error".to_string(),
+                data: Vec::new(),
+                error: Some(e.to_string()),
+            })
+        }
+    }
+}
+
+#[utoipa::path(
+    tag = "Canteen",
+    responses(
+        (status = 200, description = "Successfully retrieved the menu of canteen", body = AllCanteenResponse),
+        (status = 500, description = "Failed to retrieve menu of canteen due to server error", body = AllCanteenResponse)
+    ),
+    summary = "Retrieve the menu of a canteen"
+)]
+#[get("/{id}/items")]
+pub(super) async fn get_canteen_menu(menu_ops: web::Data<CanteenOperations>, path: web::Path<(i32, )>,) -> impl Responder {
+    let search_canteen_id = path.into_inner().0;
+    match menu_ops.get_canteen_items(search_canteen_id) {
+        Ok(x) => {
+            debug!("get_canteen_menu: successfully fetched {} menu items of canteen {}", x.len(), search_canteen_id);
+            HttpResponse::Ok().json(AllItemsResponse {
+                status: "ok".to_string(),
+                data: x,
+                error: None,
+            })
+        }
+        Err(e) => {
+            error!("get_canteen_menu: failed to retrieve canteen items of {}: {}", search_canteen_id, e);
             HttpResponse::InternalServerError().json(AllCanteenResponse {
                 status: "error".to_string(),
                 data: Vec::new(),

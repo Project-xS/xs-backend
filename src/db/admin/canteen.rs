@@ -1,7 +1,7 @@
 use crate::db::errors::RepositoryError;
 use crate::db::schema::canteens::dsl::*;
 use crate::db::DbConnection;
-use crate::models::admin::{Canteen, NewCanteen};
+use crate::models::admin::{Canteen, MenuItem, NewCanteen};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 
@@ -53,9 +53,21 @@ impl CanteenOperations {
             })
     }
 
-    // pub fn get_canteen(&self, canteenid: i32) -> Result<MenuItem, RepositoryError> {
-    //     todo!();
-    // }
+    pub fn get_canteen_items(&self, search_canteen_id: i32) -> Result<Vec<MenuItem>, RepositoryError> {
+        let mut conn = DbConnection::new(&self.pool).map_err(|e| {
+            error!("get_canteen_items: failed to acquire DB connection: {}", e);
+            e
+        })?;
+
+        use crate::db::schema::menu_items::dsl::*;
+        menu_items
+            .filter(canteen_id.eq(search_canteen_id))
+            .load::<MenuItem>(conn.connection())
+            .map_err(|e| {
+                error!("get_canteen_items: error fetching canteen items for {:?}: {}", search_canteen_id, e);
+                RepositoryError::DatabaseError(e)
+            })
+    }
 }
 
 impl Clone for CanteenOperations {

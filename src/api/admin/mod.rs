@@ -36,6 +36,6 @@ pub fn config(cfg: &mut ServiceConfig, menu_ops: &MenuOperations, canteen_ops: &
                     .guard(ContentTypeHeader)
                     .service(create_canteen),
             )
-            .service(scope::scope("").service(get_all_canteens)),
+            .service(scope::scope("").service(get_all_canteens).service(get_canteen_menu)),
     );
 }
