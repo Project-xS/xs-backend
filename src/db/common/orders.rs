@@ -368,9 +368,9 @@ impl OrderOperations {
         }))
     }
 
-    pub fn deliver_order(&self, search_order_id: &i32) -> Result<(), RepositoryError> {
+    pub fn order_actions(&self, search_order_id: &i32, deliver_status: &str) -> Result<(), RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
-            error!("get_orders_by_orderid: failed to acquire DB connection for order_id {}: {}", search_order_id, e);
+            error!("order_actions: get_orders_by_orderid: failed to acquire DB connection for order_id {}: {}", search_order_id, e);
             e
         })?;
 
@@ -386,12 +386,15 @@ impl OrderOperations {
                     .filter(active_orders::order_id.eq(search_order_id))
                     .load::<(i32, i32, i16, DateTime<Utc>)>(conn)
                     .map_err(|e| {
-                        error!("deliver_order: error fetching order items for order_id {}: {}", search_order_id, e);
+                        error!("order_actions: error fetching order items for order_id {}: {}", search_order_id, e);
                         match e {
-                            Error::NotFound => RepositoryError::NotFound(format!("deliver_order: {}", search_order_id)),
+                            Error::NotFound => RepositoryError::NotFound(format!("order_actions: {}", search_order_id)),
                             other => RepositoryError::DatabaseError(other),
                         }
                     })?;
+                if order_items.is_empty() {
+                    return Err(RepositoryError::NotFound(format!("order_actions: {}", search_order_id)));
+                }
             }
             let items_in_order: Vec<i32> = order_items
                 .iter().flat_map(|&(_, item_id, quantity, _)| {
@@ -412,7 +415,7 @@ impl OrderOperations {
                         order_id: search_order_id.to_string(),
                         user_id: order_user_id,
                         items: items_in_order,
-                        order_status: true,
+                        order_status: deliver_status == "delivered",
                         ordered_at: ordered_time
                     })
                     .execute(conn)
@@ -425,9 +428,9 @@ impl OrderOperations {
                     .filter(active_orders::order_id.eq(search_order_id)))
                     .execute(conn)
                     .map_err(|e| {
-                        error!("deliver_order: error fetching order items for order_id during delete: {}: {}", search_order_id, e);
+                        error!("order_actions: error fetching order items for order_id during delete: {}: {}", search_order_id, e);
                         match e {
-                            Error::NotFound => RepositoryError::NotFound(format!("deliver_order: {}", search_order_id)),
+                            Error::NotFound => RepositoryError::NotFound(format!("order_actions: {}", search_order_id)),
                             other => RepositoryError::DatabaseError(other),
                         }
                     })?;

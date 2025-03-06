@@ -46,11 +46,6 @@ pub struct OrderItemsResponse {
 }
 
 #[derive(Deserialize, ToSchema)]
-pub struct DeliverOrderRequest {
-    pub order_id: i32
-}
-
-#[derive(Deserialize, ToSchema)]
 pub struct OrderRequest {
     pub user_id: i32,
     pub item_ids: Vec<i32>,

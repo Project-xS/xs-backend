@@ -1,7 +1,7 @@
 use log::{debug, error};
 use crate::db::OrderOperations;
-use crate::enums::common::{ActiveItemCountResponse, DeliverOrderRequest, OrderItemContainer, OrderItemsResponse, OrderRequest, OrderResponse, OrdersItemsResponse};
-use actix_web::{get, post, web, HttpResponse, Responder};
+use crate::enums::common::{ActiveItemCountResponse, OrderItemContainer, OrderItemsResponse, OrderRequest, OrderResponse, OrdersItemsResponse};
+use actix_web::{get, post, put, web, HttpResponse, Responder};
 use serde::Deserialize;
 use utoipa::IntoParams;
 
@@ -169,29 +169,39 @@ pub(super) async fn get_orders_by_user(
 
 #[utoipa::path(
     tag = "Orders",
-    request_body = DeliverOrderRequest,
+    params(
+        ("id", description = "Unique identifier for the order"),
+        ("action", description = "\"delivered\" for delivering and \"cancelled\" for cancelling."),
+    ),
     responses(
         (status = 200, description = "Order delivered successfully", body = OrderResponse),
         (status = 409, description = "Failed to deliver order due to conflict or invalid items", body = OrderResponse)
     ),
-    summary = "Deliver an existing order"
+    summary = "Deliver or cancel an existing order"
 )]
-#[post("/deliver")]
-pub(super) async fn deliver_order(
+#[put("/{id}/{action}")]
+pub(super) async fn order_actions(
     order_ops: web::Data<OrderOperations>,
-    req_data: web::Json<DeliverOrderRequest>,
+    path: web::Path<(i32, String, )>,
 ) -> impl Responder {
-    let DeliverOrderRequest { order_id } = req_data.into_inner();
-    match order_ops.deliver_order(&order_id) {
+    let (order_id, status) = path.into_inner();
+    if !(status == "delivered" || status == "cancelled") {
+        error!("order_actions: failed to parse order with order_id {:?}: Invalid status: {:?}", order_id, status);
+        return HttpResponse::BadRequest().json(OrderResponse {
+            status: "error".to_string(),
+            error: Option::from(format!("status cannot be {:?}, must be either \"delivered\" or \"cancelled\".", status).to_string())
+        });
+    }
+    match order_ops.order_actions(&order_id, &status) {
         Ok(_) => {
-            debug!("deliver_order: successfully delivered order with order_id {:?}", order_id);
+            debug!("order_actions: successfully changed order with order_id {:?} to status {:?}", order_id, status);
             HttpResponse::Ok().json(OrderResponse {
                 status: "ok".to_string(),
                 error: None,
             })
         }
         Err(e) => {
-            error!("deliver_order: failed to deliver order with order_id {:?}: {}", order_id, e);
+            error!("order_actions: failed to change order with order_id {:?} to status {:?}: {}", order_id, status, e);
             HttpResponse::Conflict().json(OrderResponse {
                 status: "error".to_string(),
                 error: Some(e.to_string()),

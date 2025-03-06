@@ -6,7 +6,7 @@ use orders::{create_order, get_all_orders, get_order_by_orderid, get_orders_by_u
 use search::get_search_query_results;
 use utoipa_actix_web::scope;
 use utoipa_actix_web::service_config::ServiceConfig;
-use crate::api::common::orders::deliver_order;
+use crate::api::common::orders::order_actions;
 
 mod orders;
 mod search;
@@ -24,7 +24,7 @@ pub(super) fn config(
                 scope::scope("")
                     .guard(ContentTypeHeader)
                     .service(create_order)
-                    .service(deliver_order),
+                    .service(order_actions),
             )
             .service(
                 scope::scope("")
