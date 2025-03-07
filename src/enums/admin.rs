@@ -36,7 +36,7 @@ impl Default for MenuItem {
             canteen_id: -1,
             name: "".to_string(),
             is_veg: false,
-            price: -1.0,
+            price: 0,
             stock: -1,
             is_available: false,
             pic_link: None,

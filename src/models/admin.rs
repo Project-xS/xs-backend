@@ -26,7 +26,7 @@ pub struct MenuItem {
     pub canteen_id: i32,
     pub name: String,
     pub is_veg: bool,
-    pub price: f64,
+    pub price: i32,
     pub stock: i32,
     pub is_available: bool,
     pub pic_link: Option<String>,
@@ -39,7 +39,7 @@ pub struct NewMenuItem {
     pub canteen_id: i32,
     pub name: String,
     pub is_veg: bool,
-    pub price: f64,
+    pub price: i32,
     pub stock: i32,
     pub is_available: bool,
     pub pic_link: Option<String>,
@@ -53,6 +53,7 @@ pub struct MenuItemCheck {
     pub item_id: i32,
     pub name: String,
     pub stock: i32,
+    pub price: i32,
     pub is_available: bool,
 }
 
@@ -61,7 +62,7 @@ pub struct MenuItemCheck {
 pub struct UpdateMenuItem {
     pub name: Option<String>,
     pub is_veg: Option<bool>,
-    pub price: Option<f64>,
+    pub price: Option<i32>,
     pub stock: Option<i32>,
     pub is_available: Option<bool>,
     pub pic_link: Option<String>,

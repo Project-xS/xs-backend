@@ -13,6 +13,7 @@ diesel::table! {
         order_id -> Int4,
         user_id -> Int4,
         ordered_at -> Timestamptz,
+        price -> Int4,
     }
 }
 
@@ -30,7 +31,7 @@ diesel::table! {
         canteen_id -> Int4,
         name -> Varchar,
         is_veg -> Bool,
-        price -> Float8,
+        price -> Int4,
         stock -> Int4,
         is_available -> Bool,
         pic_link -> Nullable<Varchar>,
@@ -45,6 +46,7 @@ diesel::table! {
         items -> Array<Nullable<Int4>>,
         order_status -> Bool,
         ordered_at -> Timestamptz,
+        price -> Int4,
     }
 }
 

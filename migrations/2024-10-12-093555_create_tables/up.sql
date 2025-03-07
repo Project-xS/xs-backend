@@ -27,7 +27,7 @@ CREATE TABLE menu_items
     canteen_id   INTEGER NOT NULL REFERENCES canteens (canteen_id),
     name         VARCHAR NOT NULL,
     is_veg       BOOLEAN NOT NULL,
-    price        FLOAT   NOT NULL,
+    price        INTEGER NOT NULL,
     stock        INTEGER NOT NULL DEFAULT 0,
     is_available BOOLEAN NOT NULL DEFAULT false,
     list         BOOLEAN NOT NULL DEFAULT true,
@@ -45,6 +45,7 @@ CREATE TABLE active_orders
     order_id   SERIAL PRIMARY KEY,
     user_id    INTEGER NOT NULL REFERENCES users (user_id),
     items      INTEGER[] NOT NULL CHECK (array_length(items, 1) > 0),
+    price      INTEGER NOT NULL,
     ordered_at TIMESTAMP(0) WITH TIME ZONE NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC')
 );
 CREATE INDEX idx_active_orders_user_id ON active_orders (user_id);
@@ -56,6 +57,7 @@ CREATE TABLE past_orders
     order_id     VARCHAR PRIMARY KEY,
     user_id      INTEGER NOT NULL REFERENCES users (user_id),
     items        INTEGER[] NOT NULL CHECK (array_length(items, 1) > 0),
+    price        INTEGER NOT NULL,
     order_status BOOLEAN NOT NULL DEFAULT true,
     ordered_at   TIMESTAMP(0) WITH TIME ZONE NOT NULL
 );

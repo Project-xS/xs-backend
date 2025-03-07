@@ -10,6 +10,7 @@ pub struct PastOrder {
     pub order_id: String,
     pub user_id: i32,
     pub items: Vec<i32>,
+    pub price: i32,
     pub order_status: bool,
     pub ordered_at: DateTime<Utc>,
 }
@@ -20,6 +21,7 @@ pub struct NewPastOrder {
     pub order_id: String,
     pub user_id: i32,
     pub items: Vec<i32>,
+    pub price: i32,
     pub order_status: bool,
     pub ordered_at: DateTime<Utc>,
 }

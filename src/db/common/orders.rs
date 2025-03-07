@@ -3,7 +3,7 @@ use crate::enums::common::{ActiveItemCount, ItemContainer, OrderItemContainer};
 use crate::models::{admin::MenuItemCheck, common::OrderItems, user::NewPastOrder};
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
-use diesel::dsl::sum;
+use diesel::dsl::{sum};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::result::Error;
@@ -24,6 +24,15 @@ struct OrderItem {
 struct ItemNameQty {
     item_name: String,
     quantity: i64,
+}
+
+#[derive(Queryable, Clone, Debug)]
+struct OrderDeliverItems {
+    user_id: i32,
+    item_id: i32,
+    price: i32,
+    quantity: i16,
+    ordered_at: DateTime<Utc>,
 }
 
 #[derive(Clone)]
@@ -162,13 +171,15 @@ impl OrderOperations {
         }
 
         conn.connection().transaction(|conn| {
+            let total_price = items_in_order.iter().map(|e| e.price).sum::<i32>();
+
             // Add to active orders
             {
                 let new_order_id: i32;
                 {
                     use crate::db::schema::active_orders::dsl::*;
                     new_order_id = diesel::insert_into(active_orders)
-                        .values(user_id.eq(&userid))
+                        .values((user_id.eq(&userid), price.eq(&total_price)))
                         .returning(order_id)
                         .get_result::<i32>(conn)
                         .map_err(RepositoryError::DatabaseError)?;
@@ -423,16 +434,22 @@ impl OrderOperations {
         })?;
 
         conn.connection().transaction(|conn| {
-            let order_items: Vec<(i32, i32, i16, DateTime<Utc>)>;
+            let order_items: Vec<OrderDeliverItems>;
             {
                 use crate::db::schema::*;
                 order_items = active_orders::table
                     .inner_join(active_order_items::table.on(
                         active_orders::order_id.eq(active_order_items::order_id)
                     ))
-                    .select((active_orders::user_id, active_order_items::item_id, active_order_items::quantity, active_orders::ordered_at))
+                    .select((
+                        active_orders::user_id,
+                        active_order_items::item_id,
+                        active_orders::price,
+                        active_order_items::quantity,
+                        active_orders::ordered_at
+                    ))
                     .filter(active_orders::order_id.eq(search_order_id))
-                    .load::<(i32, i32, i16, DateTime<Utc>)>(conn)
+                    .load::<OrderDeliverItems>(conn)
                     .map_err(|e| {
                         error!("order_actions: error fetching order items for order_id {}: {}", search_order_id, e);
                         match e {
@@ -445,14 +462,14 @@ impl OrderOperations {
                 }
             }
             let items_in_order: Vec<i32> = order_items
-                .iter().flat_map(|&(_, item_id, quantity, _)| {
-                    std::iter::repeat(item_id).take(quantity as usize)
+                .iter().flat_map(|item| {
+                    std::iter::repeat(item.item_id).take(item.quantity as usize)
                 })
                 .collect();
-            let (order_user_id, _, _, ordered_time) = *order_items.first().unwrap();
-            for (_, item_id, quantity, _) in order_items {
-                if let Some(mut val) = self.active_item_counts.get_mut(&item_id) {
-                    val.value_mut().quantity -= quantity as i64;
+            let first_item = order_items.first().unwrap();
+            for item in order_items.iter() {
+                if let Some(mut val) = self.active_item_counts.get_mut(&item.item_id) {
+                    val.value_mut().quantity -= item.quantity as i64;
                 }
             }
 
@@ -461,10 +478,11 @@ impl OrderOperations {
                 diesel::insert_into(past_orders)
                     .values(&NewPastOrder {
                         order_id: search_order_id.to_string(),
-                        user_id: order_user_id,
+                        user_id: first_item.user_id,
                         items: items_in_order,
+                        price: first_item.price,
                         order_status: deliver_status == "delivered",
-                        ordered_at: ordered_time
+                        ordered_at: first_item.ordered_at
                     })
                     .execute(conn)
                     .map_err(RepositoryError::DatabaseError)?;
