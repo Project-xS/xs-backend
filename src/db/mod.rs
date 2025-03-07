@@ -16,12 +16,15 @@ pub use users::user::UserOperations;
 
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
-use log::{info, error};
+use log::{error, info};
 
 pub fn establish_connection_pool(database_url: &str) -> Pool<ConnectionManager<PgConnection>> {
     let manager = ConnectionManager::<PgConnection>::new(database_url);
     info!("Initializing database connection pool...");
-    Pool::builder().max_size(50).build(manager).expect("Failed to create DB connection pool")
+    Pool::builder()
+        .max_size(50)
+        .build(manager)
+        .expect("Failed to create DB connection pool")
 }
 
 pub fn run_db_migrations(db: Pool<ConnectionManager<PgConnection>>) -> Result<(), RepositoryError> {
@@ -42,7 +45,10 @@ impl DbConnection<'_> {
     pub fn new(pool: &Pool<ConnectionManager<PgConnection>>) -> Result<Self, RepositoryError> {
         Ok(Self {
             conn: pool.get().map_err(|e| {
-                error!("DbConnection::new: failed to acquire connection from pool: {}", e);
+                error!(
+                    "DbConnection::new: failed to acquire connection from pool: {}",
+                    e
+                );
                 RepositoryError::ConnectionPoolError(e)
             })?,
             _lifetime: std::marker::PhantomData,

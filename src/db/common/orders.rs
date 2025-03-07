@@ -1,15 +1,15 @@
 use crate::db::{DbConnection, RepositoryError};
 use crate::enums::common::{ActiveItemCount, ItemContainer, OrderItemContainer};
 use crate::models::{admin::MenuItemCheck, common::OrderItems, user::NewPastOrder};
+use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use diesel::dsl::sum;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::result::Error;
 use diesel::PgConnection;
-use std::collections::HashMap;
-use chrono::{DateTime, Utc};
 use log::{debug, error};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 #[derive(Insertable, Debug)]
@@ -37,8 +37,12 @@ impl OrderOperations {
         let active_item_counts = Arc::new(DashMap::<i32, ItemNameQty>::new());
         {
             use crate::db::schema::*;
-            let mut conn = DbConnection::new(&pool)
-                .map_err(|e| RepositoryError::InternalError(format!("OrderOperations::new: failed to acquire connection: {}", e)))?;
+            let mut conn = DbConnection::new(&pool).map_err(|e| {
+                RepositoryError::InternalError(format!(
+                    "OrderOperations::new: failed to acquire connection: {}",
+                    e
+                ))
+            })?;
 
             debug!("OrderOperations::new: pulling active order item counts from database table");
             let orders = active_order_items::table
@@ -65,7 +69,10 @@ impl OrderOperations {
                 );
             }
         }
-        debug!("OrderOperations::new: active item counts initialized: {:?}", &active_item_counts);
+        debug!(
+            "OrderOperations::new: active item counts initialized: {:?}",
+            &active_item_counts
+        );
 
         Ok(Self {
             pool,
@@ -93,9 +100,15 @@ impl OrderOperations {
                 .select(MenuItemCheck::as_select())
                 .load::<MenuItemCheck>(conn.connection())
                 .map_err(|e| {
-                    error!("create_order: error loading menu items for item_ids {:?}: {}", itemids, e);
+                    error!(
+                        "create_order: error loading menu items for item_ids {:?}: {}",
+                        itemids, e
+                    );
                     match e {
-                        Error::NotFound => RepositoryError::NotFound(format!("menu_items: No menu item matched for {:?}", &itemids)),
+                        Error::NotFound => RepositoryError::NotFound(format!(
+                            "menu_items: No menu item matched for {:?}",
+                            &itemids
+                        )),
                         other => RepositoryError::DatabaseError(other),
                     }
                 })?;
@@ -196,9 +209,15 @@ impl OrderOperations {
                         .set((stock.eq(new_stock as i32), is_available.eq(new_stock > 0)))
                         .execute(conn)
                         .map_err(|e| {
-                            error!("create_order: error updating stock for item id {}: {}", item, e);
+                            error!(
+                                "create_order: error updating stock for item id {}: {}",
+                                item, e
+                            );
                             match e {
-                                Error::NotFound => RepositoryError::NotFound(format!("menu_items: Can't find item id {} to update stock", item)),
+                                Error::NotFound => RepositoryError::NotFound(format!(
+                                    "menu_items: Can't find item id {} to update stock",
+                                    item
+                                )),
                                 other => RepositoryError::DatabaseError(other),
                             }
                         })?;
@@ -252,7 +271,10 @@ impl OrderOperations {
         search_rfid: &str,
     ) -> Result<Vec<OrderItemContainer>, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
-            error!("get_orders_by_rfid: failed to acquire DB connection for rfid '{}': {}", search_rfid, e);
+            error!(
+                "get_orders_by_rfid: failed to acquire DB connection for rfid '{}': {}",
+                search_rfid, e
+            );
             e
         })?;
         use crate::db::schema::*;
@@ -279,9 +301,14 @@ impl OrderOperations {
             .order_by(active_orders::ordered_at.desc())
             .load::<OrderItems>(conn.connection())
             .map_err(|e| {
-                error!("get_orders_by_rfid: error querying order items for rfid '{}': {}", search_rfid, e);
+                error!(
+                    "get_orders_by_rfid: error querying order items for rfid '{}': {}",
+                    search_rfid, e
+                );
                 match e {
-                    Error::NotFound => RepositoryError::NotFound(format!("get_user_by_rfid: {}", search_rfid)),
+                    Error::NotFound => {
+                        RepositoryError::NotFound(format!("get_user_by_rfid: {}", search_rfid))
+                    }
                     other => RepositoryError::DatabaseError(other),
                 }
             })?;
@@ -294,7 +321,10 @@ impl OrderOperations {
         search_user_id: &i32,
     ) -> Result<Vec<OrderItemContainer>, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
-            error!("get_orders_by_userid: failed to acquire DB connection for user_id {}: {}", search_user_id, e);
+            error!(
+                "get_orders_by_userid: failed to acquire DB connection for user_id {}: {}",
+                search_user_id, e
+            );
             e
         })?;
         use crate::db::schema::*;
@@ -320,9 +350,14 @@ impl OrderOperations {
             .order_by(active_orders::ordered_at.desc())
             .load::<OrderItems>(conn.connection())
             .map_err(|e| {
-                error!("get_orders_by_userid: error loading order items for user_id {}: {}", search_user_id, e);
+                error!(
+                    "get_orders_by_userid: error loading order items for user_id {}: {}",
+                    search_user_id, e
+                );
                 match e {
-                    Error::NotFound => RepositoryError::NotFound(format!("get_user_by_userid: {}", search_user_id)),
+                    Error::NotFound => {
+                        RepositoryError::NotFound(format!("get_user_by_userid: {}", search_user_id))
+                    }
                     other => RepositoryError::DatabaseError(other),
                 }
             })?;
@@ -334,7 +369,10 @@ impl OrderOperations {
         search_order_id: &i32,
     ) -> Result<OrderItemContainer, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
-            error!("get_orders_by_orderid: failed to acquire DB connection for order_id {}: {}", search_order_id, e);
+            error!(
+                "get_orders_by_orderid: failed to acquire DB connection for order_id {}: {}",
+                search_order_id, e
+            );
             e
         })?;
         use crate::db::schema::*;
@@ -354,9 +392,15 @@ impl OrderOperations {
             ))
             .load::<OrderItems>(conn.connection())
             .map_err(|e| {
-                error!("get_orders_by_orderid: error fetching order items for order_id {}: {}", search_order_id, e);
+                error!(
+                    "get_orders_by_orderid: error fetching order items for order_id {}: {}",
+                    search_order_id, e
+                );
                 match e {
-                    Error::NotFound => RepositoryError::NotFound(format!("get_user_by_orderid: {}", search_order_id)),
+                    Error::NotFound => RepositoryError::NotFound(format!(
+                        "get_user_by_orderid: {}",
+                        search_order_id
+                    )),
                     other => RepositoryError::DatabaseError(other),
                 }
             })?;
@@ -368,7 +412,11 @@ impl OrderOperations {
         }))
     }
 
-    pub fn order_actions(&self, search_order_id: &i32, deliver_status: &str) -> Result<(), RepositoryError> {
+    pub fn order_actions(
+        &self,
+        search_order_id: &i32,
+        deliver_status: &str,
+    ) -> Result<(), RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!("order_actions: get_orders_by_orderid: failed to acquire DB connection for order_id {}: {}", search_order_id, e);
             e

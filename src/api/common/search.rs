@@ -1,7 +1,7 @@
-use log::{debug, error};
 use crate::db::SearchOperations;
 use crate::enums::admin::AllItemsResponse;
 use actix_web::{get, web, HttpResponse, Responder};
+use log::{debug, error};
 
 #[utoipa::path(
     tag = "Search",
@@ -21,7 +21,10 @@ pub(super) async fn get_search_query_results(
     let search_query = &path.into_inner().0;
     match search_ops.search_menu_items(&search_query.clone()) {
         Ok(x) => {
-            debug!("get_search_query_results: successfully executed fuzzy search for query '{}'", search_query);
+            debug!(
+                "get_search_query_results: successfully executed fuzzy search for query '{}'",
+                search_query
+            );
             HttpResponse::Ok().json(AllItemsResponse {
                 status: "ok".to_string(),
                 data: x,
@@ -29,7 +32,10 @@ pub(super) async fn get_search_query_results(
             })
         }
         Err(e) => {
-            error!("get_search_query_results: fuzzy search failed for query '{}': {}", search_query, e);
+            error!(
+                "get_search_query_results: fuzzy search failed for query '{}': {}",
+                search_query, e
+            );
             HttpResponse::BadRequest().json(AllItemsResponse {
                 status: "error".to_string(),
                 data: Vec::new(),

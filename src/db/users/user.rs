@@ -7,7 +7,7 @@ use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::result::Error;
 
-use log::{error};
+use log::error;
 
 pub struct UserOperations {
     pool: Pool<ConnectionManager<PgConnection>>,
@@ -28,7 +28,10 @@ impl UserOperations {
             .values(&new_user)
             .get_result(conn.connection())
             .map_err(|e| {
-                error!("create_user: error inserting new user with email '{}': {}", new_user.email, e);
+                error!(
+                    "create_user: error inserting new user with email '{}': {}",
+                    new_user.email, e
+                );
                 RepositoryError::DatabaseError(e)
             })
     }
@@ -36,7 +39,10 @@ impl UserOperations {
     #[allow(dead_code)]
     pub fn get_user_by_rfid(&self, rfid: i32) -> Result<User, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
-            error!("get_user_by_rfid: failed to acquire DB connection for rfid '{}': {}", rfid, e);
+            error!(
+                "get_user_by_rfid: failed to acquire DB connection for rfid '{}': {}",
+                rfid, e
+            );
             e
         })?;
 
@@ -58,7 +64,10 @@ impl UserOperations {
             .limit(1)
             .get_result::<User>(conn.connection())
             .map_err(|e| {
-                error!("get_user_by_email: error fetching user with email '{}': {}", email_addr, e);
+                error!(
+                    "get_user_by_email: error fetching user with email '{}': {}",
+                    email_addr, e
+                );
                 match e {
                     Error::NotFound => RepositoryError::NotFound(email_addr.to_string()),
                     other => RepositoryError::DatabaseError(other),

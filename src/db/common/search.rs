@@ -21,10 +21,16 @@ impl SearchOperations {
     /// Returns up to 10 menu items ordered by descending similarity.
     pub fn search_menu_items(&self, search_query: &str) -> Result<Vec<MenuItem>, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
-            error!("search_menu_items: failed to acquire DB connection for query '{}': {}", search_query, e);
+            error!(
+                "search_menu_items: failed to acquire DB connection for query '{}': {}",
+                search_query, e
+            );
             e
         })?;
-        debug!("search_menu_items: executing fuzzy search for query '{}'", search_query);
+        debug!(
+            "search_menu_items: executing fuzzy search for query '{}'",
+            search_query
+        );
         use crate::db::schema::menu_items::dsl::*;
         // SELECT * FROM menu_items
         //            WHERE name % $1
@@ -41,7 +47,10 @@ impl SearchOperations {
             .limit(10)
             .load::<MenuItem>(conn.connection())
             .map_err(|e| {
-                error!("search_menu_items: error performing search for query '{}': {}", search_query, e);
+                error!(
+                    "search_menu_items: error performing search for query '{}': {}",
+                    search_query, e
+                );
                 RepositoryError::DatabaseError(e)
             })
     }

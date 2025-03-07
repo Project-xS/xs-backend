@@ -1,7 +1,10 @@
-use log::{debug, error};
 use crate::db::OrderOperations;
-use crate::enums::common::{ActiveItemCountResponse, OrderItemContainer, OrderItemsResponse, OrderRequest, OrderResponse, OrdersItemsResponse};
+use crate::enums::common::{
+    ActiveItemCountResponse, OrderItemContainer, OrderItemsResponse, OrderRequest, OrderResponse,
+    OrdersItemsResponse,
+};
 use actix_web::{get, post, put, web, HttpResponse, Responder};
+use log::{debug, error};
 use serde::Deserialize;
 use utoipa::IntoParams;
 
@@ -28,14 +31,20 @@ pub(super) async fn create_order(
     let OrderRequest { user_id, item_ids } = req_data.into_inner();
     match order_ops.create_order(user_id, item_ids.clone()) {
         Ok(_) => {
-            debug!("create_order: successfully created order for user {} with item_ids {:?}", user_id, item_ids);
+            debug!(
+                "create_order: successfully created order for user {} with item_ids {:?}",
+                user_id, item_ids
+            );
             HttpResponse::Ok().json(OrderResponse {
                 status: "ok".to_string(),
                 error: None,
             })
         }
         Err(e) => {
-            error!("create_order: failed to create order for user {} with item_ids {:?}: {}", user_id, item_ids, e);
+            error!(
+                "create_order: failed to create order for user {} with item_ids {:?}: {}",
+                user_id, item_ids, e
+            );
             HttpResponse::Conflict().json(OrderResponse {
                 status: "error".to_string(),
                 error: Some(e.to_string()),
@@ -79,13 +88,17 @@ pub(super) async fn get_order_by_orderid(
     let search_order_id = path.into_inner().0;
     match order_ops.get_orders_by_orderid(&search_order_id) {
         Ok(data) => {
-            debug!("get_order_by_orderid: retrieved {} items for order_id {}", data.items.len(), search_order_id);
+            debug!(
+                "get_order_by_orderid: retrieved {} items for order_id {}",
+                data.items.len(),
+                search_order_id
+            );
             HttpResponse::Ok().json(OrderItemsResponse {
                 status: "ok".to_string(),
                 data,
                 error: None,
             })
-        },
+        }
         Err(e) => HttpResponse::InternalServerError().json(OrderItemsResponse {
             status: "error".to_string(),
             data: OrderItemContainer {
@@ -123,15 +136,22 @@ pub(super) async fn get_orders_by_user(
     if let Some(search_user_id) = &params.user_id {
         match order_ops.get_orders_by_userid(search_user_id) {
             Ok(data) => {
-                debug!("get_orders_by_user: retrieved {} orders for user_id {}", data.len(), search_user_id);
+                debug!(
+                    "get_orders_by_user: retrieved {} orders for user_id {}",
+                    data.len(),
+                    search_user_id
+                );
                 HttpResponse::Ok().json(OrdersItemsResponse {
                     status: "ok".to_string(),
                     data,
                     error: None,
                 })
-            },
+            }
             Err(e) => {
-                error!("get_orders_by_user: error retrieving orders for user_id {}: {}", search_user_id, e);
+                error!(
+                    "get_orders_by_user: error retrieving orders for user_id {}: {}",
+                    search_user_id, e
+                );
                 HttpResponse::InternalServerError().json(OrdersItemsResponse {
                     status: "error".to_string(),
                     data: Vec::new(),
@@ -142,21 +162,28 @@ pub(super) async fn get_orders_by_user(
     } else if let Some(search_rfid) = &params.rfid {
         match order_ops.get_orders_by_rfid(search_rfid) {
             Ok(data) => {
-                debug!("get_orders_by_user: retrieved {} orders for rfid '{}'", data.len(), search_rfid);
+                debug!(
+                    "get_orders_by_user: retrieved {} orders for rfid '{}'",
+                    data.len(),
+                    search_rfid
+                );
                 HttpResponse::Ok().json(OrdersItemsResponse {
                     status: "ok".to_string(),
                     data,
                     error: None,
                 })
-            },
+            }
             Err(e) => {
-                error!("get_orders_by_user: error retrieving orders for rfid '{}': {}", search_rfid, e);
+                error!(
+                    "get_orders_by_user: error retrieving orders for rfid '{}': {}",
+                    search_rfid, e
+                );
                 HttpResponse::InternalServerError().json(OrdersItemsResponse {
                     status: "error".to_string(),
                     data: Vec::new(),
                     error: Some(e.to_string()),
                 })
-            },
+            }
         }
     } else {
         HttpResponse::BadRequest().json(OrdersItemsResponse {
@@ -182,26 +209,41 @@ pub(super) async fn get_orders_by_user(
 #[put("/{id}/{action}")]
 pub(super) async fn order_actions(
     order_ops: web::Data<OrderOperations>,
-    path: web::Path<(i32, String, )>,
+    path: web::Path<(i32, String)>,
 ) -> impl Responder {
     let (order_id, status) = path.into_inner();
     if !(status == "delivered" || status == "cancelled") {
-        error!("order_actions: failed to parse order with order_id {:?}: Invalid status: {:?}", order_id, status);
+        error!(
+            "order_actions: failed to parse order with order_id {:?}: Invalid status: {:?}",
+            order_id, status
+        );
         return HttpResponse::BadRequest().json(OrderResponse {
             status: "error".to_string(),
-            error: Option::from(format!("status cannot be {:?}, must be either \"delivered\" or \"cancelled\".", status).to_string())
+            error: Option::from(
+                format!(
+                    "status cannot be {:?}, must be either \"delivered\" or \"cancelled\".",
+                    status
+                )
+                .to_string(),
+            ),
         });
     }
     match order_ops.order_actions(&order_id, &status) {
         Ok(_) => {
-            debug!("order_actions: successfully changed order with order_id {:?} to status {:?}", order_id, status);
+            debug!(
+                "order_actions: successfully changed order with order_id {:?} to status {:?}",
+                order_id, status
+            );
             HttpResponse::Ok().json(OrderResponse {
                 status: "ok".to_string(),
                 error: None,
             })
         }
         Err(e) => {
-            error!("order_actions: failed to change order with order_id {:?} to status {:?}: {}", order_id, status, e);
+            error!(
+                "order_actions: failed to change order with order_id {:?} to status {:?}: {}",
+                order_id, status, e
+            );
             HttpResponse::Conflict().json(OrderResponse {
                 status: "error".to_string(),
                 error: Some(e.to_string()),

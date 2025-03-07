@@ -1,10 +1,10 @@
-use log::{debug, error};
 use crate::db::MenuOperations;
 use crate::enums::admin::{
     AllItemsResponse, CreateMenuItemResponse, GeneralMenuResponse, ItemResponse, UpdateItemRequest,
 };
 use crate::models::admin::{MenuItem, NewMenuItem};
 use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
+use log::{debug, error};
 
 #[utoipa::path(
     tag = "Menu",
@@ -35,7 +35,10 @@ pub(super) async fn create_menu_item(
             })
         }
         Err(e) => {
-            error!("create_menu_item: failed to create menu item '{}' due to error: {}", item_name, e);
+            error!(
+                "create_menu_item: failed to create menu item '{}' due to error: {}",
+                item_name, e
+            );
             HttpResponse::Conflict().json(GeneralMenuResponse {
                 status: "error".to_string(),
                 error: Some(e.to_string()),
@@ -63,14 +66,20 @@ pub(super) async fn remove_menu_item(
     let req_data = path.into_inner().0;
     match menu_ops.remove_menu_item(req_data) {
         Ok(x) => {
-            debug!("remove_menu_item: successfully removed menu item '{}'", x.name);
+            debug!(
+                "remove_menu_item: successfully removed menu item '{}'",
+                x.name
+            );
             HttpResponse::Ok().json(GeneralMenuResponse {
                 status: "ok".to_string(),
                 error: None,
             })
         }
         Err(e) => {
-            error!("remove_menu_item: failed to remove menu item with id {}: {}", req_data, e);
+            error!(
+                "remove_menu_item: failed to remove menu item with id {}: {}",
+                req_data, e
+            );
             HttpResponse::Conflict().json(GeneralMenuResponse {
                 status: "error".to_string(),
                 error: Some(e.to_string()),
@@ -97,14 +106,20 @@ pub(super) async fn update_menu_item(
     let update_data = req_data.update.clone();
     match menu_ops.update_menu_item(req_data.item_id, update_data.clone()) {
         Ok(x) => {
-            debug!("update_menu_item: successfully updated menu item '{}' with changes: {:?}", x.name, update_data);
+            debug!(
+                "update_menu_item: successfully updated menu item '{}' with changes: {:?}",
+                x.name, update_data
+            );
             HttpResponse::Ok().json(GeneralMenuResponse {
                 status: "ok".to_string(),
                 error: None,
             })
         }
         Err(e) => {
-            error!("update_menu_item: failed to update menu item with id {}: {}", req_data.item_id, e);
+            error!(
+                "update_menu_item: failed to update menu item with id {}: {}",
+                req_data.item_id, e
+            );
             HttpResponse::Conflict().json(GeneralMenuResponse {
                 status: "error".to_string(),
                 error: Some(e.to_string()),
@@ -125,7 +140,10 @@ pub(super) async fn update_menu_item(
 pub(super) async fn get_all_menu_items(menu_ops: web::Data<MenuOperations>) -> impl Responder {
     match menu_ops.get_all_menu_items() {
         Ok(x) => {
-            debug!("get_all_menu_items: successfully fetched {} menu items", x.len());
+            debug!(
+                "get_all_menu_items: successfully fetched {} menu items",
+                x.len()
+            );
             HttpResponse::Ok().json(AllItemsResponse {
                 status: "ok".to_string(),
                 data: x,
@@ -170,7 +188,10 @@ pub(super) async fn get_menu_item(
             })
         }
         Err(e) => {
-            error!("get_menu_item: failed to fetch menu item with id {}: {}", req_data, e);
+            error!(
+                "get_menu_item: failed to fetch menu item with id {}: {}",
+                req_data, e
+            );
             HttpResponse::BadRequest().json(ItemResponse {
                 status: "error".to_string(),
                 data: MenuItem::default(),
