@@ -29,11 +29,12 @@ pub struct NewActiveOrder {
     pub price: i32
 }
 
-#[derive(Queryable, Serialize, ToSchema)]
+#[derive(Queryable, Serialize, ToSchema, Debug)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct OrderItems {
     pub order_id: i32,
     pub canteen_name: String,
+    pub price: i32,
     pub name: String,
     pub quantity: i16,
     pub is_veg: bool,

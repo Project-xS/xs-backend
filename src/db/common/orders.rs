@@ -7,7 +7,7 @@ use diesel::dsl::{sum};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::result::Error;
-use diesel::PgConnection;
+use diesel::{PgConnection};
 use log::{debug, error};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -171,7 +171,7 @@ impl OrderOperations {
         }
 
         conn.connection().transaction(|conn| {
-            let total_price = items_in_order.iter().map(|e| e.price).sum::<i32>();
+            let total_price = items_in_order.iter().map(|e| e.price * *ordered_qty.get(&e.item_id).unwrap_or(&1) as i32).sum::<i32>();
 
             // Add to active orders
             {
@@ -255,13 +255,15 @@ impl OrderOperations {
     }
 
     fn group_order_items(items: Vec<OrderItems>) -> Vec<OrderItemContainer> {
-        let mut grouped = HashMap::new();
+        debug!("Ungrouped order items: {:?}", &items);
+        let mut grouped: HashMap<i32, (i32, Vec<ItemContainer>)> = HashMap::new();
 
         for item in items {
-            grouped
+            let (_, new_item) = grouped
                 .entry(item.order_id)
-                .or_insert_with(Vec::new)
-                .push(ItemContainer {
+                .or_insert_with(|| (item.price, Vec::new()));
+
+            new_item.push(ItemContainer {
                     canteen_name: item.canteen_name,
                     name: item.name,
                     quantity: item.quantity,
@@ -270,10 +272,11 @@ impl OrderOperations {
                     description: item.description,
                 });
         }
+        debug!("Grouped order items: {:?}", &grouped);
 
         grouped
             .into_iter()
-            .map(|(order_id, items)| OrderItemContainer { order_id, items })
+            .map(|(order_id, (price, items))| OrderItemContainer { order_id, items, price })
             .collect()
     }
 
@@ -303,6 +306,7 @@ impl OrderOperations {
             .select((
                 active_orders::order_id,
                 canteens::canteen_name,
+                active_orders::price,
                 menu_items::name,
                 active_order_items::quantity,
                 menu_items::is_veg,
@@ -323,6 +327,7 @@ impl OrderOperations {
                     other => RepositoryError::DatabaseError(other),
                 }
             })?;
+
 
         Ok(Self::group_order_items(order_items))
     }
@@ -352,6 +357,7 @@ impl OrderOperations {
             .select((
                 active_orders::order_id,
                 canteens::canteen_name,
+                active_orders::price,
                 menu_items::name,
                 active_order_items::quantity,
                 menu_items::is_veg,
@@ -389,12 +395,13 @@ impl OrderOperations {
         use crate::db::schema::*;
         let order_items = active_order_items::table
             .inner_join(menu_items::table.on(active_order_items::item_id.eq(menu_items::item_id)))
-            // Finally canteen info
             .inner_join(canteens::table.on(menu_items::canteen_id.eq(canteens::canteen_id)))
+            .inner_join(active_orders::table.on(active_order_items::order_id.eq(active_orders::order_id)))
             .filter(active_order_items::order_id.eq(search_order_id))
             .select((
                 active_order_items::order_id,
                 canteens::canteen_name,
+                active_orders::price,
                 menu_items::name,
                 active_order_items::quantity,
                 menu_items::is_veg,
@@ -419,6 +426,7 @@ impl OrderOperations {
         let resp = Self::group_order_items(order_items);
         Ok(resp.into_iter().next().unwrap_or(OrderItemContainer {
             order_id: *search_order_id,
+            price: 0,
             items: Vec::new(),
         }))
     }

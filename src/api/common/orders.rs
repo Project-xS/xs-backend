@@ -103,6 +103,7 @@ pub(super) async fn get_order_by_orderid(
             status: "error".to_string(),
             data: OrderItemContainer {
                 order_id: search_order_id,
+                price: 0,
                 items: Vec::new(),
             },
             error: Option::from(e.to_string()),

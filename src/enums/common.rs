@@ -15,7 +15,7 @@ pub struct ActiveItemCountResponse {
     pub error: Option<String>,
 }
 
-#[derive(Serialize, ToSchema)]
+#[derive(Serialize, ToSchema, Debug)]
 pub struct ItemContainer {
     pub canteen_name: String,
     pub name: String,
@@ -25,9 +25,10 @@ pub struct ItemContainer {
     pub description: Option<String>,
 }
 
-#[derive(Serialize, ToSchema)]
+#[derive(Serialize, ToSchema, Debug)]
 pub struct OrderItemContainer {
     pub order_id: i32,
+    pub price: i32,
     pub items: Vec<ItemContainer>,
 }
 
