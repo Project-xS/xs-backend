@@ -95,8 +95,18 @@ impl OrderOperations {
             error!("create_order: failed to acquire DB connection: {}", e);
             e
         })?;
+
+        if itemids.is_empty() {
+            return Err(RepositoryError::ValidationError(format!(
+                "Order is empty for user: {:?}",
+                &userid
+            )));
+        }
+
         let mut ordered_qty: HashMap<i32, i64> = HashMap::new();
         let items_in_order: Vec<MenuItemCheck>;
+        let canteen_id_in_order: i32;
+
         for &item in &itemids {
             let qty = ordered_qty.entry(item).or_insert(0);
             *qty += 1;
@@ -104,9 +114,9 @@ impl OrderOperations {
 
         // Check item availability
         {
-            use crate::db::schema::menu_items::dsl::*;
-            items_in_order = menu_items
-                .filter(item_id.eq_any(itemids.clone()))
+            use crate::db::schema::*;
+            items_in_order = menu_items::table
+                .filter(menu_items::item_id.eq_any(itemids.clone()))
                 .select(MenuItemCheck::as_select())
                 .load::<MenuItemCheck>(conn.connection())
                 .map_err(|e| {
@@ -129,7 +139,16 @@ impl OrderOperations {
                     &itemids
                 )));
             }
+
+            canteen_id_in_order = items_in_order.first().unwrap().canteen_id;
+
             for item in &items_in_order {
+                if canteen_id_in_order != item.canteen_id {
+                    return Err(RepositoryError::ValidationError(format!(
+                        "Order contains items from multiple canteens: {:?} for user: {}",
+                        &itemids, userid
+                    )));
+                }
                 if !item.is_available {
                     return Err(RepositoryError::NotAvailable(
                         item.item_id,
@@ -187,7 +206,11 @@ impl OrderOperations {
                 {
                     use crate::db::schema::active_orders::dsl::*;
                     new_order_id = diesel::insert_into(active_orders)
-                        .values((user_id.eq(&userid), total_price.eq(&order_total_price), deliver_at.eq(&order_deliver_time_enum)))
+                        .values((
+                            user_id.eq(&userid),
+                            canteen_id.eq(&canteen_id_in_order),
+                            total_price.eq(&order_total_price),
+                            deliver_at.eq(&order_deliver_time_enum)))
                         .returning(order_id)
                         .get_result::<i32>(conn)
                         .map_err(RepositoryError::DatabaseError)?;
@@ -315,10 +338,8 @@ impl OrderOperations {
                 active_order_items::table
                     .on(active_orders::order_id.eq(active_order_items::order_id)),
             )
-            // Then menu items
+            .inner_join(canteens::table.on(active_orders::canteen_id.eq(canteens::canteen_id)))
             .inner_join(menu_items::table.on(active_order_items::item_id.eq(menu_items::item_id)))
-            // Finally canteen info
-            .inner_join(canteens::table.on(menu_items::canteen_id.eq(canteens::canteen_id)))
             .filter(users::rfid.eq(&search_rfid))
             .select((
                 active_orders::order_id,
@@ -367,9 +388,7 @@ impl OrderOperations {
                 active_order_items::table
                     .on(active_orders::order_id.eq(active_order_items::order_id)),
             )
-            // Then menu items
             .inner_join(menu_items::table.on(active_order_items::item_id.eq(menu_items::item_id)))
-            // Finally canteen info
             .inner_join(canteens::table.on(menu_items::canteen_id.eq(canteens::canteen_id)))
             .filter(active_orders::user_id.eq(search_user_id))
             .select((

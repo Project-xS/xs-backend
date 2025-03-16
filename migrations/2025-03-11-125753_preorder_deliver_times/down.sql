@@ -1,5 +1,8 @@
 -- This file should undo anything in `up.sql`
 
+ALTER TABLE active_orders
+    DROP CONSTRAINT active_orders_pk;
+
 ALTER TABLE public.active_orders
     DROP COLUMN canteen_id;
 

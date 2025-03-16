@@ -54,6 +54,7 @@ pub struct ActiveOrderItems {
 pub struct ActiveOrder {
     pub order_id: String,
     pub user_id: i32,
+    pub canteen_id: i32,
     pub price: i32,
     pub deliver_at: Option<TimeBandEnum>,
     pub ordered_at: DateTime<Utc>,
@@ -63,6 +64,7 @@ pub struct ActiveOrder {
 #[diesel(table_name = crate::db::schema::active_orders)]
 pub struct NewActiveOrder {
     pub user_id: i32,
+    pub canteen_id: i32,
     pub total_price: i32,
     pub deliver_at: Option<TimeBandEnum>,
 }

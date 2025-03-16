@@ -51,6 +51,7 @@ pub struct NewMenuItem {
 #[diesel(primary_key(item_id))]
 pub struct MenuItemCheck {
     pub item_id: i32,
+    pub canteen_id: i32,
     pub name: String,
     pub stock: i32,
     pub price: i32,
