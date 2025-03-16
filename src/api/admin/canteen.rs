@@ -79,8 +79,8 @@ pub(super) async fn get_all_canteens(menu_ops: web::Data<CanteenOperations>) -> 
 #[utoipa::path(
     tag = "Canteen",
     responses(
-        (status = 200, description = "Successfully retrieved the menu of canteen", body = AllCanteenResponse),
-        (status = 500, description = "Failed to retrieve menu of canteen due to server error", body = AllCanteenResponse)
+        (status = 200, description = "Successfully retrieved the menu of canteen", body = AllItemsResponse),
+        (status = 500, description = "Failed to retrieve menu of canteen due to server error", body = AllItemsResponse)
     ),
     summary = "Retrieve the menu of a canteen"
 )]

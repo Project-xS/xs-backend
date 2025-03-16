@@ -1,5 +1,11 @@
 // @generated automatically by Diesel CLI.
 
+pub mod sql_types {
+    #[derive(diesel::query_builder::QueryId, Clone, diesel::sql_types::SqlType)]
+    #[diesel(postgres_type(name = "time_band"))]
+    pub struct TimeBand;
+}
+
 diesel::table! {
     active_order_items (order_id, item_id) {
         order_id -> Int4,
@@ -9,11 +15,16 @@ diesel::table! {
 }
 
 diesel::table! {
+    use diesel::sql_types::*;
+    use super::sql_types::TimeBand;
+
     active_orders (order_id) {
         order_id -> Int4,
         user_id -> Int4,
         ordered_at -> Timestamptz,
-        price -> Int4,
+        total_price -> Int4,
+        canteen_id -> Int4,
+        deliver_at -> Nullable<TimeBand>,
     }
 }
 
@@ -62,6 +73,7 @@ diesel::table! {
 
 diesel::joinable!(active_order_items -> active_orders (order_id));
 diesel::joinable!(active_order_items -> menu_items (item_id));
+diesel::joinable!(active_orders -> canteens (canteen_id));
 diesel::joinable!(active_orders -> users (user_id));
 diesel::joinable!(menu_items -> canteens (canteen_id));
 diesel::joinable!(past_orders -> users (user_id));
@@ -73,8 +85,4 @@ diesel::allow_tables_to_appear_in_same_query!(
     menu_items,
     past_orders,
     users,
-);
-diesel::allow_columns_to_appear_in_same_group_by_clause!(
-    menu_items::name,
-    active_order_items::item_id
 );

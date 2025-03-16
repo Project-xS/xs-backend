@@ -1,7 +1,43 @@
+use std::io::Write;
 use chrono::{DateTime, Utc};
-use diesel::{Associations, Identifiable, Insertable, Queryable, Selectable};
+use diesel::{serialize, AsExpression, Associations, FromSqlRow, Identifiable, Insertable, Queryable, Selectable};
+use diesel::deserialize::FromSql;
+use diesel::serialize::{IsNull, Output, ToSql};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+use crate::db::schema::sql_types::TimeBand;
+
+diesel::allow_columns_to_appear_in_same_group_by_clause!(
+    crate::db::schema::menu_items::name,
+    crate::db::schema::active_order_items::item_id
+);
+
+#[derive(Debug, PartialEq, FromSqlRow, AsExpression, Eq, Serialize, Deserialize, ToSchema)]
+#[diesel(sql_type = TimeBand)]
+pub enum TimeBandEnum {
+    ElevenAM,
+    TwevlvePM
+}
+
+impl ToSql<TimeBand, diesel::pg::Pg> for TimeBandEnum {
+    fn to_sql<'b>(&'b self, out: &mut Output<'b, '_, diesel::pg::Pg>) -> serialize::Result {
+        match *self {
+            TimeBandEnum::ElevenAM => out.write_all(b"ElevenAM")?,
+            TimeBandEnum::TwevlvePM => out.write_all(b"TwelvePM")?,
+        }
+        Ok(IsNull::No)
+    }
+}
+
+impl FromSql<TimeBand, diesel::pg::Pg> for TimeBandEnum {
+    fn from_sql(bytes: diesel::pg::PgValue<'_>) -> diesel::deserialize::Result<Self> {
+        match bytes.as_bytes() {
+            b"ElevenAM" => Ok(TimeBandEnum::ElevenAM),
+            b"TwelvePM" => Ok(TimeBandEnum::TwevlvePM),
+            _ => Err("Unrecognized enum variant".into()),
+        }
+    }
+}
 
 #[derive(Queryable, Selectable, Serialize, Deserialize, ToSchema, Associations, Debug)]
 #[diesel(table_name = crate::db::schema::active_order_items)]
@@ -19,6 +55,7 @@ pub struct ActiveOrder {
     pub order_id: String,
     pub user_id: i32,
     pub price: i32,
+    pub deliver_at: Option<TimeBandEnum>,
     pub ordered_at: DateTime<Utc>,
 }
 
@@ -26,7 +63,8 @@ pub struct ActiveOrder {
 #[diesel(table_name = crate::db::schema::active_orders)]
 pub struct NewActiveOrder {
     pub user_id: i32,
-    pub price: i32
+    pub total_price: i32,
+    pub deliver_at: Option<TimeBandEnum>,
 }
 
 #[derive(Queryable, Serialize, ToSchema, Debug)]
@@ -34,7 +72,8 @@ pub struct NewActiveOrder {
 pub struct OrderItems {
     pub order_id: i32,
     pub canteen_name: String,
-    pub price: i32,
+    pub total_price: i32,
+    pub deliver_at: Option<TimeBandEnum>,
     pub name: String,
     pub quantity: i16,
     pub is_veg: bool,

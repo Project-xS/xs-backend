@@ -28,12 +28,18 @@ pub(super) async fn create_order(
     order_ops: web::Data<OrderOperations>,
     req_data: web::Json<OrderRequest>,
 ) -> impl Responder {
-    let OrderRequest { user_id, item_ids } = req_data.into_inner();
-    match order_ops.create_order(user_id, item_ids.clone()) {
+    let OrderRequest { user_id, deliver_at, item_ids } = req_data.into_inner();
+    if deliver_at.is_some() && (deliver_at != Some(String::from("11:00am - 12:00pm")) && deliver_at != Some(String::from("12:00pm - 01:00pm"))) {
+        return HttpResponse::BadRequest().json(OrderResponse {
+            status: "error".to_string(),
+            error: Some(format!("Invalid time band: {}", deliver_at.unwrap_or(String::new())))
+        })
+    }
+    match order_ops.create_order(user_id, item_ids.clone(), deliver_at.clone()) {
         Ok(_) => {
             debug!(
-                "create_order: successfully created order for user {} with item_ids {:?}",
-                user_id, item_ids
+                "create_order: successfully created order for user {} for time {:?} with item_ids {:?}",
+                user_id, deliver_at.unwrap_or(String::from("Instant")), item_ids
             );
             HttpResponse::Ok().json(OrderResponse {
                 status: "ok".to_string(),
@@ -42,8 +48,8 @@ pub(super) async fn create_order(
         }
         Err(e) => {
             error!(
-                "create_order: failed to create order for user {} with item_ids {:?}: {}",
-                user_id, item_ids, e
+                "create_order: failed to create order for user {} for time {:?} with item_ids {:?}: {}",
+                user_id, deliver_at.unwrap_or(String::from("Instant")), item_ids, e
             );
             HttpResponse::Conflict().json(OrderResponse {
                 status: "error".to_string(),
@@ -103,7 +109,8 @@ pub(super) async fn get_order_by_orderid(
             status: "error".to_string(),
             data: OrderItemContainer {
                 order_id: search_order_id,
-                price: 0,
+                total_price: 0,
+                deliver_at: None,
                 items: Vec::new(),
             },
             error: Option::from(e.to_string()),

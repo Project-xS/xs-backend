@@ -28,7 +28,8 @@ pub struct ItemContainer {
 #[derive(Serialize, ToSchema, Debug)]
 pub struct OrderItemContainer {
     pub order_id: i32,
-    pub price: i32,
+    pub total_price: i32,
+    pub deliver_at: Option<String>,
     pub items: Vec<ItemContainer>,
 }
 
@@ -49,6 +50,7 @@ pub struct OrderItemsResponse {
 #[derive(Deserialize, ToSchema)]
 pub struct OrderRequest {
     pub user_id: i32,
+    pub deliver_at: Option<String>,
     pub item_ids: Vec<i32>,
 }
 
