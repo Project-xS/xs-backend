@@ -1,12 +1,6 @@
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use utoipa::ToSchema;
-
-// #[derive(Serialize, ToSchema)]
-// pub struct TimedActiveItemCount {
-//     pub deliver_at: TimeBandEnum,
-//     pub items: Vec<ActiveItemCount>,
-// }
 
 pub type TimedActiveItemCount = HashMap<String, Vec<ActiveItemCount>>;
 

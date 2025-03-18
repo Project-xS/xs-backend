@@ -1,5 +1,8 @@
 use crate::db::OrderOperations;
-use crate::enums::common::{OrderItemContainer, OrderItemsResponse, OrderRequest, OrderResponse, OrdersItemsResponse, TimedActiveItemCount, TimedActiveItemCountResponse};
+use crate::enums::common::{
+    OrderItemContainer, OrderItemsResponse, OrderRequest, OrderResponse, OrdersItemsResponse,
+    TimedActiveItemCount, TimedActiveItemCountResponse,
+};
 use actix_web::{get, post, put, web, HttpResponse, Responder};
 use log::{debug, error};
 use serde::Deserialize;
@@ -30,12 +33,22 @@ pub(super) async fn create_order(
     order_ops: web::Data<OrderOperations>,
     req_data: web::Json<OrderRequest>,
 ) -> impl Responder {
-    let OrderRequest { user_id, deliver_at, item_ids } = req_data.into_inner();
-    if deliver_at.is_some() && (deliver_at != Some(String::from("11:00am - 12:00pm")) && deliver_at != Some(String::from("12:00pm - 01:00pm"))) {
+    let OrderRequest {
+        user_id,
+        deliver_at,
+        item_ids,
+    } = req_data.into_inner();
+    if deliver_at.is_some()
+        && (deliver_at != Some(String::from("11:00am - 12:00pm"))
+            && deliver_at != Some(String::from("12:00pm - 01:00pm")))
+    {
         return HttpResponse::BadRequest().json(OrderResponse {
             status: "error".to_string(),
-            error: Some(format!("Invalid time band: {}", deliver_at.unwrap_or(String::new())))
-        })
+            error: Some(format!(
+                "Invalid time band: {}",
+                deliver_at.unwrap_or(String::new())
+            )),
+        });
     }
     match order_ops.create_order(user_id, item_ids.clone(), deliver_at.clone()) {
         Ok(_) => {
@@ -72,14 +85,14 @@ pub(super) async fn create_order(
     summary = "Get aggregated active order item counts"
 )]
 #[get("")]
-pub(super) async fn get_all_orders(order_ops: web::Data<OrderOperations>, params: web::Query<OrderCanteenQuery>) -> impl Responder {
+pub(super) async fn get_all_orders(
+    order_ops: web::Data<OrderOperations>,
+    params: web::Query<OrderCanteenQuery>,
+) -> impl Responder {
     let search_canteen_id = params.canteen_id;
     match order_ops.get_all_orders_by_count(search_canteen_id) {
         Ok(data) => {
-            debug!(
-                "get_all_orders_by_count: retrieved {} items.",
-                data.len(),
-            );
+            debug!("get_all_orders_by_count: retrieved {} items.", data.len(),);
             HttpResponse::Ok().json(TimedActiveItemCountResponse {
                 status: "ok".to_string(),
                 data,

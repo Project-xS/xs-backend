@@ -8,20 +8,20 @@ name = "proj-xs"
 path = "src/main.rs"
 
 [dependencies]
-actix-web = "4.9.0"
+actix-web = "4.10.2"
 utoipa-actix-web = "0.1.2"
 utoipa = { version = "5.3.1", features = ["actix_extras"] }
 utoipa-swagger-ui = { version = "9.0.0", features = ["actix-web"] }
-serde = {version = "1.0.218", features = ["derive"]}
-diesel = {version = "2.2.7", features = ["postgres", "r2d2", "chrono"]}
+serde = {version = "1.0.219", features = ["derive"]}
+diesel = {version = "2.2.8", features = ["postgres", "r2d2", "chrono"]}
 pq-sys = { version = "0.7.0", features = ["bundled"] }
 openssl-sys = { version = "0.9.106", features = ["vendored"] }
 diesel_migrations = { version = "2.2.0", features = ["postgres"] }
-chrono = {version = "0.4.39", features = ["serde"]}
+chrono = {version = "0.4.40", features = ["serde"]}
 dotenvy = "0.15.7"
 log = "0.4.26"
 pretty_env_logger = "0.5.0"
-thiserror = "2.0.11"
+thiserror = "2.0.12"
 
 [workspace.lints.clippy]
 # --- Correctness: Catch serious errors ---

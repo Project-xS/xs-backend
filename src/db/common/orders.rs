@@ -1,5 +1,7 @@
 use crate::db::{DbConnection, RepositoryError};
-use crate::enums::common::{ActiveItemCount, ItemContainer, OrderItemContainer, TimedActiveItemCount};
+use crate::enums::common::{
+    ActiveItemCount, ItemContainer, OrderItemContainer, TimedActiveItemCount,
+};
 use crate::models::common::TimeBandEnum;
 use crate::models::{admin::MenuItemCheck, common::OrderItems, user::NewPastOrder};
 use chrono::{DateTime, Utc};
@@ -46,7 +48,12 @@ impl OrderOperations {
         Self { pool }
     }
 
-    pub fn create_order(&self, userid: i32, itemids: Vec<i32>, order_deliver_at: Option<String>) -> Result<(), RepositoryError> {
+    pub fn create_order(
+        &self,
+        userid: i32,
+        itemids: Vec<i32>,
+        order_deliver_at: Option<String>,
+    ) -> Result<(), RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!("create_order: failed to acquire DB connection: {}", e);
             e
@@ -125,17 +132,15 @@ impl OrderOperations {
         }
 
         conn.connection().transaction(|conn| {
-            let order_total_price = items_in_order.iter().map(|e| e.price * *ordered_qty.get(&e.item_id).unwrap_or(&1) as i32).sum::<i32>();
+            let order_total_price = items_in_order
+                .iter()
+                .map(|e| e.price * *ordered_qty.get(&e.item_id).unwrap_or(&1) as i32)
+                .sum::<i32>();
 
             // Add to active orders
             {
-                let mut order_deliver_time_enum: Option<TimeBandEnum> = None;
-                if order_deliver_at == Some(String::from("11:00am - 12:00pm")) {
-                    order_deliver_time_enum = Some(TimeBandEnum::ElevenAM);
-                }
-                else if order_deliver_at == Some(String::from("12:00pm - 01:00pm")) {
-                    order_deliver_time_enum = Some(TimeBandEnum::TwevlvePM);
-                }
+                let order_deliver_time_enum: Option<TimeBandEnum> =
+                    TimeBandEnum::get_enum_from_str(order_deliver_at.as_deref());
                 let new_order_id: i32;
                 {
                     use crate::db::schema::active_orders::dsl::*;
@@ -144,7 +149,8 @@ impl OrderOperations {
                             user_id.eq(&userid),
                             canteen_id.eq(&canteen_id_in_order),
                             total_price.eq(&order_total_price),
-                            deliver_at.eq(&order_deliver_time_enum)))
+                            deliver_at.eq(&order_deliver_time_enum),
+                        ))
                         .returning(order_id)
                         .get_result::<i32>(conn)
                         .map_err(RepositoryError::DatabaseError)?;
@@ -203,9 +209,15 @@ impl OrderOperations {
         })
     }
 
-    pub fn get_all_orders_by_count(&self, search_canteen_id: i32) -> Result<TimedActiveItemCount, RepositoryError> {
+    pub fn get_all_orders_by_count(
+        &self,
+        search_canteen_id: i32,
+    ) -> Result<TimedActiveItemCount, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
-            error!("get_all_orders_by_count: failed to acquire DB connection.: {}", e);
+            error!(
+                "get_all_orders_by_count: failed to acquire DB connection.: {}",
+                e
+            );
             e
         })?;
 
@@ -213,23 +225,19 @@ impl OrderOperations {
 
         let db_resp = active_order_items::table
             .inner_join(
-                active_orders::table.on(
-                    active_order_items::order_id.eq(active_orders::order_id))
+                active_orders::table.on(active_order_items::order_id.eq(active_orders::order_id)),
             )
-            .inner_join(
-                menu_items::table.on(
-                    active_order_items::item_id.eq(menu_items::item_id))
-            )
+            .inner_join(menu_items::table.on(active_order_items::item_id.eq(menu_items::item_id)))
             .group_by((
                 active_order_items::item_id,
                 active_orders::deliver_at,
-                menu_items::name
+                menu_items::name,
             ))
             .select((
                 active_order_items::item_id,
                 menu_items::name,
                 sum(active_order_items::quantity),
-                active_orders::deliver_at
+                active_orders::deliver_at,
             ))
             .filter(active_orders::canteen_id.eq(search_canteen_id))
             .load::<ItemNameQtyTime>(conn.connection())
@@ -262,13 +270,11 @@ impl OrderOperations {
             } else {
                 resp.insert(
                     deliver_time_string,
-                    vec![
-                        ActiveItemCount {
-                            item_id: item.item_id,
-                            item_name: item.item_name,
-                            num_ordered: item.total_quantity.unwrap_or(1),
-                        }
-                    ],
+                    vec![ActiveItemCount {
+                        item_id: item.item_id,
+                        item_name: item.item_name,
+                        num_ordered: item.total_quantity.unwrap_or(1),
+                    }],
                 );
             }
         }
@@ -277,7 +283,8 @@ impl OrderOperations {
 
     fn group_order_items(items: Vec<OrderItems>) -> Vec<OrderItemContainer> {
         debug!("Ungrouped order items: {:?}", &items);
-        let mut grouped: HashMap<i32, (i32, Option<TimeBandEnum>, Vec<ItemContainer>)> = HashMap::new();
+        let mut grouped: HashMap<i32, (i32, Option<TimeBandEnum>, Vec<ItemContainer>)> =
+            HashMap::new();
 
         for item in items {
             let (_, _, new_item) = grouped
@@ -285,13 +292,13 @@ impl OrderOperations {
                 .or_insert_with(|| (item.total_price, item.deliver_at, Vec::new()));
 
             new_item.push(ItemContainer {
-                    canteen_name: item.canteen_name,
-                    name: item.name,
-                    quantity: item.quantity,
-                    is_veg: item.is_veg,
-                    pic_link: item.pic_link,
-                    description: item.description,
-                });
+                canteen_name: item.canteen_name,
+                name: item.name,
+                quantity: item.quantity,
+                is_veg: item.is_veg,
+                pic_link: item.pic_link,
+                description: item.description,
+            });
         }
         debug!("Grouped order items: {:?}", &grouped);
 
@@ -302,7 +309,12 @@ impl OrderOperations {
                     Some(deliver_at) => deliver_at.human_readable().to_string(),
                     None => "Instant".to_string(),
                 };
-                OrderItemContainer { order_id, items, total_price, deliver_at:order_deliver_time_string }
+                OrderItemContainer {
+                    order_id,
+                    items,
+                    total_price,
+                    deliver_at: order_deliver_time_string,
+                }
             })
             .collect()
     }
@@ -353,7 +365,6 @@ impl OrderOperations {
                     other => RepositoryError::DatabaseError(other),
                 }
             })?;
-
 
         Ok(Self::group_order_items(order_items))
     }
@@ -421,7 +432,9 @@ impl OrderOperations {
         let order_items = active_order_items::table
             .inner_join(menu_items::table.on(active_order_items::item_id.eq(menu_items::item_id)))
             .inner_join(canteens::table.on(menu_items::canteen_id.eq(canteens::canteen_id)))
-            .inner_join(active_orders::table.on(active_order_items::order_id.eq(active_orders::order_id)))
+            .inner_join(
+                active_orders::table.on(active_order_items::order_id.eq(active_orders::order_id)),
+            )
             .filter(active_order_items::order_id.eq(search_order_id))
             .select((
                 active_order_items::order_id,

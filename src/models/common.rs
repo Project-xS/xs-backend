@@ -1,11 +1,14 @@
-use std::io::Write;
+use crate::db::schema::sql_types::TimeBand;
 use chrono::{DateTime, Utc};
-use diesel::{serialize, AsExpression, Associations, FromSqlRow, Identifiable, Insertable, Queryable, Selectable};
 use diesel::deserialize::FromSql;
 use diesel::serialize::{IsNull, Output, ToSql};
+use diesel::{
+    serialize, AsExpression, Associations, FromSqlRow, Identifiable, Insertable, Queryable,
+    Selectable,
+};
 use serde::{Deserialize, Serialize};
+use std::io::Write;
 use utoipa::ToSchema;
-use crate::db::schema::sql_types::TimeBand;
 
 diesel::allow_columns_to_appear_in_same_group_by_clause!(
     crate::db::schema::menu_items::name,
@@ -13,11 +16,13 @@ diesel::allow_columns_to_appear_in_same_group_by_clause!(
     crate::db::schema::active_orders::deliver_at,
 );
 
-#[derive(Debug, PartialEq, FromSqlRow, AsExpression, Eq, Serialize, Deserialize, ToSchema, Hash)]
+#[derive(
+    Debug, PartialEq, FromSqlRow, AsExpression, Eq, Serialize, Deserialize, ToSchema, Hash,
+)]
 #[diesel(sql_type = TimeBand)]
 pub enum TimeBandEnum {
     ElevenAM,
-    TwevlvePM
+    TwevlvePM,
 }
 
 impl ToSql<TimeBand, diesel::pg::Pg> for TimeBandEnum {
@@ -45,6 +50,13 @@ impl TimeBandEnum {
         match self {
             Self::ElevenAM => "11:00am - 12:00pm",
             Self::TwevlvePM => "12:00pm - 01:00pm",
+        }
+    }
+    pub fn get_enum_from_str(text: Option<&str>) -> Option<TimeBandEnum> {
+        match text {
+            Some("11:00am - 12:00pm") => Some(TimeBandEnum::ElevenAM),
+            Some("12:00pm - 01:00pm") => Some(TimeBandEnum::TwevlvePM),
+            _ => None,
         }
     }
 }
