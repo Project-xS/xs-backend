@@ -15,5 +15,6 @@ pub enum RepositoryError {
     ValidationError(String),
 
     #[error("Internal error: {0}")]
+    #[allow(dead_code)]
     InternalError(String),
 }

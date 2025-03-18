@@ -1,5 +1,14 @@
+use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+
+// #[derive(Serialize, ToSchema)]
+// pub struct TimedActiveItemCount {
+//     pub deliver_at: TimeBandEnum,
+//     pub items: Vec<ActiveItemCount>,
+// }
+
+pub type TimedActiveItemCount = HashMap<String, Vec<ActiveItemCount>>;
 
 #[derive(Serialize, ToSchema)]
 pub struct ActiveItemCount {
@@ -9,9 +18,9 @@ pub struct ActiveItemCount {
 }
 
 #[derive(Serialize, ToSchema)]
-pub struct ActiveItemCountResponse {
+pub struct TimedActiveItemCountResponse {
     pub status: String,
-    pub data: Vec<ActiveItemCount>,
+    pub data: TimedActiveItemCount,
     pub error: Option<String>,
 }
 
@@ -29,7 +38,7 @@ pub struct ItemContainer {
 pub struct OrderItemContainer {
     pub order_id: i32,
     pub total_price: i32,
-    pub deliver_at: Option<String>,
+    pub deliver_at: String,
     pub items: Vec<ItemContainer>,
 }
 

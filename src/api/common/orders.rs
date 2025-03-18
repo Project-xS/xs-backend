@@ -1,8 +1,5 @@
 use crate::db::OrderOperations;
-use crate::enums::common::{
-    ActiveItemCountResponse, OrderItemContainer, OrderItemsResponse, OrderRequest, OrderResponse,
-    OrdersItemsResponse,
-};
+use crate::enums::common::{OrderItemContainer, OrderItemsResponse, OrderRequest, OrderResponse, OrdersItemsResponse, TimedActiveItemCount, TimedActiveItemCountResponse};
 use actix_web::{get, post, put, web, HttpResponse, Responder};
 use log::{debug, error};
 use serde::Deserialize;
@@ -12,6 +9,11 @@ use utoipa::IntoParams;
 struct UserOrderQuery {
     user_id: Option<i32>,
     rfid: Option<String>,
+}
+
+#[derive(Deserialize, Debug, IntoParams)]
+struct OrderCanteenQuery {
+    canteen_id: i32,
 }
 
 #[utoipa::path(
@@ -61,19 +63,35 @@ pub(super) async fn create_order(
 
 #[utoipa::path(
     tag = "Orders",
+    params(
+        OrderCanteenQuery,
+    ),
     responses(
-        (status = 200, description = "Successfully fetched aggregated counts of active ordered items", body = ActiveItemCountResponse)
+        (status = 200, description = "Successfully fetched aggregated counts of active ordered items", body = TimedActiveItemCountResponse)
     ),
     summary = "Get aggregated active order item counts"
 )]
 #[get("")]
-pub(super) async fn get_all_orders(order_ops: web::Data<OrderOperations>) -> impl Responder {
-    let resp = order_ops.get_all_orders_by_count();
-    HttpResponse::Ok().json(ActiveItemCountResponse {
-        status: "ok".to_string(),
-        data: resp,
-        error: None,
-    })
+pub(super) async fn get_all_orders(order_ops: web::Data<OrderOperations>, params: web::Query<OrderCanteenQuery>) -> impl Responder {
+    let search_canteen_id = params.canteen_id;
+    match order_ops.get_all_orders_by_count(search_canteen_id) {
+        Ok(data) => {
+            debug!(
+                "get_all_orders_by_count: retrieved {} items.",
+                data.len(),
+            );
+            HttpResponse::Ok().json(TimedActiveItemCountResponse {
+                status: "ok".to_string(),
+                data,
+                error: None,
+            })
+        }
+        Err(e) => HttpResponse::InternalServerError().json(TimedActiveItemCountResponse {
+            status: "error".to_string(),
+            data: TimedActiveItemCount::new(),
+            error: Option::from(e.to_string()),
+        }),
+    }
 }
 
 #[utoipa::path(
@@ -110,7 +128,7 @@ pub(super) async fn get_order_by_orderid(
             data: OrderItemContainer {
                 order_id: search_order_id,
                 total_price: 0,
-                deliver_at: None,
+                deliver_at: String::new(),
                 items: Vec::new(),
             },
             error: Option::from(e.to_string()),

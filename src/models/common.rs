@@ -9,10 +9,11 @@ use crate::db::schema::sql_types::TimeBand;
 
 diesel::allow_columns_to_appear_in_same_group_by_clause!(
     crate::db::schema::menu_items::name,
-    crate::db::schema::active_order_items::item_id
+    crate::db::schema::active_order_items::item_id,
+    crate::db::schema::active_orders::deliver_at,
 );
 
-#[derive(Debug, PartialEq, FromSqlRow, AsExpression, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, PartialEq, FromSqlRow, AsExpression, Eq, Serialize, Deserialize, ToSchema, Hash)]
 #[diesel(sql_type = TimeBand)]
 pub enum TimeBandEnum {
     ElevenAM,
@@ -35,6 +36,15 @@ impl FromSql<TimeBand, diesel::pg::Pg> for TimeBandEnum {
             b"ElevenAM" => Ok(TimeBandEnum::ElevenAM),
             b"TwelvePM" => Ok(TimeBandEnum::TwevlvePM),
             _ => Err("Unrecognized enum variant".into()),
+        }
+    }
+}
+
+impl TimeBandEnum {
+    pub fn human_readable(&self) -> &str {
+        match self {
+            Self::ElevenAM => "11:00am - 12:00pm",
+            Self::TwevlvePM => "12:00pm - 01:00pm",
         }
     }
 }
