@@ -9,6 +9,7 @@ pub struct Canteen {
     pub canteen_id: i32,
     pub canteen_name: String,
     pub location: String,
+    pub pic_link: Option<String>,
 }
 
 #[derive(Insertable, Debug, Serialize, Deserialize, ToSchema)]
@@ -16,6 +17,7 @@ pub struct Canteen {
 pub struct NewCanteen {
     pub canteen_name: String,
     pub location: String,
+    pub pic_link: Option<String>,
 }
 
 #[derive(Queryable, Debug, Identifiable, Serialize, Deserialize, ToSchema, Selectable)]
