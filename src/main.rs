@@ -8,10 +8,7 @@ mod enums;
 mod models;
 
 use crate::api::default_error_handler;
-use crate::db::{
-    establish_connection_pool, run_db_migrations, CanteenOperations, MenuOperations,
-    OrderOperations, SearchOperations, UserOperations,
-};
+use crate::db::{establish_connection_pool, run_db_migrations, AssetUploadOperations, CanteenOperations, MenuOperations, OrderOperations, SearchOperations, UserOperations};
 use actix_web::{middleware, web, App, HttpServer};
 use dotenvy::dotenv;
 use utoipa::OpenApi;
@@ -25,10 +22,11 @@ pub(crate) struct AppState {
     canteen_ops: CanteenOperations,
     order_ops: OrderOperations,
     search_ops: SearchOperations,
+    asset_ops: AssetUploadOperations
 }
 
 impl AppState {
-    pub(crate) fn new(url: &str) -> Self {
+    pub(crate) async fn new(url: &str) -> Self {
         let db = establish_connection_pool(url);
         run_db_migrations(db.clone()).expect("Unable to run migrations");
         let user_ops = UserOperations::new(db.clone());
@@ -36,12 +34,14 @@ impl AppState {
         let canteen_ops = CanteenOperations::new(db.clone());
         let order_ops = OrderOperations::new(db.clone());
         let search_ops = SearchOperations::new(db.clone());
+        let asset_ops = AssetUploadOperations::new().await.expect("Unable to create asset_upload operations");
         AppState {
             user_ops,
             menu_ops,
             canteen_ops,
             order_ops,
             search_ops,
+            asset_ops
         }
     }
 }
@@ -69,7 +69,7 @@ async fn main() -> std::io::Result<()> {
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
     // App State initialization & App Connection
-    let state = AppState::new(database_url.as_str());
+    let state = AppState::new(database_url.as_str()).await;
 
     // Server configuration
     const HOST: &str = if cfg!(debug_assertions) {

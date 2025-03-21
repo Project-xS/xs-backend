@@ -65,3 +65,10 @@ pub struct AllCanteenResponse {
     pub data: Vec<Canteen>,
     pub error: Option<String>,
 }
+
+#[derive(Serialize, ToSchema)]
+pub struct ItemUploadResponse {
+    pub status: String,
+    pub url: String,
+    pub error: Option<String>,
+}

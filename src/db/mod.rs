@@ -9,6 +9,7 @@ mod users;
 
 pub use admin::canteen::CanteenOperations;
 pub use admin::menu::MenuOperations;
+pub use admin::asset_upload::AssetUploadOperations;
 pub use common::orders::OrderOperations;
 pub use common::search::SearchOperations;
 pub use errors::RepositoryError;

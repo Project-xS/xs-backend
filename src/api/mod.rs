@@ -43,7 +43,7 @@ impl Guard for ContentTypeHeader {
 
 pub(crate) fn configure(cfg: &mut ServiceConfig, state: &AppState) {
     cfg.service(root_endpoint)
-        .configure(|cfg| admin::config(cfg, &state.menu_ops, &state.canteen_ops))
+        .configure(|cfg| admin::config(cfg, &state.menu_ops, &state.canteen_ops, &state.asset_ops))
         .configure(|cfg| users::config(cfg, &state.user_ops))
         .configure(|cfg| common::config(cfg, &state.order_ops, &state.search_ops));
 }

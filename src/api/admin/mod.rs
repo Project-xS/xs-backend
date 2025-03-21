@@ -1,15 +1,17 @@
 use crate::api::ContentTypeHeader;
-use crate::db::{CanteenOperations, MenuOperations};
+use crate::db::{AssetUploadOperations, CanteenOperations, MenuOperations};
 use actix_web::middleware::NormalizePath;
 use actix_web::web;
 use canteen::*;
 use menu::*;
+use asset_upload::*;
 use utoipa_actix_web::{scope, service_config::ServiceConfig};
 
 mod canteen;
 mod menu;
+mod asset_upload;
 
-pub fn config(cfg: &mut ServiceConfig, menu_ops: &MenuOperations, canteen_ops: &CanteenOperations) {
+pub fn config(cfg: &mut ServiceConfig, menu_ops: &MenuOperations, canteen_ops: &CanteenOperations, asset_ops: &AssetUploadOperations) {
     cfg.service(
         scope::scope("/menu")
             .wrap(NormalizePath::trim())
@@ -41,5 +43,12 @@ pub fn config(cfg: &mut ServiceConfig, menu_ops: &MenuOperations, canteen_ops: &
                     .service(get_all_canteens)
                     .service(get_canteen_menu),
             ),
-    );
+    )
+        .service(
+            scope::scope("/assets")
+                .wrap(NormalizePath::trim())
+                .app_data(web::Data::new(asset_ops.clone()))
+                .service(upload_image_handler)
+                .service(get_image_handler)
+        );
 }
