@@ -7,6 +7,7 @@ app = 'proj-xs'
 primary_region = 'sin'
 
 [build]
+image = "proj-xs:latest"
 
 [http_service]
   internal_port = 8080
