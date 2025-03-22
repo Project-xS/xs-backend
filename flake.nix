@@ -41,7 +41,7 @@
 
             };
 
-            dockerImage = pkgs.dockerTools.buildImage {
+            dockerImage = pkgs.dockerTools.buildLayeredImage {
               name = "proj-xs";
               tag = "latest";
               config = { Cmd = [ "${myRustBuild}/bin/proj-xs" ]; };
