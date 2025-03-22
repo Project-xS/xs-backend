@@ -21,3 +21,6 @@ target/
 .idea/
 .env
 .aider*
+
+# Nix Build Result
+result
