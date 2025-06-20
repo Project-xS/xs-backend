@@ -8,7 +8,10 @@ mod enums;
 mod models;
 
 use crate::api::default_error_handler;
-use crate::db::{establish_connection_pool, run_db_migrations, AssetUploadOperations, CanteenOperations, MenuOperations, OrderOperations, SearchOperations, UserOperations};
+use crate::db::{
+    establish_connection_pool, run_db_migrations, AssetUploadOperations, CanteenOperations,
+    MenuOperations, OrderOperations, SearchOperations, UserOperations,
+};
 use actix_web::{middleware, web, App, HttpServer};
 use dotenvy::dotenv;
 use utoipa::OpenApi;
@@ -22,7 +25,7 @@ pub(crate) struct AppState {
     canteen_ops: CanteenOperations,
     order_ops: OrderOperations,
     search_ops: SearchOperations,
-    asset_ops: AssetUploadOperations
+    asset_ops: AssetUploadOperations,
 }
 
 impl AppState {
@@ -34,14 +37,16 @@ impl AppState {
         let canteen_ops = CanteenOperations::new(db.clone());
         let order_ops = OrderOperations::new(db.clone());
         let search_ops = SearchOperations::new(db.clone());
-        let asset_ops = AssetUploadOperations::new().await.expect("Unable to create asset_upload operations");
+        let asset_ops = AssetUploadOperations::new()
+            .await
+            .expect("Unable to create asset_upload operations");
         AppState {
             user_ops,
             menu_ops,
             canteen_ops,
             order_ops,
             search_ops,
-            asset_ops
+            asset_ops,
         }
     }
 }

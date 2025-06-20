@@ -5,9 +5,10 @@ repos:
       - id: fmt
         name: Format
         description: Format files with rustfmt.
-        entry: rustfmt
+        entry: cargo +nightly fmt
         language: system
         pass_filenames: false
+        files: \.rs$
 
       - id: cargo-check
         name: Check

@@ -260,8 +260,7 @@ pub(super) async fn order_actions(
             status: "error".to_string(),
             error: Option::from(
                 format!(
-                    "status cannot be {:?}, must be either \"delivered\" or \"cancelled\".",
-                    status
+                    "status cannot be {status}, must be either \"delivered\" or \"cancelled\"."
                 )
                 .to_string(),
             ),

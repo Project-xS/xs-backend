@@ -240,6 +240,7 @@ impl OrderOperations {
                 active_orders::deliver_at,
             ))
             .filter(active_orders::canteen_id.eq(search_canteen_id))
+            .order(active_orders::ordered_at.asc())
             .load::<ItemNameQtyTime>(conn.connection())
             .map_err(|e| {
                 error!(
@@ -447,6 +448,7 @@ impl OrderOperations {
                 menu_items::pic_link,
                 menu_items::description,
             ))
+            .order(menu_items::item_id.asc())
             .load::<OrderItems>(conn.connection())
             .map_err(|e| {
                 error!(
@@ -511,7 +513,7 @@ impl OrderOperations {
             }
             let items_in_order: Vec<i32> = order_items
                 .iter().flat_map(|item| {
-                    std::iter::repeat(item.item_id).take(item.quantity as usize)
+                    std::iter::repeat_n(item.item_id, item.quantity as usize)
                 })
                 .collect();
             let first_item = order_items.first().unwrap();

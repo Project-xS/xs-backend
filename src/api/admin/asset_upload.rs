@@ -1,7 +1,7 @@
-use actix_web::{get, post, web, HttpResponse, Responder};
-use uuid::Uuid;
 use crate::db::AssetUploadOperations;
 use crate::enums::admin::ItemUploadResponse;
+use actix_web::{get, post, web, HttpResponse, Responder};
+use uuid::Uuid;
 
 #[utoipa::path(
     tag = "Assets",
@@ -29,7 +29,8 @@ pub async fn upload_image_handler(asset_ops: web::Data<AssetUploadOperations>) -
         }
         Err(e) => {
             error!(
-                "upload_image: couldn't generate presigned url '{:?}'", s3_key,
+                "upload_image: couldn't generate presigned url '{:?}'",
+                s3_key,
             );
             HttpResponse::InternalServerError().json(ItemUploadResponse {
                 status: "error".to_string(),
@@ -54,7 +55,10 @@ pub async fn upload_image_handler(asset_ops: web::Data<AssetUploadOperations>) -
 
 )]
 #[get("/{key}")]
-pub async fn get_image_handler(asset_ops: web::Data<AssetUploadOperations>, path: web::Path<(String, )>) -> impl Responder {
+pub async fn get_image_handler(
+    asset_ops: web::Data<AssetUploadOperations>,
+    path: web::Path<(String,)>,
+) -> impl Responder {
     let s3_key = path.into_inner().0;
     match asset_ops.get_object(&s3_key).await {
         Ok(url) => {
@@ -69,9 +73,7 @@ pub async fn get_image_handler(asset_ops: web::Data<AssetUploadOperations>, path
             })
         }
         Err(e) => {
-            error!(
-                "get_image: couldn't generate presigned url '{:?}'", s3_key,
-            );
+            error!("get_image: couldn't generate presigned url '{:?}'", s3_key,);
             HttpResponse::InternalServerError().json(ItemUploadResponse {
                 status: "error".to_string(),
                 url: String::new(),

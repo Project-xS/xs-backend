@@ -92,10 +92,13 @@ impl MenuOperations {
             e
         })?;
 
-        menu_items.load::<MenuItem>(conn.connection()).map_err(|e| {
-            error!("get_all_menu_items: error fetching menu items: {}", e);
-            RepositoryError::DatabaseError(e)
-        })
+        menu_items
+            .order_by(item_id.asc())
+            .load::<MenuItem>(conn.connection())
+            .map_err(|e| {
+                error!("get_all_menu_items: error fetching menu items: {}", e);
+                RepositoryError::DatabaseError(e)
+            })
     }
 
     pub fn get_menu_item(&self, itemid: i32) -> Result<MenuItem, RepositoryError> {

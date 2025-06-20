@@ -48,10 +48,13 @@ impl CanteenOperations {
             e
         })?;
 
-        canteens.load::<Canteen>(conn.connection()).map_err(|e| {
-            error!("get_all_canteens: error fetching canteens: {}", e);
-            RepositoryError::DatabaseError(e)
-        })
+        canteens
+            .order_by(canteen_id.asc())
+            .load::<Canteen>(conn.connection())
+            .map_err(|e| {
+                error!("get_all_canteens: error fetching canteens: {}", e);
+                RepositoryError::DatabaseError(e)
+            })
     }
 
     pub fn get_canteen_items(
@@ -66,6 +69,7 @@ impl CanteenOperations {
         use crate::db::schema::menu_items::dsl::*;
         menu_items
             .filter(canteen_id.eq(search_canteen_id))
+            .order(item_id.asc())
             .load::<MenuItem>(conn.connection())
             .map_err(|e| {
                 error!(
