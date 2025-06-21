@@ -67,7 +67,9 @@ async fn main() -> std::io::Result<()> {
 
     // Setup logging
     if std::env::var("RUST_LOG").is_err() {
-        std::env::set_var("RUST_LOG", "info");
+        unsafe {
+            std::env::set_var("RUST_LOG", "info");
+        }
     }
     pretty_env_logger::init();
 

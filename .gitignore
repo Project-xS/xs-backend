@@ -20,7 +20,8 @@ target/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 .idea/
 .env
-.aider*
+.vscode/
+.github/
 
 # Nix Build Result
 result

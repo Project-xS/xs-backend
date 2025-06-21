@@ -44,3 +44,45 @@ pub(super) async fn get_search_query_results(
         }
     }
 }
+
+#[utoipa::path(
+    tag = "Search",
+    params(
+        ("query", description = "The search query used to perform a fuzzy match on menu item names."),
+    ),
+    responses(
+        (status = 200, description = "Successfully retrieved fuzzy search results for menu items", body = AllItemsResponse)
+    ),
+    summary = "Perform fuzzy search on menu items"
+)]
+#[get("/{canteen_id}/{query}")]
+pub(super) async fn search_query_by_canteen(
+    search_ops: web::Data<SearchOperations>,
+    path: web::Path<(i32, String)>,
+) -> impl Responder {
+    let (canteen_id, search_query) = &path.into_inner();
+    match search_ops.search_menu_items_by_canteen(canteen_id, &search_query.clone()) {
+        Ok(x) => {
+            debug!(
+                "search_query_by_canteen: successfully executed fuzzy search for query '{}'",
+                search_query
+            );
+            HttpResponse::Ok().json(AllItemsResponse {
+                status: "ok".to_string(),
+                data: x,
+                error: None,
+            })
+        }
+        Err(e) => {
+            error!(
+                "search_query_by_canteen: fuzzy search failed for query '{}': {}",
+                search_query, e
+            );
+            HttpResponse::BadRequest().json(AllItemsResponse {
+                status: "error".to_string(),
+                data: Vec::new(),
+                error: Some(e.to_string()),
+            })
+        }
+    }
+}
