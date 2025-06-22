@@ -2,9 +2,11 @@ use crate::db::errors::RepositoryError;
 use crate::db::schema::canteens::dsl::*;
 use crate::db::DbConnection;
 use crate::models::admin::{Canteen, MenuItem, NewCanteen};
+use diesel::dsl::sql;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
-
+use diesel::result::Error;
+use diesel::sql_types::{Bool, Text};
 use log::error;
 
 pub struct CanteenOperations {
@@ -78,6 +80,35 @@ impl CanteenOperations {
                 );
                 RepositoryError::DatabaseError(e)
             })
+    }
+
+    pub fn login_canteen(
+        &self,
+        try_username: &str,
+        try_password: &str,
+    ) -> Result<bool, RepositoryError> {
+        let mut conn = DbConnection::new(&self.pool).map_err(|e| {
+            error!("login_canteen: failed to acquire DB connection: {}", e);
+            e
+        })?;
+
+        let query = canteens.filter(username.eq(try_username)).select(
+            sql::<Bool>("password = crypt(")
+                .bind::<Text, _>(try_password)
+                .sql(", password)"),
+        );
+
+        match query.get_result::<bool>(conn.connection()) {
+            Ok(is_password_correct) => Ok(is_password_correct),
+            Err(Error::NotFound) => Ok(false),
+            Err(e) => {
+                error!(
+                    "login_canteen: error logging in canteen {:?}: {}",
+                    try_username, e
+                );
+                Err(RepositoryError::DatabaseError(e))
+            }
+        }
     }
 }
 

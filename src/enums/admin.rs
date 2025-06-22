@@ -72,3 +72,9 @@ pub struct ItemUploadResponse {
     pub url: String,
     pub error: Option<String>,
 }
+
+#[derive(Deserialize, ToSchema)]
+pub struct LoginRequest {
+    pub username: String,
+    pub password: String,
+}

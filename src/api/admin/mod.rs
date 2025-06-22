@@ -41,7 +41,8 @@ pub fn config(
             .service(
                 scope::scope("")
                     .guard(ContentTypeHeader)
-                    .service(create_canteen),
+                    .service(create_canteen)
+                    .service(login_canteen),
             )
             .service(
                 scope::scope("")

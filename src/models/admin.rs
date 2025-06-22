@@ -10,6 +10,8 @@ pub struct Canteen {
     pub canteen_name: String,
     pub location: String,
     pub pic_link: Option<String>,
+    pub username: String,
+    pub password: String,
 }
 
 #[derive(Insertable, Debug, Serialize, Deserialize, ToSchema)]

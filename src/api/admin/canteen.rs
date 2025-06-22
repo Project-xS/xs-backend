@@ -1,5 +1,7 @@
 use crate::db::CanteenOperations;
-use crate::enums::admin::{AllCanteenResponse, AllItemsResponse, NewCanteenResponse};
+use crate::enums::admin::{
+    AllCanteenResponse, AllItemsResponse, GeneralMenuResponse, LoginRequest, NewCanteenResponse,
+};
 use crate::models::admin::NewCanteen;
 use actix_web::{get, post, web, HttpResponse, Responder};
 use log::{debug, error};
@@ -111,6 +113,56 @@ pub(super) async fn get_canteen_menu(
             HttpResponse::InternalServerError().json(AllCanteenResponse {
                 status: "error".to_string(),
                 data: Vec::new(),
+                error: Some(e.to_string()),
+            })
+        }
+    }
+}
+
+#[utoipa::path(
+    tag = "Canteen",
+    request_body = LoginRequest,
+    responses(
+        (status = 200, description = "Successfully logged in", body = GeneralMenuResponse),
+        (status = 401, description = "Incorrect username or password", body = GeneralMenuResponse),
+        (status = 500, description = "Failed to retrieve login details due to server error", body = GeneralMenuResponse),
+    ),
+    summary = "Initiate login request for a canteen"
+)]
+#[post("/login")]
+pub(super) async fn login_canteen(
+    menu_ops: web::Data<CanteenOperations>,
+    req_data: web::Json<LoginRequest>,
+) -> impl Responder {
+    match menu_ops.login_canteen(&req_data.username, &req_data.password) {
+        Ok(login_status) => {
+            if login_status {
+                debug!(
+                    "login_canteen: successfully logged in canteen {}",
+                    &req_data.username
+                );
+                HttpResponse::Ok().json(GeneralMenuResponse {
+                    status: "ok".to_string(),
+                    error: None,
+                })
+            } else {
+                debug!(
+                    "login_canteen: incorrect password for canteen {}",
+                    &req_data.username
+                );
+                HttpResponse::Unauthorized().json(GeneralMenuResponse {
+                    status: "invalid_password".to_string(),
+                    error: None,
+                })
+            }
+        }
+        Err(e) => {
+            error!(
+                "login_canteen: failed to login {}: {}",
+                &req_data.username, e
+            );
+            HttpResponse::InternalServerError().json(GeneralMenuResponse {
+                status: "error".to_string(),
                 error: Some(e.to_string()),
             })
         }

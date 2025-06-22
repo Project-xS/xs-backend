@@ -34,6 +34,8 @@ diesel::table! {
         canteen_name -> Varchar,
         location -> Varchar,
         pic_link -> Nullable<Varchar>,
+        username -> Varchar,
+        password -> Varchar,
     }
 }
 
