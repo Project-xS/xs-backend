@@ -73,3 +73,10 @@ pub struct UpdateMenuItem {
     pub pic_link: Option<String>,
     pub description: Option<String>,
 }
+
+#[derive(Debug, Selectable, Queryable, Serialize, ToSchema)]
+#[diesel(table_name = crate::db::schema::canteens)]
+pub struct CanteenLoginSuccess {
+    pub canteen_id: i32,
+    pub canteen_name: String,
+}

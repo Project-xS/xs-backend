@@ -1,6 +1,7 @@
 use crate::db::CanteenOperations;
 use crate::enums::admin::{
-    AllCanteenResponse, AllItemsResponse, GeneralMenuResponse, LoginRequest, NewCanteenResponse,
+    AllCanteenResponse, AllItemsResponse, GeneralMenuResponse, LoginRequest, LoginResponse,
+    NewCanteenResponse,
 };
 use crate::models::admin::NewCanteen;
 use actix_web::{get, post, web, HttpResponse, Responder};
@@ -136,13 +137,14 @@ pub(super) async fn login_canteen(
 ) -> impl Responder {
     match menu_ops.login_canteen(&req_data.username, &req_data.password) {
         Ok(login_status) => {
-            if login_status {
+            if login_status.is_some() {
                 debug!(
                     "login_canteen: successfully logged in canteen {}",
                     &req_data.username
                 );
-                HttpResponse::Ok().json(GeneralMenuResponse {
+                HttpResponse::Ok().json(LoginResponse {
                     status: "ok".to_string(),
+                    data: login_status,
                     error: None,
                 })
             } else {
@@ -150,8 +152,9 @@ pub(super) async fn login_canteen(
                     "login_canteen: incorrect password for canteen {}",
                     &req_data.username
                 );
-                HttpResponse::Unauthorized().json(GeneralMenuResponse {
-                    status: "invalid_password".to_string(),
+                HttpResponse::Unauthorized().json(LoginResponse {
+                    status: "invalid_credentials".to_string(),
+                    data: None,
                     error: None,
                 })
             }

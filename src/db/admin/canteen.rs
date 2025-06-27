@@ -1,8 +1,8 @@
 use crate::db::errors::RepositoryError;
 use crate::db::schema::canteens::dsl::*;
 use crate::db::DbConnection;
-use crate::models::admin::{Canteen, MenuItem, NewCanteen};
-use diesel::dsl::sql;
+use crate::models::admin::{Canteen, CanteenLoginSuccess, MenuItem, NewCanteen};
+use diesel::dsl::{case_when, sql};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::result::Error;
@@ -86,21 +86,37 @@ impl CanteenOperations {
         &self,
         try_username: &str,
         try_password: &str,
-    ) -> Result<bool, RepositoryError> {
+    ) -> Result<Option<CanteenLoginSuccess>, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!("login_canteen: failed to acquire DB connection: {}", e);
             e
         })?;
 
-        let query = canteens.filter(username.eq(try_username)).select(
-            sql::<Bool>("password = crypt(")
-                .bind::<Text, _>(try_password)
-                .sql(", password)"),
-        );
+        let query = canteens.filter(username.eq(try_username)).select((
+            canteen_id,
+            canteen_name,
+            case_when::<_, _, Bool>(
+                password.eq(sql::<Text>("crypt(")
+                    .bind::<Text, _>(try_password)
+                    .sql(", password)")),
+                true,
+            )
+            .otherwise(false),
+        ));
 
-        match query.get_result::<bool>(conn.connection()) {
-            Ok(is_password_correct) => Ok(is_password_correct),
-            Err(Error::NotFound) => Ok(false),
+        match query.get_result::<(i32, String, bool)>(conn.connection()) {
+            Ok(resp) => {
+                let (matched_canteen_id, matched_canteen_name, is_password_correct) = resp;
+                if is_password_correct {
+                    Ok(Some(CanteenLoginSuccess {
+                        canteen_id: matched_canteen_id,
+                        canteen_name: matched_canteen_name,
+                    }))
+                } else {
+                    Ok(None)
+                }
+            }
+            Err(Error::NotFound) => Ok(None),
             Err(e) => {
                 error!(
                     "login_canteen: error logging in canteen {:?}: {}",

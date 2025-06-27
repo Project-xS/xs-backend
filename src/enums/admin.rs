@@ -1,4 +1,4 @@
-use crate::models::admin::{Canteen, MenuItem, UpdateMenuItem};
+use crate::models::admin::{Canteen, CanteenLoginSuccess, MenuItem, UpdateMenuItem};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -77,4 +77,11 @@ pub struct ItemUploadResponse {
 pub struct LoginRequest {
     pub username: String,
     pub password: String,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct LoginResponse {
+    pub status: String,
+    pub error: Option<String>,
+    pub data: Option<CanteenLoginSuccess>,
 }
