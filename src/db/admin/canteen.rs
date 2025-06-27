@@ -36,6 +36,32 @@ impl CanteenOperations {
             })
     }
 
+    pub fn set_canteen_pic(&self, canteen_id_to_update: &i32) -> Result<usize, RepositoryError> {
+        let mut conn = DbConnection::new(&self.pool).map_err(|e| {
+            error!(
+                "approve_canteen_pic: failed to acquire DB connection: {}",
+                e
+            );
+            e
+        })?;
+
+        diesel::update(canteens.filter(canteen_id.eq(canteen_id_to_update)))
+            .set(pic_link.eq(true))
+            .execute(conn.connection())
+            .map_err(|e| {
+                error!(
+                    "approve_canteen_pic: error approving pic for menu item with id {}: {}",
+                    canteen_id_to_update, e
+                );
+                match e {
+                    Error::NotFound => {
+                        RepositoryError::NotFound(format!("canteens: {}", canteen_id_to_update))
+                    }
+                    other => RepositoryError::DatabaseError(other),
+                }
+            })
+    }
+
     // pub fn delete_canteen(&self, id: i32) -> Result<usize, RepositoryError> {
     //     todo!()
     // }

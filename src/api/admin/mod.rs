@@ -2,12 +2,12 @@ use crate::api::ContentTypeHeader;
 use crate::db::{AssetUploadOperations, CanteenOperations, MenuOperations};
 use actix_web::middleware::NormalizePath;
 use actix_web::web;
-use asset_upload::*;
+use asset_management::*;
 use canteen::*;
 use menu::*;
 use utoipa_actix_web::{scope, service_config::ServiceConfig};
 
-mod asset_upload;
+mod asset_management;
 mod canteen;
 mod menu;
 
@@ -31,7 +31,8 @@ pub fn config(
                 scope::scope("")
                     .service(get_all_menu_items)
                     .service(get_menu_item)
-                    .service(remove_menu_item),
+                    .service(remove_menu_item)
+                    .service(set_menu_pic_link),
             ),
     )
     .service(
@@ -46,6 +47,7 @@ pub fn config(
             )
             .service(
                 scope::scope("")
+                    .service(set_canteen_pic_link)
                     .service(get_all_canteens)
                     .service(get_canteen_menu),
             ),

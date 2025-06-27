@@ -9,9 +9,9 @@ pub struct Canteen {
     pub canteen_id: i32,
     pub canteen_name: String,
     pub location: String,
-    pub pic_link: Option<String>,
     pub username: String,
     pub password: String,
+    pub pic_link: bool,
 }
 
 #[derive(Insertable, Debug, Serialize, Deserialize, ToSchema)]
@@ -19,7 +19,7 @@ pub struct Canteen {
 pub struct NewCanteen {
     pub canteen_name: String,
     pub location: String,
-    pub pic_link: Option<String>,
+    pub pic_link: bool,
 }
 
 #[derive(Queryable, Debug, Identifiable, Serialize, Deserialize, ToSchema, Selectable)]
@@ -33,8 +33,8 @@ pub struct MenuItem {
     pub price: i32,
     pub stock: i32,
     pub is_available: bool,
-    pub pic_link: Option<String>,
     pub description: Option<String>,
+    pub pic_link: bool,
 }
 
 #[derive(Insertable, Debug, Serialize, Deserialize, ToSchema, Selectable)]
@@ -46,8 +46,8 @@ pub struct NewMenuItem {
     pub price: i32,
     pub stock: i32,
     pub is_available: bool,
-    pub pic_link: Option<String>,
     pub description: Option<String>,
+    pub pic_link: bool,
 }
 
 #[derive(Debug, Selectable, Queryable)]
@@ -70,8 +70,8 @@ pub struct UpdateMenuItem {
     pub price: Option<i32>,
     pub stock: Option<i32>,
     pub is_available: Option<bool>,
-    pub pic_link: Option<String>,
     pub description: Option<String>,
+    pub pic_link: bool,
 }
 
 #[derive(Debug, Selectable, Queryable, Serialize, ToSchema)]

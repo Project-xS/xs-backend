@@ -33,9 +33,9 @@ diesel::table! {
         canteen_id -> Int4,
         canteen_name -> Varchar,
         location -> Varchar,
-        pic_link -> Nullable<Varchar>,
         username -> Varchar,
         password -> Varchar,
+        pic_link -> Bool,
     }
 }
 
@@ -48,8 +48,8 @@ diesel::table! {
         price -> Int4,
         stock -> Int4,
         is_available -> Bool,
-        pic_link -> Nullable<Varchar>,
         description -> Nullable<Varchar>,
+        pic_link -> Bool,
     }
 }
 

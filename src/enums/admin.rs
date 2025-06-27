@@ -39,7 +39,7 @@ impl Default for MenuItem {
             price: 0,
             stock: -1,
             is_available: false,
-            pic_link: None,
+            pic_link: false,
             description: None,
         }
     }
@@ -70,6 +70,7 @@ pub struct AllCanteenResponse {
 pub struct ItemUploadResponse {
     pub status: String,
     pub url: String,
+    pub item_id: i32,
     pub error: Option<String>,
 }
 

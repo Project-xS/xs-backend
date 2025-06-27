@@ -1,7 +1,6 @@
 use crate::db::AssetUploadOperations;
 use crate::enums::admin::ItemUploadResponse;
 use actix_web::{get, post, web, HttpResponse, Responder};
-use uuid::Uuid;
 
 #[utoipa::path(
     tag = "Assets",
@@ -12,9 +11,12 @@ use uuid::Uuid;
     summary = "Generate s3 presigned URL to upload images",
     description = "Generates a s3 presigned URL to upload images with. Do a PUT request with the body as the image binary to the returned URL to upload images."
 )]
-#[post("/upload")]
-pub async fn upload_image_handler(asset_ops: web::Data<AssetUploadOperations>) -> impl Responder {
-    let s3_key = Uuid::new_v4().to_string();
+#[post("/upload/{item_id}")]
+pub async fn upload_image_handler(
+    asset_ops: web::Data<AssetUploadOperations>,
+    path: web::Path<(i32,)>,
+) -> impl Responder {
+    let s3_key = path.into_inner().0;
     match asset_ops.upload_object(&s3_key).await {
         Ok(url) => {
             debug!(
@@ -24,6 +26,7 @@ pub async fn upload_image_handler(asset_ops: web::Data<AssetUploadOperations>) -
             HttpResponse::Ok().json(ItemUploadResponse {
                 status: "ok".to_string(),
                 url: url.to_string(),
+                item_id: s3_key,
                 error: None,
             })
         }
@@ -35,6 +38,7 @@ pub async fn upload_image_handler(asset_ops: web::Data<AssetUploadOperations>) -
             HttpResponse::InternalServerError().json(ItemUploadResponse {
                 status: "error".to_string(),
                 url: String::new(),
+                item_id: -1,
                 error: Some(e.to_string()),
             })
         }
@@ -57,7 +61,7 @@ pub async fn upload_image_handler(asset_ops: web::Data<AssetUploadOperations>) -
 #[get("/{key}")]
 pub async fn get_image_handler(
     asset_ops: web::Data<AssetUploadOperations>,
-    path: web::Path<(String,)>,
+    path: web::Path<(i32,)>,
 ) -> impl Responder {
     let s3_key = path.into_inner().0;
     match asset_ops.get_object(&s3_key).await {
@@ -69,6 +73,7 @@ pub async fn get_image_handler(
             HttpResponse::Ok().json(ItemUploadResponse {
                 status: "ok".to_string(),
                 url: url.to_string(),
+                item_id: s3_key,
                 error: None,
             })
         }
@@ -77,6 +82,7 @@ pub async fn get_image_handler(
             HttpResponse::InternalServerError().json(ItemUploadResponse {
                 status: "error".to_string(),
                 url: String::new(),
+                item_id: -1,
                 error: Some(e.to_string()),
             })
         }

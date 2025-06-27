@@ -41,12 +41,12 @@ impl AssetUploadOperations {
         })
     }
 
-    pub async fn upload_object(&self, key: &str) -> Result<String, S3Error> {
+    pub async fn upload_object(&self, key: &i32) -> Result<String, S3Error> {
         let response = self
             .client
             .put_object()
             .bucket(&self.bucket_name)
-            .key(key)
+            .key(key.to_string())
             .presigned(
                 PresigningConfig::builder()
                     .expires_in(Duration::from_secs(6 * 50))
@@ -61,12 +61,12 @@ impl AssetUploadOperations {
         Ok(response.uri().to_string())
     }
 
-    pub async fn get_object(&self, key: &str) -> Result<String, S3Error> {
+    pub async fn get_object(&self, key: &i32) -> Result<String, S3Error> {
         let response = self
             .client
             .get_object()
             .bucket(&self.bucket_name)
-            .key(key)
+            .key(key.to_string())
             .presigned(
                 PresigningConfig::builder()
                     .expires_in(Duration::from_secs(6 * 50))

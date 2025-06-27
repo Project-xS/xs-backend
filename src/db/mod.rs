@@ -7,7 +7,7 @@ mod errors;
 pub mod schema;
 mod users;
 
-pub use admin::asset_upload::AssetUploadOperations;
+pub use admin::asset_management::AssetUploadOperations;
 pub use admin::canteen::CanteenOperations;
 pub use admin::menu::MenuOperations;
 pub use common::orders::OrderOperations;

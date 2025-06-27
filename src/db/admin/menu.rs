@@ -35,6 +35,29 @@ impl MenuOperations {
             })
     }
 
+    pub fn set_menu_item_pic(&self, item_id_to_update: &i32) -> Result<usize, RepositoryError> {
+        let mut conn = DbConnection::new(&self.pool).map_err(|e| {
+            error!("add_menu_item: failed to acquire DB connection: {}", e);
+            e
+        })?;
+
+        diesel::update(menu_items.filter(item_id.eq(item_id_to_update)))
+            .set(pic_link.eq(true))
+            .execute(conn.connection())
+            .map_err(|e| {
+                error!(
+                    "approve_menu_item_pic: error approving pic for menu item with id {}: {}",
+                    item_id_to_update, e
+                );
+                match e {
+                    Error::NotFound => {
+                        RepositoryError::NotFound(format!("menu_items: {}", item_id_to_update))
+                    }
+                    other => RepositoryError::DatabaseError(other),
+                }
+            })
+    }
+
     pub fn remove_menu_item(&self, id: i32) -> Result<MenuItem, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!(

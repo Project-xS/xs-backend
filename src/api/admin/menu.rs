@@ -90,6 +90,47 @@ pub(super) async fn remove_menu_item(
 
 #[utoipa::path(
     tag = "Menu",
+    params(
+        ("item_id", description = "The unique identifier of the item to set pic for."),
+    ),
+    responses(
+        (status = 200, description = "Menu item updated successfully", body = GeneralMenuResponse),
+        (status = 409, description = "Failed to update menu item due to conflict", body = GeneralMenuResponse)
+    ),
+    summary = "Set picture link for a menu item after uploading the asset."
+)]
+#[put("/set_pic/{item_id}")]
+pub(super) async fn set_menu_pic_link(
+    menu_ops: web::Data<MenuOperations>,
+    path: web::Path<(i32,)>,
+) -> impl Responder {
+    let item_id_to_set = path.into_inner().0;
+    match menu_ops.set_menu_item_pic(&item_id_to_set) {
+        Ok(_x) => {
+            debug!(
+                "set_menu_pic_link: successfully approved pic for menu item '{}'",
+                item_id_to_set
+            );
+            HttpResponse::Ok().json(GeneralMenuResponse {
+                status: "ok".to_string(),
+                error: None,
+            })
+        }
+        Err(e) => {
+            error!(
+                "set_menu_pic_link: failed to approve pic for menu item with id {}: {}",
+                item_id_to_set, e
+            );
+            HttpResponse::Conflict().json(GeneralMenuResponse {
+                status: "error".to_string(),
+                error: Some(e.to_string()),
+            })
+        }
+    }
+}
+
+#[utoipa::path(
+    tag = "Menu",
     request_body = UpdateItemRequest,
     responses(
         (status = 200, description = "Menu item updated successfully", body = GeneralMenuResponse),

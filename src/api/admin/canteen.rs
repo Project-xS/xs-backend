@@ -4,7 +4,7 @@ use crate::enums::admin::{
     NewCanteenResponse,
 };
 use crate::models::admin::NewCanteen;
-use actix_web::{get, post, web, HttpResponse, Responder};
+use actix_web::{get, post, put, web, HttpResponse, Responder};
 use log::{debug, error};
 
 #[utoipa::path(
@@ -39,6 +39,47 @@ pub(super) async fn create_canteen(
                 item_name, e
             );
             HttpResponse::BadRequest().json(NewCanteenResponse {
+                status: "error".to_string(),
+                error: Some(e.to_string()),
+            })
+        }
+    }
+}
+
+#[utoipa::path(
+    tag = "Canteen",
+    params(
+        ("canteen_id", description = "The unique identifier of the canteen to set pic for."),
+    ),
+    responses(
+        (status = 200, description = "Canteen pic set successfully", body = NewCanteenResponse),
+        (status = 409, description = "Failed to set pic for canteen due to conflict", body = NewCanteenResponse)
+    ),
+    summary = "Set picture link for a menu item after uploading the asset."
+)]
+#[put("/set_pic/{canteen_id}")]
+pub(super) async fn set_canteen_pic_link(
+    canteen_ops: web::Data<CanteenOperations>,
+    path: web::Path<(i32,)>,
+) -> impl Responder {
+    let canteen_id_to_set = path.into_inner().0;
+    match canteen_ops.set_canteen_pic(&canteen_id_to_set) {
+        Ok(_res) => {
+            debug!(
+                "set_canteen_pic_link: successfully approved pic for menu item '{}'",
+                canteen_id_to_set
+            );
+            HttpResponse::Ok().json(NewCanteenResponse {
+                status: "ok".to_string(),
+                error: None,
+            })
+        }
+        Err(e) => {
+            error!(
+                "set_canteen_pic_link: failed to approve pic for menu item with id {}: {}",
+                canteen_id_to_set, e
+            );
+            HttpResponse::Conflict().json(NewCanteenResponse {
                 status: "error".to_string(),
                 error: Some(e.to_string()),
             })

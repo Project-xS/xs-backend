@@ -24,7 +24,7 @@ pub struct ItemContainer {
     pub name: String,
     pub quantity: i16,
     pub is_veg: bool,
-    pub pic_link: Option<String>,
+    pub pic_link: bool,
     pub description: Option<String>,
 }
 
