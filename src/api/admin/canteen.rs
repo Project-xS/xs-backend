@@ -165,9 +165,9 @@ pub(super) async fn get_canteen_menu(
     tag = "Canteen",
     request_body = LoginRequest,
     responses(
-        (status = 200, description = "Successfully logged in", body = GeneralMenuResponse),
-        (status = 401, description = "Incorrect username or password", body = GeneralMenuResponse),
-        (status = 500, description = "Failed to retrieve login details due to server error", body = GeneralMenuResponse),
+        (status = 200, description = "Successfully logged in", body = LoginResponse),
+        (status = 401, description = "Incorrect username or password", body = LoginResponse),
+        (status = 500, description = "Failed to retrieve login details due to server error", body = LoginResponse),
     ),
     summary = "Initiate login request for a canteen"
 )]
