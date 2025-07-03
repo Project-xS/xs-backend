@@ -49,7 +49,7 @@ impl AssetUploadOperations {
             .key(key.to_string())
             .presigned(
                 PresigningConfig::builder()
-                    .expires_in(Duration::from_secs(6 * 50))
+                    .expires_in(Duration::from_secs(60 * 5))
                     .build()
                     .expect("can't build presigning config"),
             )
@@ -69,7 +69,7 @@ impl AssetUploadOperations {
             .key(key.to_string())
             .presigned(
                 PresigningConfig::builder()
-                    .expires_in(Duration::from_secs(6 * 50))
+                    .expires_in(Duration::from_secs(12 * 60 * 60))
                     .build()
                     .expect("can't build presigning config"),
             )

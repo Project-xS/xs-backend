@@ -19,30 +19,31 @@ use log::{debug, error};
 pub(super) async fn create_menu_item(
     menu_ops: web::Data<MenuOperations>,
     req_data: web::Json<NewMenuItem>,
-) -> impl Responder {
+) -> actix_web::Result<impl Responder> {
     let req_data = req_data.into_inner();
     let item_name = req_data.name.clone();
-    match menu_ops.add_menu_item(req_data) {
+    let result = web::block(move || menu_ops.add_menu_item(req_data)).await?;
+    match result {
         Ok(res) => {
             debug!(
                 "create_menu_item: successfully created menu item with item_name '{}' and id {}",
                 item_name, res.item_id
             );
-            HttpResponse::Ok().json(CreateMenuItemResponse {
+            Ok(HttpResponse::Ok().json(CreateMenuItemResponse {
                 status: "ok".to_string(),
                 item_id: res.item_id,
                 error: None,
-            })
+            }))
         }
         Err(e) => {
             error!(
                 "create_menu_item: failed to create menu item '{}' due to error: {}",
                 item_name, e
             );
-            HttpResponse::Conflict().json(GeneralMenuResponse {
+            Ok(HttpResponse::Conflict().json(GeneralMenuResponse {
                 status: "error".to_string(),
                 error: Some(e.to_string()),
-            })
+            }))
         }
     }
 }
@@ -62,28 +63,29 @@ pub(super) async fn create_menu_item(
 pub(super) async fn remove_menu_item(
     menu_ops: web::Data<MenuOperations>,
     path: web::Path<(i32,)>,
-) -> impl Responder {
+) -> actix_web::Result<impl Responder> {
     let req_data = path.into_inner().0;
-    match menu_ops.remove_menu_item(req_data) {
+    let result = web::block(move || menu_ops.remove_menu_item(req_data)).await?;
+    match result {
         Ok(x) => {
             debug!(
                 "remove_menu_item: successfully removed menu item '{}'",
                 x.name
             );
-            HttpResponse::Ok().json(GeneralMenuResponse {
+            Ok(HttpResponse::Ok().json(GeneralMenuResponse {
                 status: "ok".to_string(),
                 error: None,
-            })
+            }))
         }
         Err(e) => {
             error!(
                 "remove_menu_item: failed to remove menu item with id {}: {}",
                 req_data, e
             );
-            HttpResponse::Conflict().json(GeneralMenuResponse {
+            Ok(HttpResponse::Conflict().json(GeneralMenuResponse {
                 status: "error".to_string(),
                 error: Some(e.to_string()),
-            })
+            }))
         }
     }
 }
@@ -103,28 +105,29 @@ pub(super) async fn remove_menu_item(
 pub(super) async fn set_menu_pic_link(
     menu_ops: web::Data<MenuOperations>,
     path: web::Path<(i32,)>,
-) -> impl Responder {
+) -> actix_web::Result<impl Responder> {
     let item_id_to_set = path.into_inner().0;
-    match menu_ops.set_menu_item_pic(&item_id_to_set) {
+    let result = web::block(move || menu_ops.set_menu_item_pic(&item_id_to_set)).await?;
+    match result {
         Ok(_x) => {
             debug!(
                 "set_menu_pic_link: successfully approved pic for menu item '{}'",
                 item_id_to_set
             );
-            HttpResponse::Ok().json(GeneralMenuResponse {
+            Ok(HttpResponse::Ok().json(GeneralMenuResponse {
                 status: "ok".to_string(),
                 error: None,
-            })
+            }))
         }
         Err(e) => {
             error!(
                 "set_menu_pic_link: failed to approve pic for menu item with id {}: {}",
                 item_id_to_set, e
             );
-            HttpResponse::Conflict().json(GeneralMenuResponse {
+            Ok(HttpResponse::Conflict().json(GeneralMenuResponse {
                 status: "error".to_string(),
                 error: Some(e.to_string()),
-            })
+            }))
         }
     }
 }
@@ -142,29 +145,32 @@ pub(super) async fn set_menu_pic_link(
 pub(super) async fn update_menu_item(
     menu_ops: web::Data<MenuOperations>,
     req_data: web::Json<UpdateItemRequest>,
-) -> impl Responder {
+) -> actix_web::Result<impl Responder> {
     let req_data = req_data.into_inner();
-    let update_data = req_data.update.clone();
-    match menu_ops.update_menu_item(req_data.item_id, update_data.clone()) {
+    let update_data = req_data.update;
+    let update_data_cl = update_data.clone();
+    let result =
+        web::block(move || menu_ops.update_menu_item(req_data.item_id, update_data_cl)).await?;
+    match result {
         Ok(x) => {
             debug!(
                 "update_menu_item: successfully updated menu item '{}' with changes: {:?}",
                 x.name, update_data
             );
-            HttpResponse::Ok().json(GeneralMenuResponse {
+            Ok(HttpResponse::Ok().json(GeneralMenuResponse {
                 status: "ok".to_string(),
                 error: None,
-            })
+            }))
         }
         Err(e) => {
             error!(
                 "update_menu_item: failed to update menu item with id {}: {}",
                 req_data.item_id, e
             );
-            HttpResponse::Conflict().json(GeneralMenuResponse {
+            Ok(HttpResponse::Conflict().json(GeneralMenuResponse {
                 status: "error".to_string(),
                 error: Some(e.to_string()),
-            })
+            }))
         }
     }
 }
@@ -178,26 +184,29 @@ pub(super) async fn update_menu_item(
     summary = "Retrieve the complete list of menu items"
 )]
 #[get("/items")]
-pub(super) async fn get_all_menu_items(menu_ops: web::Data<MenuOperations>) -> impl Responder {
-    match menu_ops.get_all_menu_items() {
+pub(super) async fn get_all_menu_items(
+    menu_ops: web::Data<MenuOperations>,
+) -> actix_web::Result<impl Responder> {
+    let result = web::block(move || menu_ops.get_all_menu_items()).await?;
+    match result {
         Ok(x) => {
             debug!(
                 "get_all_menu_items: successfully fetched {} menu items",
                 x.len()
             );
-            HttpResponse::Ok().json(AllItemsResponse {
+            Ok(HttpResponse::Ok().json(AllItemsResponse {
                 status: "ok".to_string(),
                 data: x,
                 error: None,
-            })
+            }))
         }
         Err(e) => {
             error!("get_all_menu_items: error retrieving menu items: {}", e);
-            HttpResponse::InternalServerError().json(AllItemsResponse {
+            Ok(HttpResponse::InternalServerError().json(AllItemsResponse {
                 status: "error".to_string(),
                 data: Vec::new(),
                 error: Some(e.to_string()),
-            })
+            }))
         }
     }
 }
@@ -217,27 +226,28 @@ pub(super) async fn get_all_menu_items(menu_ops: web::Data<MenuOperations>) -> i
 pub(super) async fn get_menu_item(
     menu_ops: web::Data<MenuOperations>,
     path: web::Path<(i32,)>,
-) -> impl Responder {
+) -> actix_web::Result<impl Responder> {
     let req_data = path.into_inner().0;
-    match menu_ops.get_menu_item(req_data) {
+    let result = web::block(move || menu_ops.get_menu_item(req_data)).await?;
+    match result {
         Ok(x) => {
             debug!("get_menu_item: successfully fetched menu item '{}'", x.name);
-            HttpResponse::Ok().json(ItemResponse {
+            Ok(HttpResponse::Ok().json(ItemResponse {
                 status: "ok".to_string(),
                 data: x,
                 error: None,
-            })
+            }))
         }
         Err(e) => {
             error!(
                 "get_menu_item: failed to fetch menu item with id {}: {}",
                 req_data, e
             );
-            HttpResponse::BadRequest().json(ItemResponse {
+            Ok(HttpResponse::BadRequest().json(ItemResponse {
                 status: "error".to_string(),
                 data: MenuItem::default(),
                 error: Some(e.to_string()),
-            })
+            }))
         }
     }
 }

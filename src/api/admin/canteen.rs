@@ -20,28 +20,29 @@ use log::{debug, error};
 pub(super) async fn create_canteen(
     canteen_ops: web::Data<CanteenOperations>,
     req_data: web::Json<NewCanteen>,
-) -> impl Responder {
+) -> actix_web::Result<impl Responder> {
     let item_name = req_data.canteen_name.clone();
-    match canteen_ops.create_canteen(req_data.into_inner()) {
+    let result = web::block(move || canteen_ops.create_canteen(req_data.into_inner())).await?;
+    match result {
         Ok(_) => {
             debug!(
                 "create_canteen: successfully created new canteen '{}'",
                 item_name
             );
-            HttpResponse::Ok().json(NewCanteenResponse {
+            Ok(HttpResponse::Ok().json(NewCanteenResponse {
                 status: "ok".to_string(),
                 error: None,
-            })
+            }))
         }
         Err(e) => {
             error!(
                 "create_canteen: failed to create canteen '{}': {}",
                 item_name, e
             );
-            HttpResponse::BadRequest().json(NewCanteenResponse {
+            Ok(HttpResponse::BadRequest().json(NewCanteenResponse {
                 status: "error".to_string(),
                 error: Some(e.to_string()),
-            })
+            }))
         }
     }
 }
@@ -61,28 +62,29 @@ pub(super) async fn create_canteen(
 pub(super) async fn set_canteen_pic_link(
     canteen_ops: web::Data<CanteenOperations>,
     path: web::Path<(i32,)>,
-) -> impl Responder {
+) -> actix_web::Result<impl Responder> {
     let canteen_id_to_set = path.into_inner().0;
-    match canteen_ops.set_canteen_pic(&canteen_id_to_set) {
+    let result = web::block(move || canteen_ops.set_canteen_pic(&canteen_id_to_set)).await?;
+    match result {
         Ok(_res) => {
             debug!(
                 "set_canteen_pic_link: successfully approved pic for menu item '{}'",
                 canteen_id_to_set
             );
-            HttpResponse::Ok().json(NewCanteenResponse {
+            Ok(HttpResponse::Ok().json(NewCanteenResponse {
                 status: "ok".to_string(),
                 error: None,
-            })
+            }))
         }
         Err(e) => {
             error!(
                 "set_canteen_pic_link: failed to approve pic for menu item with id {}: {}",
                 canteen_id_to_set, e
             );
-            HttpResponse::Conflict().json(NewCanteenResponse {
+            Ok(HttpResponse::Conflict().json(NewCanteenResponse {
                 status: "error".to_string(),
                 error: Some(e.to_string()),
-            })
+            }))
         }
     }
 }
@@ -96,26 +98,31 @@ pub(super) async fn set_canteen_pic_link(
     summary = "Retrieve a list of all available canteens"
 )]
 #[get("")]
-pub(super) async fn get_all_canteens(menu_ops: web::Data<CanteenOperations>) -> impl Responder {
-    match menu_ops.get_all_canteens() {
+pub(super) async fn get_all_canteens(
+    menu_ops: web::Data<CanteenOperations>,
+) -> actix_web::Result<impl Responder> {
+    let result = web::block(move || menu_ops.get_all_canteens()).await?;
+    match result {
         Ok(x) => {
             debug!(
                 "get_all_canteens: successfully fetched {} canteens",
                 x.len()
             );
-            HttpResponse::Ok().json(AllCanteenResponse {
+            Ok(HttpResponse::Ok().json(AllCanteenResponse {
                 status: "ok".to_string(),
                 data: x,
                 error: None,
-            })
+            }))
         }
         Err(e) => {
             error!("get_all_canteens: failed to retrieve canteens: {}", e);
-            HttpResponse::InternalServerError().json(AllCanteenResponse {
-                status: "error".to_string(),
-                data: Vec::new(),
-                error: Some(e.to_string()),
-            })
+            Ok(
+                HttpResponse::InternalServerError().json(AllCanteenResponse {
+                    status: "error".to_string(),
+                    data: Vec::new(),
+                    error: Some(e.to_string()),
+                }),
+            )
         }
     }
 }
@@ -132,31 +139,34 @@ pub(super) async fn get_all_canteens(menu_ops: web::Data<CanteenOperations>) -> 
 pub(super) async fn get_canteen_menu(
     menu_ops: web::Data<CanteenOperations>,
     path: web::Path<(i32,)>,
-) -> impl Responder {
+) -> actix_web::Result<impl Responder> {
     let search_canteen_id = path.into_inner().0;
-    match menu_ops.get_canteen_items(search_canteen_id) {
+    let result = web::block(move || menu_ops.get_canteen_items(search_canteen_id)).await?;
+    match result {
         Ok(x) => {
             debug!(
                 "get_canteen_menu: successfully fetched {} menu items of canteen {}",
                 x.len(),
                 search_canteen_id
             );
-            HttpResponse::Ok().json(AllItemsResponse {
+            Ok(HttpResponse::Ok().json(AllItemsResponse {
                 status: "ok".to_string(),
                 data: x,
                 error: None,
-            })
+            }))
         }
         Err(e) => {
             error!(
                 "get_canteen_menu: failed to retrieve canteen items of {}: {}",
                 search_canteen_id, e
             );
-            HttpResponse::InternalServerError().json(AllCanteenResponse {
-                status: "error".to_string(),
-                data: Vec::new(),
-                error: Some(e.to_string()),
-            })
+            Ok(
+                HttpResponse::InternalServerError().json(AllCanteenResponse {
+                    status: "error".to_string(),
+                    data: Vec::new(),
+                    error: Some(e.to_string()),
+                }),
+            )
         }
     }
 }
@@ -175,29 +185,32 @@ pub(super) async fn get_canteen_menu(
 pub(super) async fn login_canteen(
     menu_ops: web::Data<CanteenOperations>,
     req_data: web::Json<LoginRequest>,
-) -> impl Responder {
-    match menu_ops.login_canteen(&req_data.username, &req_data.password) {
+) -> actix_web::Result<impl Responder> {
+    let username_cl = req_data.username.clone();
+    let password_cl = req_data.password.clone();
+    let result = web::block(move || menu_ops.login_canteen(&username_cl, &password_cl)).await?;
+    match result {
         Ok(login_status) => {
             if login_status.is_some() {
                 debug!(
                     "login_canteen: successfully logged in canteen {}",
                     &req_data.username
                 );
-                HttpResponse::Ok().json(LoginResponse {
+                Ok(HttpResponse::Ok().json(LoginResponse {
                     status: "ok".to_string(),
                     data: login_status,
                     error: None,
-                })
+                }))
             } else {
                 debug!(
                     "login_canteen: incorrect password for canteen {}",
                     &req_data.username
                 );
-                HttpResponse::Unauthorized().json(LoginResponse {
+                Ok(HttpResponse::Unauthorized().json(LoginResponse {
                     status: "invalid_credentials".to_string(),
                     data: None,
                     error: None,
-                })
+                }))
             }
         }
         Err(e) => {
@@ -205,10 +218,12 @@ pub(super) async fn login_canteen(
                 "login_canteen: failed to login {}: {}",
                 &req_data.username, e
             );
-            HttpResponse::InternalServerError().json(GeneralMenuResponse {
-                status: "error".to_string(),
-                error: Some(e.to_string()),
-            })
+            Ok(
+                HttpResponse::InternalServerError().json(GeneralMenuResponse {
+                    status: "error".to_string(),
+                    error: Some(e.to_string()),
+                }),
+            )
         }
     }
 }

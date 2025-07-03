@@ -17,28 +17,29 @@ use log::{debug, error};
 pub(super) async fn create_user(
     user_ops: web::Data<UserOperations>,
     req_data: web::Json<NewUser>,
-) -> impl Responder {
+) -> actix_web::Result<impl Responder> {
     let email = req_data.email.clone();
-    match user_ops.create_user(req_data.into_inner()) {
+    let result = web::block(move || user_ops.create_user(req_data.into_inner())).await?;
+    match result {
         Ok(_) => {
             debug!(
                 "create_user: successfully created user account with email '{}'",
                 email
             );
-            HttpResponse::Ok().json(CreateUserResp {
+            Ok(HttpResponse::Ok().json(CreateUserResp {
                 status: "ok".to_string(),
                 error: None,
-            })
+            }))
         }
         Err(e) => {
             error!(
                 "create_user: failed to create user account for email '{}': {}",
                 email, e
             );
-            HttpResponse::Conflict().json(CreateUserResp {
+            Ok(HttpResponse::Conflict().json(CreateUserResp {
                 status: "error".to_string(),
                 error: Some(e.to_string()),
-            })
+            }))
         }
     }
 }
@@ -55,25 +56,27 @@ pub(super) async fn create_user(
 pub(super) async fn login(
     user_ops: web::Data<UserOperations>,
     req_body: web::Json<LoginReq>,
-) -> impl Responder {
+) -> actix_web::Result<impl Responder> {
     let email = req_body.email.clone();
-    match user_ops.get_user_by_email(&email) {
+    let email_cl = email.clone();
+    let result = web::block(move || user_ops.get_user_by_email(&email_cl)).await?;
+    match result {
         Ok(_) => {
             debug!(
                 "login: user authenticated successfully for email '{}'",
                 email
             );
-            HttpResponse::Ok().json(LoginResp {
+            Ok(HttpResponse::Ok().json(LoginResp {
                 status: "valid".to_string(),
                 error: None,
-            })
+            }))
         }
         Err(e) => {
             error!("login: authentication failed for email '{}': {}", email, e);
-            HttpResponse::BadRequest().json(LoginResp {
+            Ok(HttpResponse::BadRequest().json(LoginResp {
                 status: "error".to_string(),
                 error: Some(e.to_string()),
-            })
+            }))
         }
     }
 }
