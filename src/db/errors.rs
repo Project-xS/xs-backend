@@ -19,29 +19,12 @@ pub enum RepositoryError {
     InternalError(String),
 }
 
-#[derive(Debug)]
-pub struct S3Error(String);
-
-impl<T: aws_sdk_s3::error::ProvideErrorMetadata> From<T> for S3Error {
-    fn from(value: T) -> Self {
-        S3Error(format!(
-            "{}: {}",
-            value
-                .code()
-                .map(String::from)
-                .unwrap_or("unknown code".into()),
-            value
-                .message()
-                .map(String::from)
-                .unwrap_or("missing reason".into()),
-        ))
-    }
-}
-
-impl std::error::Error for S3Error {}
-
-impl std::fmt::Display for S3Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
+#[derive(Debug, Error)]
+pub enum S3Error {
+    #[error("File not found in S3 for key: {0}")]
+    NotFound(String),
+    #[error("S3 Service error: {0}")]
+    S3ServiceError(String),
+    #[error("S3 operation failed: {0}")]
+    S3OperationFailed(String),
 }

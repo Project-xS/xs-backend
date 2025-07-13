@@ -55,7 +55,7 @@ impl CanteenOperations {
                 );
                 match e {
                     Error::NotFound => {
-                        RepositoryError::NotFound(format!("canteens: {}", canteen_id_to_update))
+                        RepositoryError::NotFound(format!("canteens: {canteen_id_to_update}"))
                     }
                     other => RepositoryError::DatabaseError(other),
                 }

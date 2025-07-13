@@ -51,7 +51,7 @@ impl MenuOperations {
                 );
                 match e {
                     Error::NotFound => {
-                        RepositoryError::NotFound(format!("menu_items: {}", item_id_to_update))
+                        RepositoryError::NotFound(format!("menu_items: {item_id_to_update}"))
                     }
                     other => RepositoryError::DatabaseError(other),
                 }
@@ -75,7 +75,7 @@ impl MenuOperations {
                     id, e
                 );
                 match e {
-                    Error::NotFound => RepositoryError::NotFound(format!("menu_items: {}", id)),
+                    Error::NotFound => RepositoryError::NotFound(format!("menu_items: {id}")),
                     other => RepositoryError::DatabaseError(other),
                 }
             })
@@ -103,7 +103,7 @@ impl MenuOperations {
                     itemid, e
                 );
                 match e {
-                    Error::NotFound => RepositoryError::NotFound(format!("menu_items: {}", itemid)),
+                    Error::NotFound => RepositoryError::NotFound(format!("menu_items: {itemid}")),
                     other => RepositoryError::DatabaseError(other),
                 }
             })
@@ -143,7 +143,7 @@ impl MenuOperations {
                     itemid, e
                 );
                 match e {
-                    Error::NotFound => RepositoryError::NotFound(format!("menu_items: {}", itemid)),
+                    Error::NotFound => RepositoryError::NotFound(format!("menu_items: {itemid}")),
                     other => RepositoryError::DatabaseError(other),
                 }
             })

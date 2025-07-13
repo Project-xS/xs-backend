@@ -1,4 +1,4 @@
-use crate::db::AssetUploadOperations;
+use crate::db::{AssetUploadOperations, S3Error};
 use crate::enums::admin::ItemUploadResponse;
 use actix_web::{get, post, web, HttpResponse, Responder};
 
@@ -78,13 +78,21 @@ pub async fn get_image_handler(
             })
         }
         Err(e) => {
-            error!("get_image: couldn't generate presigned url '{:?}'", s3_key,);
-            HttpResponse::InternalServerError().json(ItemUploadResponse {
-                status: "error".to_string(),
-                url: String::new(),
-                item_id: -1,
-                error: Some(e.to_string()),
-            })
+            error!("get_image: couldn't generate presigned url '{:?}'", s3_key);
+            match e {
+                S3Error::NotFound(_) => HttpResponse::NotFound().json(ItemUploadResponse {
+                    status: "error".to_string(),
+                    url: String::new(),
+                    item_id: -1,
+                    error: Some(String::from("key not found")),
+                }),
+                _ => HttpResponse::InternalServerError().json(ItemUploadResponse {
+                    status: "error".to_string(),
+                    url: String::new(),
+                    item_id: -1,
+                    error: Some(e.to_string()),
+                }),
+            }
         }
     }
 }

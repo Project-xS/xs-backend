@@ -197,8 +197,7 @@ impl OrderOperations {
                             );
                             match e {
                                 Error::NotFound => RepositoryError::NotFound(format!(
-                                    "menu_items: Can't find item id {} to update stock",
-                                    item
+                                    "menu_items: Can't find item id {item} to update stock"
                                 )),
                                 other => RepositoryError::DatabaseError(other),
                             }
@@ -243,13 +242,10 @@ impl OrderOperations {
             .order(active_orders::ordered_at.asc())
             .load::<ItemNameQtyTime>(conn.connection())
             .map_err(|e| {
-                error!(
-                    "get_all_orders_by_count: error querying order items count: {}",
-                    e
-                );
+                error!("get_all_orders_by_count: error querying order items count: {e}");
                 match e {
                     Error::NotFound => {
-                        RepositoryError::NotFound(format!("get_all_orders_by_count: {}", e))
+                        RepositoryError::NotFound(format!("get_all_orders_by_count: {e}"))
                     }
                     other => RepositoryError::DatabaseError(other),
                 }
@@ -361,7 +357,7 @@ impl OrderOperations {
                 );
                 match e {
                     Error::NotFound => {
-                        RepositoryError::NotFound(format!("get_user_by_rfid: {}", search_rfid))
+                        RepositoryError::NotFound(format!("get_user_by_rfid: {search_rfid}"))
                     }
                     other => RepositoryError::DatabaseError(other),
                 }
@@ -410,7 +406,7 @@ impl OrderOperations {
                 );
                 match e {
                     Error::NotFound => {
-                        RepositoryError::NotFound(format!("get_user_by_userid: {}", search_user_id))
+                        RepositoryError::NotFound(format!("get_user_by_userid: {search_user_id}"))
                     }
                     other => RepositoryError::DatabaseError(other),
                 }
@@ -456,10 +452,9 @@ impl OrderOperations {
                     search_order_id, e
                 );
                 match e {
-                    Error::NotFound => RepositoryError::NotFound(format!(
-                        "get_user_by_orderid: {}",
-                        search_order_id
-                    )),
+                    Error::NotFound => {
+                        RepositoryError::NotFound(format!("get_user_by_orderid: {search_order_id}"))
+                    }
                     other => RepositoryError::DatabaseError(other),
                 }
             })?;
@@ -503,12 +498,12 @@ impl OrderOperations {
                     .map_err(|e| {
                         error!("order_actions: error fetching order items for order_id {}: {}", search_order_id, e);
                         match e {
-                            Error::NotFound => RepositoryError::NotFound(format!("order_actions: {}", search_order_id)),
+                            Error::NotFound => RepositoryError::NotFound(format!("order_actions: {search_order_id}")),
                             other => RepositoryError::DatabaseError(other),
                         }
                     })?;
                 if order_items.is_empty() {
-                    return Err(RepositoryError::NotFound(format!("order_actions: {}", search_order_id)));
+                    return Err(RepositoryError::NotFound(format!("order_actions: {search_order_id}")));
                 }
             }
             let items_in_order: Vec<i32> = order_items
@@ -541,7 +536,7 @@ impl OrderOperations {
                     .map_err(|e| {
                         error!("order_actions: error fetching order items for order_id during delete: {}: {}", search_order_id, e);
                         match e {
-                            Error::NotFound => RepositoryError::NotFound(format!("order_actions: {}", search_order_id)),
+                            Error::NotFound => RepositoryError::NotFound(format!("order_actions: {search_order_id}")),
                             other => RepositoryError::DatabaseError(other),
                         }
                     })?;

@@ -2,6 +2,7 @@ use crate::db::errors::S3Error;
 use aws_config::meta::region::RegionProviderChain;
 use aws_config::Region;
 use aws_sdk_s3::config::{Builder as S3ConfigBuilder, Credentials};
+use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::presigning::PresigningConfig;
 use std::time::Duration;
 
@@ -54,7 +55,7 @@ impl AssetUploadOperations {
                     .expect("can't build presigning config"),
             )
             .await
-            .map_err(S3Error::from)?;
+            .map_err(|err| S3Error::S3OperationFailed(err.to_string()))?;
 
         response.uri();
 
@@ -62,6 +63,28 @@ impl AssetUploadOperations {
     }
 
     pub async fn get_object(&self, key: &i32) -> Result<String, S3Error> {
+        self.client
+            .get_object()
+            .bucket(&self.bucket_name)
+            .key(key.to_string())
+            .send()
+            .await
+            .map_err(|err| {
+                // if err.as_service_error().map(|e| e.is_not_found()) == Some(true) {
+                // this is a temporary hack for garage
+                debug!("failed to retrieve object: {:?}", err);
+                match err {
+                    SdkError::ServiceError(e) => {
+                        let status = e.raw().status().as_u16();
+                        if status == 403 || status == 404 {
+                            S3Error::NotFound(key.to_string())
+                        } else {
+                            S3Error::S3ServiceError(e.raw().status().to_string())
+                        }
+                    }
+                    _ => S3Error::S3OperationFailed(err.to_string()),
+                }
+            })?;
         let response = self
             .client
             .get_object()
@@ -74,7 +97,13 @@ impl AssetUploadOperations {
                     .expect("can't build presigning config"),
             )
             .await
-            .map_err(S3Error::from)?;
+            .map_err(|err| {
+                if err.as_service_error().map(|e| e.is_no_such_key()) == Some(true) {
+                    S3Error::NotFound(format!("{key}"))
+                } else {
+                    S3Error::S3OperationFailed(err.to_string())
+                }
+            })?;
 
         response.uri();
 

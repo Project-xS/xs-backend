@@ -13,6 +13,7 @@ pub use admin::menu::MenuOperations;
 pub use common::orders::OrderOperations;
 pub use common::search::SearchOperations;
 pub use errors::RepositoryError;
+pub use errors::S3Error;
 pub use users::user::UserOperations;
 
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
