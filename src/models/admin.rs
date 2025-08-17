@@ -14,6 +14,16 @@ pub struct Canteen {
     pub pic_link: bool,
 }
 
+#[derive(Queryable, Debug, Identifiable, Selectable, Serialize, Deserialize, ToSchema)]
+#[diesel(table_name = crate::db::schema::canteens)]
+#[diesel(primary_key(canteen_id))]
+pub struct CanteenDetails {
+    pub canteen_id: i32,
+    pub canteen_name: String,
+    pub location: String,
+    pub pic_link: bool,
+}
+
 #[derive(Insertable, Debug, Serialize, Deserialize, ToSchema)]
 #[diesel(table_name = crate::db::schema::canteens)]
 pub struct NewCanteen {

@@ -1,4 +1,4 @@
-use crate::models::admin::{Canteen, CanteenLoginSuccess, MenuItem, UpdateMenuItem};
+use crate::models::admin::{CanteenDetails, CanteenLoginSuccess, MenuItem, UpdateMenuItem};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -62,7 +62,7 @@ pub struct NewCanteenResponse {
 #[derive(Serialize, ToSchema)]
 pub struct AllCanteenResponse {
     pub status: String,
-    pub data: Vec<Canteen>,
+    pub data: Vec<CanteenDetails>,
     pub error: Option<String>,
 }
 

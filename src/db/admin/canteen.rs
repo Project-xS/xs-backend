@@ -1,7 +1,7 @@
 use crate::db::errors::RepositoryError;
 use crate::db::schema::canteens::dsl::*;
 use crate::db::DbConnection;
-use crate::models::admin::{Canteen, CanteenLoginSuccess, MenuItem, NewCanteen};
+use crate::models::admin::{CanteenDetails, CanteenLoginSuccess, MenuItem, NewCanteen};
 use diesel::dsl::{case_when, sql};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
@@ -70,7 +70,7 @@ impl CanteenOperations {
     //     todo!()
     // }
 
-    pub fn get_all_canteens(&self) -> Result<Vec<Canteen>, RepositoryError> {
+    pub fn get_all_canteens(&self) -> Result<Vec<CanteenDetails>, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!("get_all_canteens: failed to acquire DB connection: {}", e);
             e
@@ -78,7 +78,8 @@ impl CanteenOperations {
 
         canteens
             .order_by(canteen_id.asc())
-            .load::<Canteen>(conn.connection())
+            .select(CanteenDetails::as_select())
+            .load::<CanteenDetails>(conn.connection())
             .map_err(|e| {
                 error!("get_all_canteens: error fetching canteens: {}", e);
                 RepositoryError::DatabaseError(e)
