@@ -239,7 +239,6 @@ impl OrderOperations {
                 active_orders::deliver_at,
             ))
             .filter(active_orders::canteen_id.eq(search_canteen_id))
-            .order(active_orders::ordered_at.asc())
             .load::<ItemNameQtyTime>(conn.connection())
             .map_err(|e| {
                 error!("get_all_orders_by_count: error querying order items count: {e}");
