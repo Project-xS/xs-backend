@@ -44,7 +44,10 @@
             dockerImage = pkgs.dockerTools.buildLayeredImage {
               name = "proj-xs";
               tag = "latest";
-              config = { Cmd = [ "${myRustBuild}/bin/proj-xs" ]; };
+              config = {
+                Env = [ "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt" ];
+                Cmd = [ "${myRustBuild}/bin/proj-xs" ];
+              };
             };
 
           in {
