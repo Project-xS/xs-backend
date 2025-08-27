@@ -1,21 +1,27 @@
 use crate::db::errors::RepositoryError;
 use crate::db::schema::canteens::dsl::*;
-use crate::db::DbConnection;
+use crate::db::{AssetOperations, DbConnection};
+use crate::enums::admin::MenuItemWithPic;
 use crate::models::admin::{CanteenDetails, CanteenLoginSuccess, MenuItem, NewCanteen};
 use diesel::dsl::{case_when, sql};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::result::Error;
 use diesel::sql_types::{Bool, Text};
+use futures::future::join_all;
 use log::error;
 
 pub struct CanteenOperations {
     pool: Pool<ConnectionManager<PgConnection>>,
+    asset_ops: AssetOperations,
 }
 
 impl CanteenOperations {
-    pub fn new(pool: Pool<ConnectionManager<PgConnection>>) -> Self {
-        Self { pool }
+    pub async fn new(pool: Pool<ConnectionManager<PgConnection>>) -> Self {
+        Self {
+            pool,
+            asset_ops: AssetOperations::new().await.unwrap(),
+        }
     }
 
     pub fn create_canteen(&self, canteen: NewCanteen) -> Result<usize, RepositoryError> {
@@ -86,17 +92,17 @@ impl CanteenOperations {
             })
     }
 
-    pub fn get_canteen_items(
+    pub async fn get_canteen_items(
         &self,
         search_canteen_id: i32,
-    ) -> Result<Vec<MenuItem>, RepositoryError> {
+    ) -> Result<Vec<MenuItemWithPic>, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!("get_canteen_items: failed to acquire DB connection: {}", e);
             e
         })?;
 
         use crate::db::schema::menu_items::dsl::*;
-        menu_items
+        let items = menu_items
             .filter(canteen_id.eq(search_canteen_id))
             .order(item_id.asc())
             .load::<MenuItem>(conn.connection())
@@ -106,7 +112,21 @@ impl CanteenOperations {
                     search_canteen_id, e
                 );
                 RepositoryError::DatabaseError(e)
-            })
+            })?;
+
+        let futures = items.iter().map(async |item| {
+            let mut item_with_pic: MenuItemWithPic = item.into();
+            if item.pic_link {
+                let pic_url = self.asset_ops.get_object(&item.item_id).await.ok();
+                item_with_pic.pic_link = pic_url;
+                item_with_pic
+            } else {
+                item_with_pic
+            }
+        });
+
+        let results = join_all(futures).await;
+        Ok(results)
     }
 
     pub fn login_canteen(
@@ -159,6 +179,7 @@ impl Clone for CanteenOperations {
     fn clone(&self) -> Self {
         Self {
             pool: self.pool.clone(),
+            asset_ops: self.asset_ops.clone(),
         }
     }
 }

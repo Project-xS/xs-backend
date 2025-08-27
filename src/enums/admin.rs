@@ -18,20 +18,49 @@ pub struct CreateMenuItemResponse {
 #[derive(Serialize, ToSchema)]
 pub struct AllItemsResponse {
     pub status: String,
-    pub data: Vec<MenuItem>,
+    pub data: Vec<MenuItemWithPic>,
     pub error: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct MenuItemWithPic {
+    pub item_id: i32,
+    pub canteen_id: i32,
+    pub name: String,
+    pub is_veg: bool,
+    pub price: i32,
+    pub stock: i32,
+    pub is_available: bool,
+    pub description: Option<String>,
+    pub pic_link: Option<String>,
+}
+
+impl From<&MenuItem> for MenuItemWithPic {
+    fn from(item: &MenuItem) -> Self {
+        MenuItemWithPic {
+            item_id: item.item_id,
+            canteen_id: item.canteen_id,
+            name: item.name.clone(),
+            is_veg: item.is_veg,
+            price: item.price,
+            stock: item.stock,
+            is_available: item.is_available,
+            description: item.description.clone(),
+            pic_link: None,
+        }
+    }
 }
 
 #[derive(Serialize, ToSchema)]
 pub struct ItemResponse {
     pub status: String,
-    pub data: MenuItem,
+    pub data: MenuItemWithPic,
     pub error: Option<String>,
 }
 
-impl Default for MenuItem {
-    fn default() -> MenuItem {
-        MenuItem {
+impl Default for MenuItemWithPic {
+    fn default() -> MenuItemWithPic {
+        MenuItemWithPic {
             item_id: -1,
             canteen_id: -1,
             name: "".to_string(),
@@ -39,7 +68,7 @@ impl Default for MenuItem {
             price: 0,
             stock: -1,
             is_available: false,
-            pic_link: false,
+            pic_link: None,
             description: None,
         }
     }

@@ -20,7 +20,7 @@ pub(super) async fn get_search_query_results(
 ) -> actix_web::Result<impl Responder> {
     let search_query = path.into_inner().0;
     let search_query_cl = search_query.clone();
-    let result = web::block(move || search_ops.search_menu_items(&search_query_cl)).await?;
+    let result = search_ops.search_menu_items(&search_query_cl).await;
     match result {
         Ok(x) => {
             debug!(
@@ -64,9 +64,9 @@ pub(super) async fn search_query_by_canteen(
 ) -> actix_web::Result<impl Responder> {
     let (canteen_id, search_query) = path.into_inner();
     let search_query_cl = search_query.clone();
-    let result =
-        web::block(move || search_ops.search_menu_items_by_canteen(&canteen_id, &search_query_cl))
-            .await?;
+    let result = search_ops
+        .search_menu_items_by_canteen(&canteen_id, &search_query_cl)
+        .await;
     match result {
         Ok(x) => {
             debug!(

@@ -1,5 +1,5 @@
 use crate::api::ContentTypeHeader;
-use crate::db::{AssetUploadOperations, CanteenOperations, MenuOperations};
+use crate::db::{AssetOperations, CanteenOperations, MenuOperations};
 use actix_web::middleware::NormalizePath;
 use actix_web::web;
 use asset_management::*;
@@ -15,7 +15,7 @@ pub fn config(
     cfg: &mut ServiceConfig,
     menu_ops: &MenuOperations,
     canteen_ops: &CanteenOperations,
-    asset_ops: &AssetUploadOperations,
+    asset_ops: &AssetOperations,
 ) {
     cfg.service(
         scope::scope("/menu")

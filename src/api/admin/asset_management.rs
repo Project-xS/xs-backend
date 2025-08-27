@@ -1,4 +1,4 @@
-use crate::db::{AssetUploadOperations, S3Error};
+use crate::db::{AssetOperations, S3Error};
 use crate::enums::admin::ItemUploadResponse;
 use actix_web::{get, post, web, HttpResponse, Responder};
 
@@ -13,7 +13,7 @@ use actix_web::{get, post, web, HttpResponse, Responder};
 )]
 #[post("/upload/{item_id}")]
 pub async fn upload_image_handler(
-    asset_ops: web::Data<AssetUploadOperations>,
+    asset_ops: web::Data<AssetOperations>,
     path: web::Path<(i32,)>,
 ) -> impl Responder {
     let s3_key = path.into_inner().0;
@@ -60,7 +60,7 @@ pub async fn upload_image_handler(
 )]
 #[get("/{key}")]
 pub async fn get_image_handler(
-    asset_ops: web::Data<AssetUploadOperations>,
+    asset_ops: web::Data<AssetOperations>,
     path: web::Path<(i32,)>,
 ) -> impl Responder {
     let s3_key = path.into_inner().0;

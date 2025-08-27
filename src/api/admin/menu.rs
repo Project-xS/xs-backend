@@ -1,8 +1,9 @@
 use crate::db::MenuOperations;
 use crate::enums::admin::{
-    AllItemsResponse, CreateMenuItemResponse, GeneralMenuResponse, ItemResponse, UpdateItemRequest,
+    AllItemsResponse, CreateMenuItemResponse, GeneralMenuResponse, ItemResponse, MenuItemWithPic,
+    UpdateItemRequest,
 };
-use crate::models::admin::{MenuItem, NewMenuItem};
+use crate::models::admin::NewMenuItem;
 use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
 use log::{debug, error};
 
@@ -187,7 +188,7 @@ pub(super) async fn update_menu_item(
 pub(super) async fn get_all_menu_items(
     menu_ops: web::Data<MenuOperations>,
 ) -> actix_web::Result<impl Responder> {
-    let result = web::block(move || menu_ops.get_all_menu_items()).await?;
+    let result = menu_ops.get_all_menu_items().await;
     match result {
         Ok(x) => {
             debug!(
@@ -228,7 +229,7 @@ pub(super) async fn get_menu_item(
     path: web::Path<(i32,)>,
 ) -> actix_web::Result<impl Responder> {
     let req_data = path.into_inner().0;
-    let result = web::block(move || menu_ops.get_menu_item(req_data)).await?;
+    let result = menu_ops.get_menu_item(req_data).await;
     match result {
         Ok(x) => {
             debug!("get_menu_item: successfully fetched menu item '{}'", x.name);
@@ -245,7 +246,7 @@ pub(super) async fn get_menu_item(
             );
             Ok(HttpResponse::BadRequest().json(ItemResponse {
                 status: "error".to_string(),
-                data: MenuItem::default(),
+                data: MenuItemWithPic::default(),
                 error: Some(e.to_string()),
             }))
         }

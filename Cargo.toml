@@ -9,6 +9,7 @@ path = "src/main.rs"
 
 [dependencies]
 actix-web = "4.10.2"
+futures = "0.3.31"
 utoipa-actix-web = "0.1.2"
 utoipa = { version = "5.3.1", features = ["actix_extras"] }
 utoipa-swagger-ui = { version = "9.0.0", features = ["actix-web"] }

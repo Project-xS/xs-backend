@@ -9,7 +9,7 @@ mod models;
 
 use crate::api::default_error_handler;
 use crate::db::{
-    establish_connection_pool, run_db_migrations, AssetUploadOperations, CanteenOperations,
+    establish_connection_pool, run_db_migrations, AssetOperations, CanteenOperations,
     MenuOperations, OrderOperations, SearchOperations, UserOperations,
 };
 use actix_web::{middleware, web, App, HttpServer};
@@ -25,7 +25,7 @@ pub(crate) struct AppState {
     canteen_ops: CanteenOperations,
     order_ops: OrderOperations,
     search_ops: SearchOperations,
-    asset_ops: AssetUploadOperations,
+    asset_ops: AssetOperations,
 }
 
 impl AppState {
@@ -33,11 +33,11 @@ impl AppState {
         let db = establish_connection_pool(url);
         run_db_migrations(db.clone()).expect("Unable to run migrations");
         let user_ops = UserOperations::new(db.clone());
-        let menu_ops = MenuOperations::new(db.clone());
-        let canteen_ops = CanteenOperations::new(db.clone());
+        let menu_ops = MenuOperations::new(db.clone()).await;
+        let canteen_ops = CanteenOperations::new(db.clone()).await;
         let order_ops = OrderOperations::new(db.clone());
-        let search_ops = SearchOperations::new(db.clone());
-        let asset_ops = AssetUploadOperations::new()
+        let search_ops = SearchOperations::new(db.clone()).await;
+        let asset_ops = AssetOperations::new()
             .await
             .expect("Unable to create asset_upload operations");
         AppState {

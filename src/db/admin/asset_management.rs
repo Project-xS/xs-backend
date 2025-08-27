@@ -6,13 +6,13 @@ use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::presigning::PresigningConfig;
 use std::time::Duration;
 
-pub struct AssetUploadOperations {
-    pub client: aws_sdk_s3::Client,
-    pub s3_endpoint: String,
-    pub bucket_name: String,
+pub struct AssetOperations {
+    client: aws_sdk_s3::Client,
+    s3_endpoint: String,
+    bucket_name: String,
 }
 
-impl AssetUploadOperations {
+impl AssetOperations {
     pub async fn new() -> Result<Self, S3Error> {
         let s3_endpoint = std::env::var("S3_ENDPOINT").expect("S3_ENDPOINT must be set");
         let region_provider = RegionProviderChain::first_try(Region::new(
@@ -111,7 +111,7 @@ impl AssetUploadOperations {
     }
 }
 
-impl Clone for AssetUploadOperations {
+impl Clone for AssetOperations {
     fn clone(&self) -> Self {
         Self {
             client: self.client.clone(),

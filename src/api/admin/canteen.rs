@@ -141,7 +141,7 @@ pub(super) async fn get_canteen_menu(
     path: web::Path<(i32,)>,
 ) -> actix_web::Result<impl Responder> {
     let search_canteen_id = path.into_inner().0;
-    let result = web::block(move || menu_ops.get_canteen_items(search_canteen_id)).await?;
+    let result = menu_ops.get_canteen_items(search_canteen_id).await;
     match result {
         Ok(x) => {
             debug!(
