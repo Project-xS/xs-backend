@@ -66,7 +66,11 @@ impl SearchOperations {
         let futures = items.iter().map(async |item| {
             let mut item_with_pic: MenuItemWithPic = item.into();
             if item.pic_link {
-                let pic_url = self.asset_ops.get_object(&item.item_id).await.ok();
+                let pic_url = self
+                    .asset_ops
+                    .get_object_presign(&item.item_id.to_string())
+                    .await
+                    .ok();
                 item_with_pic.pic_link = pic_url;
                 item_with_pic
             } else {
@@ -124,7 +128,11 @@ impl SearchOperations {
         let futures = items.iter().map(async |item| {
             let mut item_with_pic: MenuItemWithPic = item.into();
             if item.pic_link {
-                let pic_url = self.asset_ops.get_object(&item.item_id).await.ok();
+                let pic_url = self
+                    .asset_ops
+                    .get_object_presign(&item.item_id.to_string())
+                    .await
+                    .ok();
                 item_with_pic.pic_link = pic_url;
                 item_with_pic
             } else {

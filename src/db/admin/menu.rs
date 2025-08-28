@@ -1,6 +1,6 @@
 use crate::db::errors::RepositoryError;
 use crate::db::schema::menu_items::dsl::*;
-use crate::db::{AssetOperations, DbConnection};
+use crate::db::{AssetOperations, DbConnection, S3Error};
 use crate::enums::admin::MenuItemWithPic;
 use crate::models::admin::{MenuItem, NewMenuItem, UpdateMenuItem};
 use diesel::prelude::*;
@@ -40,6 +40,12 @@ impl MenuOperations {
             })
     }
 
+    pub async fn upload_menu_item_pic(&self, menu_item_to_set: &i32) -> Result<String, S3Error> {
+        self.asset_ops
+            .get_upload_presign_url(&format!("items/{}", menu_item_to_set))
+            .await
+    }
+
     pub async fn set_menu_item_pic(
         &self,
         item_id_to_update: &i32,
@@ -53,7 +59,10 @@ impl MenuOperations {
             item_id_to_update
         );
 
-        let etag = self.asset_ops.get_object_etag(item_id_to_update).await?;
+        let etag = self
+            .asset_ops
+            .get_object_etag(&item_id_to_update.to_string())
+            .await?;
         if etag.is_some() {
             info!("set_menu_item_pic: etag: {}", etag.clone().unwrap());
         } else {
@@ -145,7 +154,11 @@ impl MenuOperations {
         let futures = items.iter().map(async |item| {
             let mut item_with_pic: MenuItemWithPic = item.into();
             if item.pic_link {
-                let pic_url = self.asset_ops.get_object(&item.item_id).await.ok();
+                let pic_url = self
+                    .asset_ops
+                    .get_object_presign(&item.item_id.to_string())
+                    .await
+                    .ok();
                 item_with_pic.pic_link = pic_url;
                 item_with_pic
             } else {
@@ -182,7 +195,11 @@ impl MenuOperations {
 
         let mut item_with_pic: MenuItemWithPic = (&item).into();
         if item.pic_link {
-            let pic_url = self.asset_ops.get_object(&item.item_id).await.ok();
+            let pic_url = self
+                .asset_ops
+                .get_object_presign(&item.item_id.to_string())
+                .await
+                .ok();
             item_with_pic.pic_link = pic_url;
             Ok(item_with_pic)
         } else {

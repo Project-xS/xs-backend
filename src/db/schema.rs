@@ -36,6 +36,7 @@ diesel::table! {
         username -> Varchar,
         password -> Varchar,
         pic_link -> Bool,
+        pic_etag -> Nullable<Varchar>,
     }
 }
 

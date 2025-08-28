@@ -1,7 +1,7 @@
 use crate::db::MenuOperations;
 use crate::enums::admin::{
     AllItemsResponse, CreateMenuItemResponse, GeneralMenuResponse, ItemResponse, MenuItemWithPic,
-    UpdateItemRequest,
+    UpdateItemRequest, UploadMenuItemPicPresignedResponse,
 };
 use crate::models::admin::NewMenuItem;
 use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
@@ -87,6 +87,52 @@ pub(super) async fn remove_menu_item(
                 status: "error".to_string(),
                 error: Some(e.to_string()),
             }))
+        }
+    }
+}
+
+#[utoipa::path(
+    tag = "Menu",
+    params(
+        ("item_id", description = "The unique identifier of the item to upload pic for."),
+    ),
+    responses(
+        (status = 200, description = "Presigned URL generated successfully", body = GeneralMenuResponse),
+        (status = 409, description = "Failed to generate presigned url", body = GeneralMenuResponse)
+    ),
+    summary = "Get presigned URL for uploading the menu item picture. Call the resulting URL with PUT to upload the image."
+)]
+#[put("/upload_pic/{item_id}")]
+pub(super) async fn upload_menu_item_pic(
+    menu_ops: web::Data<MenuOperations>,
+    path: web::Path<(i32,)>,
+) -> actix_web::Result<impl Responder> {
+    let item_id_to_set = path.into_inner().0;
+    let result = menu_ops.upload_menu_item_pic(&item_id_to_set).await;
+    match result {
+        Ok(res) => {
+            debug!(
+                "upload_menu_item_pic: successfully generated presign upload for menu item '{}'",
+                item_id_to_set
+            );
+            Ok(HttpResponse::Ok().json(UploadMenuItemPicPresignedResponse {
+                status: "ok".to_string(),
+                presigned_url: Some(res),
+                error: None,
+            }))
+        }
+        Err(e) => {
+            error!(
+                "upload_menu_item_pic: failed to generate presign upload for menu item with id {}: {}",
+                item_id_to_set, e
+            );
+            Ok(
+                HttpResponse::Conflict().json(UploadMenuItemPicPresignedResponse {
+                    status: "error".to_string(),
+                    presigned_url: None,
+                    error: Some(e.to_string()),
+                }),
+            )
         }
     }
 }

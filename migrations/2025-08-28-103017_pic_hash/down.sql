@@ -1,3 +1,6 @@
 -- This file should undo anything in `up.sql`
-alter table public.menu_items
-    drop pic_etag;
+ALTER TABLE public.menu_items
+    DROP pic_etag;
+
+ALTER TABLE public.canteens
+    DROP pic_etag;

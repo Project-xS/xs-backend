@@ -1,7 +1,7 @@
 use crate::db::CanteenOperations;
 use crate::enums::admin::{
     AllCanteenResponse, AllItemsResponse, GeneralMenuResponse, LoginRequest, LoginResponse,
-    NewCanteenResponse,
+    NewCanteenResponse, UploadCanteenPicPresignedResponse,
 };
 use crate::models::admin::NewCanteen;
 use actix_web::{get, post, put, web, HttpResponse, Responder};
@@ -50,6 +50,52 @@ pub(super) async fn create_canteen(
 #[utoipa::path(
     tag = "Canteen",
     params(
+        ("canteen_id", description = "The unique identifier of the canteen to upload pic for."),
+    ),
+    responses(
+        (status = 200, description = "Presigned URL generated successfully", body = NewCanteenResponse),
+        (status = 409, description = "Failed to generate presigned url", body = NewCanteenResponse)
+    ),
+    summary = "Get presigned URL for uploading the canteen picture. Call the resulting URL with PUT to upload the image."
+)]
+#[put("/upload_pic/{canteen_id}")]
+pub(super) async fn upload_canteen_pic(
+    canteen_ops: web::Data<CanteenOperations>,
+    path: web::Path<(i32,)>,
+) -> actix_web::Result<impl Responder> {
+    let canteen_id_to_set = path.into_inner().0;
+    let result = canteen_ops.upload_canteen_pic(&canteen_id_to_set).await;
+    match result {
+        Ok(res) => {
+            debug!(
+                "upload_canteen_pic_link:successfully generated presign upload for canteen '{}'",
+                canteen_id_to_set
+            );
+            Ok(HttpResponse::Ok().json(UploadCanteenPicPresignedResponse {
+                status: "ok".to_string(),
+                presigned_url: Some(res),
+                error: None,
+            }))
+        }
+        Err(e) => {
+            error!(
+                "upload_canteen_pic_link: failed to generate presign upload for canteen with id {}: {}",
+                canteen_id_to_set, e
+            );
+            Ok(
+                HttpResponse::Conflict().json(UploadCanteenPicPresignedResponse {
+                    status: "error".to_string(),
+                    presigned_url: None,
+                    error: Some(e.to_string()),
+                }),
+            )
+        }
+    }
+}
+
+#[utoipa::path(
+    tag = "Canteen",
+    params(
         ("canteen_id", description = "The unique identifier of the canteen to set pic for."),
     ),
     responses(
@@ -64,7 +110,7 @@ pub(super) async fn set_canteen_pic_link(
     path: web::Path<(i32,)>,
 ) -> actix_web::Result<impl Responder> {
     let canteen_id_to_set = path.into_inner().0;
-    let result = web::block(move || canteen_ops.set_canteen_pic(&canteen_id_to_set)).await?;
+    let result = canteen_ops.set_canteen_pic(&canteen_id_to_set).await;
     match result {
         Ok(_res) => {
             debug!(

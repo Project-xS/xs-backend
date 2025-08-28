@@ -42,12 +42,12 @@ impl AssetOperations {
         })
     }
 
-    pub async fn upload_object(&self, key: &i32) -> Result<String, S3Error> {
+    pub async fn get_upload_presign_url(&self, key: &str) -> Result<String, S3Error> {
         let response = self
             .client
             .put_object()
             .bucket(&self.bucket_name)
-            .key(key.to_string())
+            .key(key)
             .presigned(
                 PresigningConfig::builder()
                     .expires_in(Duration::from_secs(60 * 5))
@@ -62,13 +62,13 @@ impl AssetOperations {
         Ok(response.uri().to_string())
     }
 
-    pub async fn get_object_etag(&self, key: &i32) -> Result<Option<String>, S3Error> {
+    pub async fn get_object_etag(&self, key: &str) -> Result<Option<String>, S3Error> {
         let response = self
             .client
             // .head_object() // This does not work for garage, so we pull the whole image, unfortunately :(
             .get_object()
             .bucket(&self.bucket_name)
-            .key(key.to_string())
+            .key(key)
             .send()
             .await
             .map_err(|err| {
@@ -91,13 +91,13 @@ impl AssetOperations {
         Ok(response.e_tag)
     }
 
-    pub async fn get_object(&self, key: &i32) -> Result<String, S3Error> {
+    pub async fn get_object_presign(&self, key: &str) -> Result<String, S3Error> {
         self.get_object_etag(key).await?;
         let response = self
             .client
             .get_object()
             .bucket(&self.bucket_name)
-            .key(key.to_string())
+            .key(key)
             .presigned(
                 PresigningConfig::builder()
                     .expires_in(Duration::from_secs(12 * 60 * 60))
@@ -107,7 +107,7 @@ impl AssetOperations {
             .await
             .map_err(|err| {
                 if err.as_service_error().map(|e| e.is_no_such_key()) == Some(true) {
-                    S3Error::NotFound(format!("{key}"))
+                    S3Error::NotFound(key.to_string())
                 } else {
                     S3Error::S3OperationFailed(err.to_string())
                 }

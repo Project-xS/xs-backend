@@ -22,6 +22,7 @@ pub struct CanteenDetails {
     pub canteen_name: String,
     pub location: String,
     pub pic_link: bool,
+    pub pic_etag: Option<String>,
 }
 
 #[derive(Insertable, Debug, Serialize, Deserialize, ToSchema)]

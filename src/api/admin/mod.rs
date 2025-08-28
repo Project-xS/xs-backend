@@ -32,6 +32,7 @@ pub fn config(
                     .service(get_all_menu_items)
                     .service(get_menu_item)
                     .service(remove_menu_item)
+                    .service(upload_menu_item_pic)
                     .service(set_menu_pic_link),
             ),
     )
@@ -47,6 +48,7 @@ pub fn config(
             )
             .service(
                 scope::scope("")
+                    .service(upload_canteen_pic)
                     .service(set_canteen_pic_link)
                     .service(get_all_canteens)
                     .service(get_canteen_menu),

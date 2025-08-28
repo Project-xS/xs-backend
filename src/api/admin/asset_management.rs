@@ -17,7 +17,7 @@ pub async fn upload_image_handler(
     path: web::Path<(i32,)>,
 ) -> impl Responder {
     let s3_key = path.into_inner().0;
-    match asset_ops.upload_object(&s3_key).await {
+    match asset_ops.get_upload_presign_url(&s3_key.to_string()).await {
         Ok(url) => {
             debug!(
                 "upload_image: successfully generated presigned url '{:?}'",
@@ -64,7 +64,7 @@ pub async fn get_image_handler(
     path: web::Path<(i32,)>,
 ) -> impl Responder {
     let s3_key = path.into_inner().0;
-    match asset_ops.get_object(&s3_key).await {
+    match asset_ops.get_object_presign(&s3_key.to_string()).await {
         Ok(url) => {
             debug!(
                 "get_image: successfully generated presigned url '{:?}'",

@@ -77,6 +77,13 @@ pub struct ItemResponse {
     pub error: Option<String>,
 }
 
+#[derive(Serialize, ToSchema)]
+pub struct UploadMenuItemPicPresignedResponse {
+    pub status: String,
+    pub presigned_url: Option<String>,
+    pub error: Option<String>,
+}
+
 #[derive(Deserialize, ToSchema)]
 pub struct UpdateItemRequest {
     pub item_id: i32,
@@ -88,6 +95,13 @@ pub struct UpdateItemRequest {
 #[derive(Serialize, ToSchema)]
 pub struct NewCanteenResponse {
     pub status: String,
+    pub error: Option<String>,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct UploadCanteenPicPresignedResponse {
+    pub status: String,
+    pub presigned_url: Option<String>,
     pub error: Option<String>,
 }
 

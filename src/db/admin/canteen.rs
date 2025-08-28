@@ -1,6 +1,6 @@
 use crate::db::errors::RepositoryError;
 use crate::db::schema::canteens::dsl::*;
-use crate::db::{AssetOperations, DbConnection};
+use crate::db::{AssetOperations, DbConnection, S3Error};
 use crate::enums::admin::MenuItemWithPic;
 use crate::models::admin::{CanteenDetails, CanteenLoginSuccess, MenuItem, NewCanteen};
 use diesel::dsl::{case_when, sql};
@@ -42,7 +42,16 @@ impl CanteenOperations {
             })
     }
 
-    pub fn set_canteen_pic(&self, canteen_id_to_update: &i32) -> Result<usize, RepositoryError> {
+    pub async fn upload_canteen_pic(&self, canteen_id_to_set: &i32) -> Result<String, S3Error> {
+        self.asset_ops
+            .get_upload_presign_url(&format!("canteens/{}", canteen_id_to_set))
+            .await
+    }
+
+    pub async fn set_canteen_pic(
+        &self,
+        canteen_id_to_update: &i32,
+    ) -> Result<usize, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!(
                 "approve_canteen_pic: failed to acquire DB connection: {}",
@@ -50,6 +59,16 @@ impl CanteenOperations {
             );
             e
         })?;
+
+        let etag = self
+            .asset_ops
+            .get_object_etag(&canteen_id_to_update.to_string())
+            .await?;
+        if etag.is_some() {
+            info!("set_menu_item_pic: etag: {}", etag.clone().unwrap());
+        } else {
+            info!("set_menu_item_pic: no etag found");
+        }
 
         diesel::update(canteens.filter(canteen_id.eq(canteen_id_to_update)))
             .set(pic_link.eq(true))
@@ -117,7 +136,11 @@ impl CanteenOperations {
         let futures = items.iter().map(async |item| {
             let mut item_with_pic: MenuItemWithPic = item.into();
             if item.pic_link {
-                let pic_url = self.asset_ops.get_object(&item.item_id).await.ok();
+                let pic_url = self
+                    .asset_ops
+                    .get_object_presign(&item.item_id.to_string())
+                    .await
+                    .ok();
                 item_with_pic.pic_link = pic_url;
                 item_with_pic
             } else {
