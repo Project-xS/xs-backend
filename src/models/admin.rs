@@ -12,6 +12,7 @@ pub struct Canteen {
     pub username: String,
     pub password: String,
     pub pic_link: bool,
+    pub pic_etag: Option<String>,
 }
 
 #[derive(Queryable, Debug, Identifiable, Selectable, Serialize, Deserialize, ToSchema)]

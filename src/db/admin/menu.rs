@@ -1,6 +1,6 @@
 use crate::db::errors::RepositoryError;
 use crate::db::schema::menu_items::dsl::*;
-use crate::db::{AssetOperations, DbConnection, S3Error};
+use crate::db::{AssetOperations, DbConnection};
 use crate::enums::admin::MenuItemWithPic;
 use crate::models::admin::{MenuItem, NewMenuItem, UpdateMenuItem};
 use diesel::prelude::*;
@@ -40,10 +40,37 @@ impl MenuOperations {
             })
     }
 
-    pub async fn upload_menu_item_pic(&self, menu_item_to_set: &i32) -> Result<String, S3Error> {
-        self.asset_ops
+    pub async fn upload_menu_item_pic(
+        &self,
+        menu_item_to_set: &i32,
+    ) -> Result<String, RepositoryError> {
+        let mut conn = DbConnection::new(&self.pool).map_err(|e| {
+            error!("set_menu_item_pic: failed to acquire DB connection: {}", e);
+            e
+        })?;
+
+        menu_items
+            .filter(item_id.eq(menu_item_to_set))
+            .first::<MenuItem>(conn.connection())
+            .map_err(|e| {
+                error!(
+                    "upload_menu_item_pic: error approving pic for menu item with id {}: {}",
+                    menu_item_to_set, e
+                );
+                match e {
+                    Error::NotFound => {
+                        RepositoryError::NotFound(format!("menu_items: {menu_item_to_set}"))
+                    }
+                    other => RepositoryError::DatabaseError(other),
+                }
+            })?;
+
+        let res = self
+            .asset_ops
             .get_upload_presign_url(&format!("items/{}", menu_item_to_set))
-            .await
+            .await?;
+
+        Ok(res)
     }
 
     pub async fn set_menu_item_pic(
@@ -74,7 +101,7 @@ impl MenuOperations {
             .execute(conn.connection())
             .map_err(|e| {
                 error!(
-                    "approve_menu_item_pic: error approving pic for menu item with id {}: {}",
+                    "set_menu_item_pic: error approving pic for menu item with id {}: {}",
                     item_id_to_update, e
                 );
                 match e {

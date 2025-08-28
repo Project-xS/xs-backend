@@ -1,8 +1,8 @@
 use crate::db::errors::RepositoryError;
 use crate::db::schema::canteens::dsl::*;
-use crate::db::{AssetOperations, DbConnection, S3Error};
+use crate::db::{AssetOperations, DbConnection};
 use crate::enums::admin::MenuItemWithPic;
-use crate::models::admin::{CanteenDetails, CanteenLoginSuccess, MenuItem, NewCanteen};
+use crate::models::admin::{Canteen, CanteenDetails, CanteenLoginSuccess, MenuItem, NewCanteen};
 use diesel::dsl::{case_when, sql};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
@@ -42,10 +42,37 @@ impl CanteenOperations {
             })
     }
 
-    pub async fn upload_canteen_pic(&self, canteen_id_to_set: &i32) -> Result<String, S3Error> {
-        self.asset_ops
+    pub async fn upload_canteen_pic(
+        &self,
+        canteen_id_to_set: &i32,
+    ) -> Result<String, RepositoryError> {
+        let mut conn = DbConnection::new(&self.pool).map_err(|e| {
+            error!("upload_canteen_pic: failed to acquire DB connection: {}", e);
+            e
+        })?;
+
+        canteens
+            .filter(canteen_id.eq(canteen_id_to_set))
+            .first::<Canteen>(conn.connection())
+            .map_err(|e| {
+                error!(
+                    "upload_canteen_pic: error generating presign upload {}: {}",
+                    canteen_id_to_set, e
+                );
+                match e {
+                    Error::NotFound => {
+                        RepositoryError::NotFound(format!("canteens: {canteen_id_to_set}"))
+                    }
+                    other => RepositoryError::DatabaseError(other),
+                }
+            })?;
+
+        let res = self
+            .asset_ops
             .get_upload_presign_url(&format!("canteens/{}", canteen_id_to_set))
-            .await
+            .await?;
+
+        Ok(res)
     }
 
     pub async fn set_canteen_pic(
@@ -53,10 +80,7 @@ impl CanteenOperations {
         canteen_id_to_update: &i32,
     ) -> Result<usize, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
-            error!(
-                "approve_canteen_pic: failed to acquire DB connection: {}",
-                e
-            );
+            error!("set_menu_item_pic: failed to acquire DB connection: {}", e);
             e
         })?;
 
@@ -75,7 +99,7 @@ impl CanteenOperations {
             .execute(conn.connection())
             .map_err(|e| {
                 error!(
-                    "approve_canteen_pic: error approving pic for menu item with id {}: {}",
+                    "set_menu_item_pic: error approving pic for menu item with id {}: {}",
                     canteen_id_to_update, e
                 );
                 match e {
