@@ -156,7 +156,7 @@ impl MenuOperations {
             if item.pic_link {
                 let pic_url = self
                     .asset_ops
-                    .get_object_presign(&item.item_id.to_string())
+                    .get_object_presign(&format!("items/{}", &item.item_id.to_string()))
                     .await
                     .ok();
                 item_with_pic.pic_link = pic_url;
@@ -197,7 +197,7 @@ impl MenuOperations {
         if item.pic_link {
             let pic_url = self
                 .asset_ops
-                .get_object_presign(&item.item_id.to_string())
+                .get_object_presign(&format!("items/{}", &item.item_id.to_string()))
                 .await
                 .ok();
             item_with_pic.pic_link = pic_url;
