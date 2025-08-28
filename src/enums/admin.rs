@@ -33,6 +33,7 @@ pub struct MenuItemWithPic {
     pub is_available: bool,
     pub description: Option<String>,
     pub pic_link: Option<String>,
+    pub pic_etag: Option<String>,
 }
 
 impl From<&MenuItem> for MenuItemWithPic {
@@ -47,15 +48,9 @@ impl From<&MenuItem> for MenuItemWithPic {
             is_available: item.is_available,
             description: item.description.clone(),
             pic_link: None,
+            pic_etag: item.pic_etag.clone(),
         }
     }
-}
-
-#[derive(Serialize, ToSchema)]
-pub struct ItemResponse {
-    pub status: String,
-    pub data: MenuItemWithPic,
-    pub error: Option<String>,
 }
 
 impl Default for MenuItemWithPic {
@@ -68,10 +63,18 @@ impl Default for MenuItemWithPic {
             price: 0,
             stock: -1,
             is_available: false,
-            pic_link: None,
             description: None,
+            pic_link: None,
+            pic_etag: None,
         }
     }
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct ItemResponse {
+    pub status: String,
+    pub data: MenuItemWithPic,
+    pub error: Option<String>,
 }
 
 #[derive(Deserialize, ToSchema)]

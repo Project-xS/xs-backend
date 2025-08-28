@@ -62,8 +62,10 @@ impl AssetOperations {
         Ok(response.uri().to_string())
     }
 
-    pub async fn get_object(&self, key: &i32) -> Result<String, S3Error> {
-        self.client
+    pub async fn get_object_etag(&self, key: &i32) -> Result<Option<String>, S3Error> {
+        let response = self
+            .client
+            // .head_object() // This does not work for garage, so we pull the whole image, unfortunately :(
             .get_object()
             .bucket(&self.bucket_name)
             .key(key.to_string())
@@ -85,6 +87,12 @@ impl AssetOperations {
                     _ => S3Error::S3OperationFailed(err.to_string()),
                 }
             })?;
+
+        Ok(response.e_tag)
+    }
+
+    pub async fn get_object(&self, key: &i32) -> Result<String, S3Error> {
+        self.get_object_etag(key).await?;
         let response = self
             .client
             .get_object()
@@ -104,8 +112,6 @@ impl AssetOperations {
                     S3Error::S3OperationFailed(err.to_string())
                 }
             })?;
-
-        response.uri();
 
         Ok(response.uri().to_string())
     }

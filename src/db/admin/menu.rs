@@ -40,14 +40,28 @@ impl MenuOperations {
             })
     }
 
-    pub fn set_menu_item_pic(&self, item_id_to_update: &i32) -> Result<usize, RepositoryError> {
+    pub async fn set_menu_item_pic(
+        &self,
+        item_id_to_update: &i32,
+    ) -> Result<usize, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
-            error!("add_menu_item: failed to acquire DB connection: {}", e);
+            error!("set_menu_item_pic: failed to acquire DB connection: {}", e);
             e
         })?;
+        info!(
+            "set_menu_item_pic: item_id_to_update: {}",
+            item_id_to_update
+        );
+
+        let etag = self.asset_ops.get_object_etag(item_id_to_update).await?;
+        if etag.is_some() {
+            info!("set_menu_item_pic: etag: {}", etag.clone().unwrap());
+        } else {
+            info!("set_menu_item_pic: no etag found");
+        }
 
         diesel::update(menu_items.filter(item_id.eq(item_id_to_update)))
-            .set(pic_link.eq(true))
+            .set((pic_link.eq(true), pic_etag.eq(etag)))
             .execute(conn.connection())
             .map_err(|e| {
                 error!(

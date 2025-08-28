@@ -17,6 +17,9 @@ pub enum RepositoryError {
     #[error("Internal error: {0}")]
     #[allow(dead_code)]
     InternalError(String),
+
+    #[error("Error fetching assets: {0}")]
+    AssetError(String),
 }
 
 #[derive(Debug, Error)]
@@ -27,4 +30,10 @@ pub enum S3Error {
     S3ServiceError(String),
     #[error("S3 operation failed: {0}")]
     S3OperationFailed(String),
+}
+
+impl From<S3Error> for RepositoryError {
+    fn from(error: S3Error) -> RepositoryError {
+        RepositoryError::AssetError(error.to_string())
+    }
 }

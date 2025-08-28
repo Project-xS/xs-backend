@@ -108,7 +108,7 @@ pub(super) async fn set_menu_pic_link(
     path: web::Path<(i32,)>,
 ) -> actix_web::Result<impl Responder> {
     let item_id_to_set = path.into_inner().0;
-    let result = web::block(move || menu_ops.set_menu_item_pic(&item_id_to_set)).await?;
+    let result = menu_ops.set_menu_item_pic(&item_id_to_set).await;
     match result {
         Ok(_x) => {
             debug!(

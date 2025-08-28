@@ -50,6 +50,7 @@ diesel::table! {
         is_available -> Bool,
         description -> Nullable<Varchar>,
         pic_link -> Bool,
+        pic_etag -> Nullable<Varchar>,
     }
 }
 

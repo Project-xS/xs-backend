@@ -45,6 +45,7 @@ pub struct MenuItem {
     pub is_available: bool,
     pub description: Option<String>,
     pub pic_link: bool,
+    pub pic_etag: Option<String>,
 }
 
 #[derive(Insertable, Debug, Serialize, Deserialize, ToSchema, Selectable)]
