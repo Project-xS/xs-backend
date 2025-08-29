@@ -70,6 +70,27 @@ impl Default for MenuItemWithPic {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct CanteenDetailsWithPic {
+    pub canteen_id: i32,
+    pub canteen_name: String,
+    pub location: String,
+    pub pic_link: Option<String>,
+    pub pic_etag: Option<String>,
+}
+
+impl From<&CanteenDetails> for CanteenDetailsWithPic {
+    fn from(item: &CanteenDetails) -> Self {
+        CanteenDetailsWithPic {
+            canteen_id: item.canteen_id,
+            canteen_name: item.canteen_name.clone(),
+            location: item.location.clone(),
+            pic_link: None,
+            pic_etag: item.pic_etag.clone(),
+        }
+    }
+}
+
 #[derive(Serialize, ToSchema)]
 pub struct ItemResponse {
     pub status: String,
@@ -108,7 +129,7 @@ pub struct UploadCanteenPicPresignedResponse {
 #[derive(Serialize, ToSchema)]
 pub struct AllCanteenResponse {
     pub status: String,
-    pub data: Vec<CanteenDetails>,
+    pub data: Vec<CanteenDetailsWithPic>,
     pub error: Option<String>,
 }
 

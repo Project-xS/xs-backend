@@ -1,7 +1,7 @@
 use crate::db::errors::RepositoryError;
 use crate::db::schema::canteens::dsl::*;
 use crate::db::{AssetOperations, DbConnection};
-use crate::enums::admin::MenuItemWithPic;
+use crate::enums::admin::{CanteenDetailsWithPic, MenuItemWithPic};
 use crate::models::admin::{Canteen, CanteenDetails, CanteenLoginSuccess, MenuItem, NewCanteen};
 use diesel::dsl::{case_when, sql};
 use diesel::prelude::*;
@@ -119,20 +119,38 @@ impl CanteenOperations {
     //     todo!()
     // }
 
-    pub fn get_all_canteens(&self) -> Result<Vec<CanteenDetails>, RepositoryError> {
+    pub async fn get_all_canteens(&self) -> Result<Vec<CanteenDetailsWithPic>, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!("get_all_canteens: failed to acquire DB connection: {}", e);
             e
         })?;
 
-        canteens
+        let canteen_details = canteens
             .order_by(canteen_id.asc())
             .select(CanteenDetails::as_select())
             .load::<CanteenDetails>(conn.connection())
             .map_err(|e| {
                 error!("get_all_canteens: error fetching canteens: {}", e);
                 RepositoryError::DatabaseError(e)
-            })
+            })?;
+
+        let futures = canteen_details.iter().map(async |canteen| {
+            let mut canteen_with_pic: CanteenDetailsWithPic = canteen.into();
+            if canteen.pic_link {
+                let pic_url = self
+                    .asset_ops
+                    .get_object_presign(&format!("canteens/{}", &canteen.canteen_id.to_string()))
+                    .await
+                    .ok();
+                canteen_with_pic.pic_link = pic_url;
+                canteen_with_pic
+            } else {
+                canteen_with_pic
+            }
+        });
+
+        let results = join_all(futures).await;
+        Ok(results)
     }
 
     pub async fn get_canteen_items(

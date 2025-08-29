@@ -145,9 +145,9 @@ pub(super) async fn set_canteen_pic_link(
 )]
 #[get("")]
 pub(super) async fn get_all_canteens(
-    menu_ops: web::Data<CanteenOperations>,
+    canteen_ops: web::Data<CanteenOperations>,
 ) -> actix_web::Result<impl Responder> {
-    let result = web::block(move || menu_ops.get_all_canteens()).await?;
+    let result = canteen_ops.get_all_canteens().await;
     match result {
         Ok(x) => {
             debug!(
