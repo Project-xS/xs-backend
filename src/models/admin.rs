@@ -84,7 +84,6 @@ pub struct UpdateMenuItem {
     pub stock: Option<i32>,
     pub is_available: Option<bool>,
     pub description: Option<String>,
-    pub pic_link: bool,
 }
 
 #[derive(Debug, Selectable, Queryable, Serialize, ToSchema)]
