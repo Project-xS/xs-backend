@@ -130,7 +130,7 @@ pub(super) async fn get_order_by_orderid(
     path: web::Path<(i32,)>,
 ) -> actix_web::Result<impl Responder> {
     let search_order_id = path.into_inner().0;
-    let result = web::block(move || order_ops.get_orders_by_orderid(&search_order_id)).await?;
+    let result = order_ops.get_orders_by_orderid(&search_order_id).await;
     match result {
         Ok(data) => {
             debug!(
@@ -184,7 +184,7 @@ pub(super) async fn get_orders_by_user(
     }
     if let Some(search_user_id) = &params.user_id {
         let search_user_id_cl = *search_user_id;
-        let result = web::block(move || order_ops.get_orders_by_userid(&search_user_id_cl)).await?;
+        let result = order_ops.get_orders_by_userid(&search_user_id_cl).await;
         match result {
             Ok(data) => {
                 debug!(
@@ -214,7 +214,7 @@ pub(super) async fn get_orders_by_user(
         }
     } else if let Some(search_rfid) = &params.rfid {
         let search_rfid_cl = search_rfid.clone();
-        let result = web::block(move || order_ops.get_orders_by_rfid(&search_rfid_cl)).await?;
+        let result = order_ops.get_orders_by_rfid(&search_rfid_cl).await;
         match result {
             Ok(data) => {
                 debug!(

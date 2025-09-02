@@ -17,7 +17,7 @@ diesel::allow_columns_to_appear_in_same_group_by_clause!(
 );
 
 #[derive(
-    Debug, PartialEq, FromSqlRow, AsExpression, Eq, Serialize, Deserialize, ToSchema, Hash,
+    Debug, PartialEq, FromSqlRow, AsExpression, Eq, Serialize, Deserialize, ToSchema, Hash, Clone,
 )]
 #[diesel(sql_type = TimeBand)]
 pub enum TimeBandEnum {
@@ -95,12 +95,14 @@ pub struct NewActiveOrder {
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct OrderItems {
     pub order_id: i32,
-    pub canteen_name: String,
+    pub canteen_id: i32,
+    pub item_id: i32,
     pub total_price: i32,
     pub deliver_at: Option<TimeBandEnum>,
     pub name: String,
     pub quantity: i16,
     pub is_veg: bool,
     pub pic_link: bool,
+    pub pic_etag: Option<String>,
     pub description: Option<String>,
 }

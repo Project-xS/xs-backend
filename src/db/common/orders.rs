@@ -1,6 +1,6 @@
-use crate::db::{DbConnection, RepositoryError};
+use crate::db::{AssetOperations, DbConnection, RepositoryError};
 use crate::enums::common::{
-    ActiveItemCount, ItemContainer, OrderItemContainer, TimedActiveItemCount,
+    ActiveItemCount, ItemContainer, OrderItemContainer, OrderItemsWithPic, TimedActiveItemCount,
 };
 use crate::models::common::TimeBandEnum;
 use crate::models::{admin::MenuItemCheck, common::OrderItems, user::NewPastOrder};
@@ -10,6 +10,7 @@ use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::result::Error;
 use diesel::PgConnection;
+use futures::future::join_all;
 use log::{debug, error};
 use std::collections::HashMap;
 
@@ -41,13 +42,16 @@ struct OrderDeliverItems {
 #[derive(Clone)]
 pub struct OrderOperations {
     pool: Pool<ConnectionManager<PgConnection>>,
+    asset_ops: AssetOperations,
 }
 
 impl OrderOperations {
-    pub fn new(pool: Pool<ConnectionManager<PgConnection>>) -> Self {
-        Self { pool }
+    pub async fn new(pool: Pool<ConnectionManager<PgConnection>>) -> Self {
+        Self {
+            pool,
+            asset_ops: AssetOperations::new().await.unwrap(),
+        }
     }
-
     pub fn create_order(
         &self,
         userid: i32,
@@ -277,7 +281,7 @@ impl OrderOperations {
         Ok(resp)
     }
 
-    fn group_order_items(items: Vec<OrderItems>) -> Vec<OrderItemContainer> {
+    fn group_order_items(items: Vec<OrderItemsWithPic>) -> Vec<OrderItemContainer> {
         debug!("Ungrouped order items: {:?}", &items);
         let mut grouped: HashMap<i32, (i32, Option<TimeBandEnum>, Vec<ItemContainer>)> =
             HashMap::new();
@@ -288,11 +292,13 @@ impl OrderOperations {
                 .or_insert_with(|| (item.total_price, item.deliver_at, Vec::new()));
 
             new_item.push(ItemContainer {
-                canteen_name: item.canteen_name,
+                canteen_id: item.canteen_id,
+                item_id: item.item_id,
                 name: item.name,
                 quantity: item.quantity,
                 is_veg: item.is_veg,
                 pic_link: item.pic_link,
+                pic_etag: item.pic_etag,
                 description: item.description,
             });
         }
@@ -315,7 +321,7 @@ impl OrderOperations {
             .collect()
     }
 
-    pub fn get_orders_by_rfid(
+    pub async fn get_orders_by_rfid(
         &self,
         search_rfid: &str,
     ) -> Result<Vec<OrderItemContainer>, RepositoryError> {
@@ -338,13 +344,15 @@ impl OrderOperations {
             .filter(users::rfid.eq(&search_rfid))
             .select((
                 active_orders::order_id,
-                canteens::canteen_name,
+                canteens::canteen_id,
+                menu_items::item_id,
                 active_orders::total_price,
                 active_orders::deliver_at,
                 menu_items::name,
                 active_order_items::quantity,
                 menu_items::is_veg,
                 menu_items::pic_link,
+                menu_items::pic_etag,
                 menu_items::description,
             ))
             .order_by(active_orders::ordered_at.desc())
@@ -362,10 +370,27 @@ impl OrderOperations {
                 }
             })?;
 
-        Ok(Self::group_order_items(order_items))
+        let futures = order_items.iter().map(async |item| {
+            let mut item_with_pic: OrderItemsWithPic = item.into();
+            if item.pic_link {
+                let pic_url = self
+                    .asset_ops
+                    .get_object_presign(&format!("items/{}", &item.item_id.to_string()))
+                    .await
+                    .ok();
+                item_with_pic.pic_link = pic_url;
+                item_with_pic
+            } else {
+                item_with_pic
+            }
+        });
+
+        let results = join_all(futures).await;
+
+        Ok(Self::group_order_items(results))
     }
 
-    pub fn get_orders_by_userid(
+    pub async fn get_orders_by_userid(
         &self,
         search_user_id: &i32,
     ) -> Result<Vec<OrderItemContainer>, RepositoryError> {
@@ -387,13 +412,15 @@ impl OrderOperations {
             .filter(active_orders::user_id.eq(search_user_id))
             .select((
                 active_orders::order_id,
-                canteens::canteen_name,
+                canteens::canteen_id,
+                menu_items::item_id,
                 active_orders::total_price,
                 active_orders::deliver_at,
                 menu_items::name,
                 active_order_items::quantity,
                 menu_items::is_veg,
                 menu_items::pic_link,
+                menu_items::pic_etag,
                 menu_items::description,
             ))
             .order_by(active_orders::ordered_at.desc())
@@ -411,9 +438,26 @@ impl OrderOperations {
                 }
             })?;
 
-        Ok(Self::group_order_items(order_items))
+        let futures = order_items.iter().map(async |item| {
+            let mut item_with_pic: OrderItemsWithPic = item.into();
+            if item.pic_link {
+                let pic_url = self
+                    .asset_ops
+                    .get_object_presign(&format!("items/{}", &item.item_id.to_string()))
+                    .await
+                    .ok();
+                item_with_pic.pic_link = pic_url;
+                item_with_pic
+            } else {
+                item_with_pic
+            }
+        });
+
+        let results = join_all(futures).await;
+
+        Ok(Self::group_order_items(results))
     }
-    pub fn get_orders_by_orderid(
+    pub async fn get_orders_by_orderid(
         &self,
         search_order_id: &i32,
     ) -> Result<OrderItemContainer, RepositoryError> {
@@ -434,13 +478,15 @@ impl OrderOperations {
             .filter(active_order_items::order_id.eq(search_order_id))
             .select((
                 active_order_items::order_id,
-                canteens::canteen_name,
+                canteens::canteen_id,
+                menu_items::item_id,
                 active_orders::total_price,
                 active_orders::deliver_at,
                 menu_items::name,
                 active_order_items::quantity,
                 menu_items::is_veg,
                 menu_items::pic_link,
+                menu_items::pic_etag,
                 menu_items::description,
             ))
             .order(menu_items::item_id.asc())
@@ -458,7 +504,24 @@ impl OrderOperations {
                 }
             })?;
 
-        let resp = Self::group_order_items(order_items);
+        let futures = order_items.iter().map(async |item| {
+            let mut item_with_pic: OrderItemsWithPic = item.into();
+            if item.pic_link {
+                let pic_url = self
+                    .asset_ops
+                    .get_object_presign(&format!("items/{}", &item.item_id.to_string()))
+                    .await
+                    .ok();
+                item_with_pic.pic_link = pic_url;
+                item_with_pic
+            } else {
+                item_with_pic
+            }
+        });
+
+        let results = join_all(futures).await;
+
+        let resp = Self::group_order_items(results);
         Ok(resp.into_iter().next().unwrap_or(OrderItemContainer {
             order_id: *search_order_id,
             total_price: 0,

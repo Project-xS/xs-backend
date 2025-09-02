@@ -1,3 +1,4 @@
+use crate::models::common::{OrderItems, TimeBandEnum};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use utoipa::ToSchema;
@@ -20,12 +21,47 @@ pub struct TimedActiveItemCountResponse {
 
 #[derive(Serialize, ToSchema, Debug)]
 pub struct ItemContainer {
-    pub canteen_name: String,
+    pub canteen_id: i32,
+    pub item_id: i32,
     pub name: String,
     pub quantity: i16,
     pub is_veg: bool,
-    pub pic_link: bool,
+    pub pic_link: Option<String>,
+    pub pic_etag: Option<String>,
     pub description: Option<String>,
+}
+
+#[derive(Serialize, ToSchema, Debug)]
+pub struct OrderItemsWithPic {
+    pub order_id: i32,
+    pub canteen_id: i32,
+    pub item_id: i32,
+    pub total_price: i32,
+    pub deliver_at: Option<TimeBandEnum>,
+    pub name: String,
+    pub quantity: i16,
+    pub is_veg: bool,
+    pub pic_link: Option<String>,
+    pub pic_etag: Option<String>,
+    pub description: Option<String>,
+}
+
+impl From<&OrderItems> for OrderItemsWithPic {
+    fn from(item: &OrderItems) -> Self {
+        OrderItemsWithPic {
+            order_id: item.order_id,
+            canteen_id: item.canteen_id,
+            item_id: item.item_id,
+            total_price: item.total_price,
+            deliver_at: item.deliver_at.clone(),
+            name: item.name.clone(),
+            quantity: item.quantity,
+            is_veg: item.is_veg,
+            pic_link: None,
+            pic_etag: item.pic_etag.clone(),
+            description: item.description.clone(),
+        }
+    }
 }
 
 #[derive(Serialize, ToSchema, Debug)]

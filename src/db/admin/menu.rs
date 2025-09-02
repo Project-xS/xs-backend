@@ -88,7 +88,7 @@ impl MenuOperations {
 
         let etag = self
             .asset_ops
-            .get_object_etag(&item_id_to_update.to_string())
+            .get_object_etag(&format!("items/{}", item_id_to_update))
             .await?;
         if etag.is_some() {
             info!("set_menu_item_pic: etag: {}", etag.clone().unwrap());

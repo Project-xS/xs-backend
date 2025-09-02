@@ -35,7 +35,7 @@ impl AppState {
         let user_ops = UserOperations::new(db.clone());
         let menu_ops = MenuOperations::new(db.clone()).await;
         let canteen_ops = CanteenOperations::new(db.clone()).await;
-        let order_ops = OrderOperations::new(db.clone());
+        let order_ops = OrderOperations::new(db.clone()).await;
         let search_ops = SearchOperations::new(db.clone()).await;
         let asset_ops = AssetOperations::new()
             .await
