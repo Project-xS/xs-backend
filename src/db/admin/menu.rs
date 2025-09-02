@@ -97,7 +97,7 @@ impl MenuOperations {
         }
 
         diesel::update(menu_items.filter(item_id.eq(item_id_to_update)))
-            .set((pic_link.eq(true), pic_etag.eq(etag)))
+            .set((has_pic.eq(true), pic_etag.eq(etag)))
             .execute(conn.connection())
             .map_err(|e| {
                 error!(
@@ -180,17 +180,10 @@ impl MenuOperations {
 
         let futures = items.iter().map(async |item| {
             let mut item_with_pic: MenuItemWithPic = item.into();
-            if item.pic_link {
-                let pic_url = self
-                    .asset_ops
-                    .get_object_presign(&format!("items/{}", &item.item_id.to_string()))
-                    .await
-                    .ok();
-                item_with_pic.pic_link = pic_url;
-                item_with_pic
-            } else {
-                item_with_pic
-            }
+            item_with_pic
+                .populate_pic_link_from(&self.asset_ops, item)
+                .await;
+            item_with_pic
         });
 
         let results = join_all(futures).await;
@@ -221,17 +214,10 @@ impl MenuOperations {
             })?;
 
         let mut item_with_pic: MenuItemWithPic = (&item).into();
-        if item.pic_link {
-            let pic_url = self
-                .asset_ops
-                .get_object_presign(&format!("items/{}", &item.item_id.to_string()))
-                .await
-                .ok();
-            item_with_pic.pic_link = pic_url;
-            Ok(item_with_pic)
-        } else {
-            Ok(item_with_pic)
-        }
+        item_with_pic
+            .populate_pic_link_from(&self.asset_ops, &item)
+            .await;
+        Ok(item_with_pic)
     }
 }
 

@@ -2,6 +2,7 @@ use crate::models::common::{OrderItems, TimeBandEnum};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use utoipa::ToSchema;
+use with_pic_macro::{with_pic, WithPic};
 
 pub type TimedActiveItemCount = HashMap<String, Vec<ActiveItemCount>>;
 
@@ -31,7 +32,8 @@ pub struct ItemContainer {
     pub description: Option<String>,
 }
 
-#[derive(Serialize, ToSchema, Debug)]
+#[with_pic(OrderItems)]
+#[derive(Serialize, ToSchema, Debug, WithPic)]
 pub struct OrderItemsWithPic {
     pub order_id: i32,
     pub canteen_id: i32,
@@ -44,24 +46,6 @@ pub struct OrderItemsWithPic {
     pub pic_link: Option<String>,
     pub pic_etag: Option<String>,
     pub description: Option<String>,
-}
-
-impl From<&OrderItems> for OrderItemsWithPic {
-    fn from(item: &OrderItems) -> Self {
-        OrderItemsWithPic {
-            order_id: item.order_id,
-            canteen_id: item.canteen_id,
-            item_id: item.item_id,
-            total_price: item.total_price,
-            deliver_at: item.deliver_at.clone(),
-            name: item.name.clone(),
-            quantity: item.quantity,
-            is_veg: item.is_veg,
-            pic_link: None,
-            pic_etag: item.pic_etag.clone(),
-            description: item.description.clone(),
-        }
-    }
 }
 
 #[derive(Serialize, ToSchema, Debug)]

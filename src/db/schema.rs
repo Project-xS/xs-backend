@@ -35,7 +35,7 @@ diesel::table! {
         location -> Varchar,
         username -> Varchar,
         password -> Varchar,
-        pic_link -> Bool,
+        has_pic -> Bool,
         pic_etag -> Nullable<Varchar>,
     }
 }
@@ -50,7 +50,7 @@ diesel::table! {
         stock -> Int4,
         is_available -> Bool,
         description -> Nullable<Varchar>,
-        pic_link -> Bool,
+        has_pic -> Bool,
         pic_etag -> Nullable<Varchar>,
     }
 }

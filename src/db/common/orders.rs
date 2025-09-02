@@ -351,7 +351,7 @@ impl OrderOperations {
                 menu_items::name,
                 active_order_items::quantity,
                 menu_items::is_veg,
-                menu_items::pic_link,
+                menu_items::has_pic,
                 menu_items::pic_etag,
                 menu_items::description,
             ))
@@ -372,17 +372,10 @@ impl OrderOperations {
 
         let futures = order_items.iter().map(async |item| {
             let mut item_with_pic: OrderItemsWithPic = item.into();
-            if item.pic_link {
-                let pic_url = self
-                    .asset_ops
-                    .get_object_presign(&format!("items/{}", &item.item_id.to_string()))
-                    .await
-                    .ok();
-                item_with_pic.pic_link = pic_url;
-                item_with_pic
-            } else {
-                item_with_pic
-            }
+            item_with_pic
+                .populate_pic_link_from(&self.asset_ops, item)
+                .await;
+            item_with_pic
         });
 
         let results = join_all(futures).await;
@@ -419,7 +412,7 @@ impl OrderOperations {
                 menu_items::name,
                 active_order_items::quantity,
                 menu_items::is_veg,
-                menu_items::pic_link,
+                menu_items::has_pic,
                 menu_items::pic_etag,
                 menu_items::description,
             ))
@@ -440,17 +433,10 @@ impl OrderOperations {
 
         let futures = order_items.iter().map(async |item| {
             let mut item_with_pic: OrderItemsWithPic = item.into();
-            if item.pic_link {
-                let pic_url = self
-                    .asset_ops
-                    .get_object_presign(&format!("items/{}", &item.item_id.to_string()))
-                    .await
-                    .ok();
-                item_with_pic.pic_link = pic_url;
-                item_with_pic
-            } else {
-                item_with_pic
-            }
+            item_with_pic
+                .populate_pic_link_from(&self.asset_ops, item)
+                .await;
+            item_with_pic
         });
 
         let results = join_all(futures).await;
@@ -485,7 +471,7 @@ impl OrderOperations {
                 menu_items::name,
                 active_order_items::quantity,
                 menu_items::is_veg,
-                menu_items::pic_link,
+                menu_items::has_pic,
                 menu_items::pic_etag,
                 menu_items::description,
             ))
@@ -506,17 +492,10 @@ impl OrderOperations {
 
         let futures = order_items.iter().map(async |item| {
             let mut item_with_pic: OrderItemsWithPic = item.into();
-            if item.pic_link {
-                let pic_url = self
-                    .asset_ops
-                    .get_object_presign(&format!("items/{}", &item.item_id.to_string()))
-                    .await
-                    .ok();
-                item_with_pic.pic_link = pic_url;
-                item_with_pic
-            } else {
-                item_with_pic
-            }
+            item_with_pic
+                .populate_pic_link_from(&self.asset_ops, item)
+                .await;
+            item_with_pic
         });
 
         let results = join_all(futures).await;

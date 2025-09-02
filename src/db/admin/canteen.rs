@@ -95,7 +95,7 @@ impl CanteenOperations {
         }
 
         diesel::update(canteens.filter(canteen_id.eq(canteen_id_to_update)))
-            .set(pic_link.eq(true))
+            .set(has_pic.eq(true))
             .execute(conn.connection())
             .map_err(|e| {
                 error!(
@@ -136,17 +136,10 @@ impl CanteenOperations {
 
         let futures = canteen_details.iter().map(async |canteen| {
             let mut canteen_with_pic: CanteenDetailsWithPic = canteen.into();
-            if canteen.pic_link {
-                let pic_url = self
-                    .asset_ops
-                    .get_object_presign(&format!("canteens/{}", &canteen.canteen_id.to_string()))
-                    .await
-                    .ok();
-                canteen_with_pic.pic_link = pic_url;
-                canteen_with_pic
-            } else {
-                canteen_with_pic
-            }
+            canteen_with_pic
+                .populate_pic_link_from(&self.asset_ops, canteen)
+                .await;
+            canteen_with_pic
         });
 
         let results = join_all(futures).await;
@@ -177,17 +170,10 @@ impl CanteenOperations {
 
         let futures = items.iter().map(async |item| {
             let mut item_with_pic: MenuItemWithPic = item.into();
-            if item.pic_link {
-                let pic_url = self
-                    .asset_ops
-                    .get_object_presign(&format!("items/{}", &item.item_id.to_string()))
-                    .await
-                    .ok();
-                item_with_pic.pic_link = pic_url;
-                item_with_pic
-            } else {
-                item_with_pic
-            }
+            item_with_pic
+                .populate_pic_link_from(&self.asset_ops, item)
+                .await;
+            item_with_pic
         });
 
         let results = join_all(futures).await;

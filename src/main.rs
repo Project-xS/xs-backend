@@ -6,6 +6,7 @@ mod api;
 mod db;
 mod enums;
 mod models;
+mod traits;
 
 use crate::api::default_error_handler;
 use crate::db::{

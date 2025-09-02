@@ -11,7 +11,7 @@ pub struct Canteen {
     pub location: String,
     pub username: String,
     pub password: String,
-    pub pic_link: bool,
+    pub has_pic: bool,
     pub pic_etag: Option<String>,
 }
 
@@ -22,7 +22,7 @@ pub struct CanteenDetails {
     pub canteen_id: i32,
     pub canteen_name: String,
     pub location: String,
-    pub pic_link: bool,
+    pub has_pic: bool,
     pub pic_etag: Option<String>,
 }
 
@@ -31,7 +31,7 @@ pub struct CanteenDetails {
 pub struct NewCanteen {
     pub canteen_name: String,
     pub location: String,
-    pub pic_link: bool,
+    pub has_pic: bool,
 }
 
 #[derive(Queryable, Debug, Identifiable, Serialize, Deserialize, ToSchema, Selectable)]
@@ -46,7 +46,7 @@ pub struct MenuItem {
     pub stock: i32,
     pub is_available: bool,
     pub description: Option<String>,
-    pub pic_link: bool,
+    pub has_pic: bool,
     pub pic_etag: Option<String>,
 }
 
@@ -60,7 +60,7 @@ pub struct NewMenuItem {
     pub stock: i32,
     pub is_available: bool,
     pub description: Option<String>,
-    pub pic_link: bool,
+    pub has_pic: bool,
 }
 
 #[derive(Debug, Selectable, Queryable)]
