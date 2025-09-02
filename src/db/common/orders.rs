@@ -12,6 +12,7 @@ use diesel::result::Error;
 use diesel::PgConnection;
 use futures::future::join_all;
 use log::{debug, error};
+use std::cmp::max;
 use std::collections::HashMap;
 
 #[derive(Insertable, Debug)]
@@ -184,7 +185,10 @@ impl OrderOperations {
                 for item in items_in_order {
                     updated_stock.insert(
                         item.item_id,
-                        (item.stock as i64) - *ordered_qty.get(&item.item_id).unwrap_or(&1),
+                        max(
+                            (item.stock as i64) - *ordered_qty.get(&item.item_id).unwrap_or(&1),
+                            -1,
+                        ),
                     );
                 }
 
@@ -192,7 +196,10 @@ impl OrderOperations {
 
                 for (item, new_stock) in updated_stock {
                     diesel::update(menu_items.filter(item_id.eq(item)))
-                        .set((stock.eq(new_stock as i32), is_available.eq(new_stock > 0)))
+                        .set((
+                            stock.eq(new_stock as i32),
+                            is_available.eq(new_stock > 0 || new_stock == -1),
+                        ))
                         .execute(conn)
                         .map_err(|e| {
                             error!(
