@@ -25,6 +25,10 @@ pretty_env_logger = "0.5.0"
 thiserror = "2.0.12"
 aws-sdk-s3 = "1.79.0"
 aws-config = { version = "1.6.0", features = ["behavior-version-latest"] }
+with_pic_macro = { path = "with_pic_macro" }
+
+[workspace]
+members = [".", "with_pic_macro"]
 
 [workspace.lints.clippy]
 correctness = { level = "deny", priority = -1 }  # Treat correctness lints as errors
