@@ -43,9 +43,12 @@ needless_return = "warn"    # Encourages omitting the `return` keyword when it's
 complexity = "warn"
 too_many_arguments = "warn"   # Avoid functions with excessive parameters
 redundant_clone = "warn"      # Learn to use references and borrowing instead of unnecessary cloning
-dead_code = "warn"
 
 # --- Performance: Start with the basics ---
 perf = "warn"
 iter_next_loop = "warn"    # Avoid common mistakes with iterators
 inefficient_to_string = "warn" # Learn about the performance implications of `to_string`
+
+[workspace.lints.rust]
+# Rustc lints (not Clippy)
+dead_code = "warn"

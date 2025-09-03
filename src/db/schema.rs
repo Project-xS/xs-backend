@@ -57,7 +57,7 @@ diesel::table! {
 
 diesel::table! {
     past_orders (order_id) {
-        order_id -> Varchar,
+        order_id -> Int4,
         user_id -> Int4,
         items -> Array<Nullable<Int4>>,
         order_status -> Bool,

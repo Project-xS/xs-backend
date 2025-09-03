@@ -54,7 +54,7 @@ CREATE INDEX idx_active_orders_ordered_at ON active_orders (ordered_at);
 -- Create past_orders table
 CREATE TABLE past_orders
 (
-    order_id     VARCHAR PRIMARY KEY,
+    order_id     INTEGER PRIMARY KEY,
     user_id      INTEGER NOT NULL REFERENCES users (user_id),
     items        INTEGER[] NOT NULL CHECK (array_length(items, 1) > 0),
     price        INTEGER NOT NULL,

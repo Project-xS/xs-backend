@@ -565,7 +565,7 @@ impl OrderOperations {
                 use crate::db::schema::past_orders::dsl::*;
                 diesel::insert_into(past_orders)
                     .values(&NewPastOrder {
-                        order_id: search_order_id.to_string(),
+                        order_id: *search_order_id,
                         user_id: first_item.user_id,
                         items: items_in_order,
                         price: first_item.price,

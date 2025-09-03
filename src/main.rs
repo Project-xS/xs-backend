@@ -33,7 +33,7 @@ impl AppState {
     pub(crate) async fn new(url: &str) -> Self {
         let db = establish_connection_pool(url);
         run_db_migrations(db.clone()).expect("Unable to run migrations");
-        let user_ops = UserOperations::new(db.clone());
+        let user_ops = UserOperations::new(db.clone()).await;
         let menu_ops = MenuOperations::new(db.clone()).await;
         let canteen_ops = CanteenOperations::new(db.clone()).await;
         let order_ops = OrderOperations::new(db.clone()).await;
