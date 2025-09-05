@@ -2,57 +2,63 @@
   description = "Proj-XS";
 
   inputs = {
-      nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+      nixpkgs.url = "github:nixos/nixpkgs/nixos-25.05";
       flake-utils.url = "github:numtide/flake-utils";
-      rust-overlay.url = "github:oxalica/rust-overlay";
+      crane.url = "github:ipetkov/crane";
     };
 
-    outputs = { self, nixpkgs, flake-utils, rust-overlay, ... }:
+    outputs = { self, nixpkgs, flake-utils, crane, ... }:
         flake-utils.lib.eachDefaultSystem (system:
           let
-            overlays = [ (import rust-overlay) ];
-            pkgs = import nixpkgs { inherit system overlays; };
-            rustVersion = pkgs.rust-bin.stable.latest.default;
+            pkgs = nixpkgs.legacyPackages.${system};
 
-            swaggerUiSrc = pkgs.fetchurl {
-              url = "https://github.com/swagger-api/swagger-ui/archive/refs/tags/v5.17.14.zip";
-              sha256 = "sha256-SBJE0IEgl7Efuu73n3HZQrFxYX+cn5UU5jrL4T5xzNw=";
+            inherit (pkgs) lib;
+
+            craneLib = crane.mkLib pkgs;
+            unfilteredRoot = ./.;
+            src = lib.fileset.toSource {
+              root = unfilteredRoot;
+              fileset = lib.fileset.unions [
+                (craneLib.fileset.commonCargoSources unfilteredRoot)
+                ./migrations
+              ];
             };
 
-            rustPlatform = pkgs.makeRustPlatform {
-              cargo = rustVersion;
-              rustc = rustVersion;
+            commonArgs = {
+              inherit src;
+              strictDeps = true;
+
+              nativeBuildInputs = with pkgs; [
+                pkg-config
+                perl
+                openssl
+                openssl.dev
+                curl
+              ];
             };
 
-            myRustBuild = rustPlatform.buildRustPackage {
-              pname =
-                "proj-xs";
-              version = "0.1.0";
-              src = ./.;
+            cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 
-              preBuild = ''
-                cp "${swaggerUiSrc}" ./swagger.zip
-                chmod 666 ./swagger.zip
-                export SWAGGER_UI_DOWNLOAD_URL="file://$(realpath ./swagger.zip)"
-              '';
+            my-rust-build = craneLib.buildPackage (
+              commonArgs
+              // {
+                inherit cargoArtifacts;
 
-              cargoLock.lockFile = ./Cargo.lock;
-              nativeBuildInputs = [ pkgs.pkg-config pkgs.perl pkgs.git pkgs.openssl pkgs.openssl.dev pkgs.curl ];
-
-            };
+                nativeBuildInputs = (commonArgs.nativeBuildInputs or [ ]);
+              }
+            );
 
             dockerImage = pkgs.dockerTools.buildLayeredImage {
               name = "proj-xs";
               tag = "latest";
               config = {
                 Env = [ "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt" ];
-                Cmd = [ "${myRustBuild}/bin/proj-xs" ];
+                Cmd = [ "${my-rust-build}/bin/proj-xs" ];
               };
             };
 
           in {
             packages = {
-              rustPackage = myRustBuild;
               docker = dockerImage;
             };
             defaultPackage = dockerImage;
