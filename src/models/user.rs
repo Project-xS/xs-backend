@@ -48,9 +48,14 @@ pub struct NewPastOrder {
 #[diesel(primary_key(user_id))]
 pub struct User {
     pub user_id: i32,
-    pub rfid: String,
+    pub rfid: Option<String>,
     pub name: String,
     pub email: String,
+    pub firebase_uid: String,
+    pub auth_provider: String,
+    pub email_verified: bool,
+    pub display_name: Option<String>,
+    pub photo_url: Option<String>,
     pub created_at: DateTime<Utc>,
 }
 

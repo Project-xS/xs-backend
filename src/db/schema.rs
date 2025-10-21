@@ -69,9 +69,14 @@ diesel::table! {
 diesel::table! {
     users (user_id) {
         user_id -> Int4,
-        rfid -> Varchar,
+        rfid -> Nullable<Varchar>,
         name -> Varchar,
         email -> Varchar,
+        firebase_uid -> Text,
+        auth_provider -> Text,
+        email_verified -> Bool,
+        display_name -> Nullable<Text>,
+        photo_url -> Nullable<Text>,
         created_at -> Timestamptz,
     }
 }

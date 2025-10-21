@@ -262,6 +262,58 @@ impl UserOperations {
 
         Ok(Self::group_order_items(results))
     }
+
+    pub fn upsert_firebase_user(
+        &self,
+        uid: String,
+        email_opt: Option<String>,
+        display_name_opt: Option<String>,
+        photo_url_opt: Option<String>,
+        email_verified_flag: bool,
+    ) -> Result<User, RepositoryError> {
+        let mut conn = DbConnection::new(&self.pool).map_err(|e| {
+            error!(
+                "upsert_firebase_user: failed to acquire DB connection: {}",
+                e
+            );
+            e
+        })?;
+
+        use crate::db::schema::users::dsl as u;
+
+        let email_val = email_opt.ok_or_else(|| {
+            RepositoryError::ValidationError(
+                "Email missing in Firebase token for google provider".to_string(),
+            )
+        })?;
+        let name_val = display_name_opt
+            .clone()
+            .unwrap_or_else(|| email_val.clone());
+
+        diesel::insert_into(u::users)
+            .values((
+                u::firebase_uid.eq(&uid),
+                u::rfid.eq::<Option<String>>(None),
+                u::name.eq(&name_val),
+                u::email.eq(&email_val),
+                u::auth_provider.eq("google"),
+                u::email_verified.eq(email_verified_flag),
+                u::display_name.eq(display_name_opt.clone()),
+                u::photo_url.eq(photo_url_opt.clone()),
+            ))
+            .on_conflict(u::firebase_uid)
+            .do_update()
+            .set((
+                u::name.eq(&name_val),
+                u::email.eq(&email_val),
+                u::auth_provider.eq("google"),
+                u::email_verified.eq(email_verified_flag),
+                u::display_name.eq(display_name_opt),
+                u::photo_url.eq(photo_url_opt),
+            ))
+            .get_result::<User>(conn.connection())
+            .map_err(RepositoryError::DatabaseError)
+    }
 }
 
 impl Clone for UserOperations {
