@@ -328,6 +328,7 @@ impl OrderOperations {
             .collect()
     }
 
+    #[allow(dead_code)]
     pub async fn get_orders_by_rfid(
         &self,
         search_rfid: &str,

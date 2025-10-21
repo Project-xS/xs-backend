@@ -9,7 +9,7 @@ use crate::auth::admin_jwt::verify_admin_jwt;
 use crate::auth::config::{AdminJwtConfig, FirebaseAuthConfig};
 use crate::auth::firebase::verify_firebase_token;
 use crate::auth::jwks::JwksCache;
-use crate::auth::principal::Principal;
+use crate::auth::Principal;
 use crate::db::UserOperations;
 
 #[derive(Clone)]
@@ -69,11 +69,12 @@ where
 
     forward_ready!(service);
 
-    fn call(&self, mut req: ServiceRequest) -> Self::Future {
+    fn call(&self, req: ServiceRequest) -> Self::Future {
         // Bypass only '/', '/health', and '/canteen/login'
         let path = req.path().to_string();
         if path == "/" || path == "/health" || path == "/canteen/login" {
             let fut = self.service.call(req);
+            #[allow(clippy::redundant_async_block)]
             return Box::pin(async move { fut.await });
         }
 
@@ -93,8 +94,7 @@ where
         Box::pin(async move {
             // 1) Try admin JWT
             if let Ok(canteen_id) = verify_admin_jwt(&token, &inner.admin_cfg) {
-                req.extensions_mut()
-                    .insert(Principal::Admin { canteen_id });
+                req.extensions_mut().insert(Principal::Admin { canteen_id });
                 return srv.call(req).await;
             }
 
@@ -114,17 +114,17 @@ where
                 })
                 .await;
 
-                match upsert_res {
+                return match upsert_res {
                     Ok(Ok(user)) => {
                         req.extensions_mut().insert(Principal::User {
                             user_id: user.user_id,
                             firebase_uid: uid_for_principal,
                             email: email_for_principal,
                         });
-                        return srv.call(req).await;
+                        srv.call(req).await
                     }
-                    _ => return Err(ErrorUnauthorized("user upsert failed")),
-                }
+                    _ => Err(ErrorUnauthorized("user upsert failed")),
+                };
             }
 
             Err(ErrorUnauthorized("unauthorized"))

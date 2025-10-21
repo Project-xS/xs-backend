@@ -29,8 +29,6 @@ struct FirebaseContainer {
 
 #[derive(Deserialize, Debug)]
 pub struct FirebaseClaims {
-    pub iss: String,
-    pub aud: String,
     pub sub: String,
     pub email: Option<String>,
     #[serde(default)]
@@ -39,7 +37,7 @@ pub struct FirebaseClaims {
     #[serde(rename = "picture")]
     pub picture: Option<String>,
     #[serde(flatten)]
-    pub fb: FirebaseContainer,
+    fb: FirebaseContainer,
 }
 
 pub struct VerifiedFirebaseUser {
@@ -56,7 +54,9 @@ pub async fn verify_firebase_token(
     cache: &JwksCache,
 ) -> Result<VerifiedFirebaseUser, FirebaseAuthError> {
     let header = decode_header(token).map_err(|e| FirebaseAuthError::Header(e.to_string()))?;
-    let kid = header.kid.ok_or_else(|| FirebaseAuthError::Header("kid missing".to_string()))?;
+    let kid = header
+        .kid
+        .ok_or_else(|| FirebaseAuthError::Header("kid missing".to_string()))?;
     if header.alg != Algorithm::RS256 {
         return Err(FirebaseAuthError::Claim("alg must be RS256".to_string()));
     }
@@ -79,10 +79,8 @@ pub async fn verify_firebase_token(
 
     let claims = data.claims;
 
-    if cfg.require_google_provider {
-        if claims.fb.firebase.sign_in_provider != "google.com" {
-            return Err(FirebaseAuthError::Claim("provider mismatch".to_string()));
-        }
+    if cfg.require_google_provider && claims.fb.firebase.sign_in_provider != "google.com" {
+        return Err(FirebaseAuthError::Claim("provider mismatch".to_string()));
     }
 
     if cfg.require_email_verified && !claims.email_verified {
@@ -92,7 +90,9 @@ pub async fn verify_firebase_token(
     if let (Some(domains), Some(email)) = (&cfg.allowed_domains, &claims.email) {
         let domain = email.split('@').nth(1).unwrap_or("").to_lowercase();
         if !domains.iter().any(|d| d == &domain) {
-            return Err(FirebaseAuthError::Claim("email domain not allowed".to_string()));
+            return Err(FirebaseAuthError::Claim(
+                "email domain not allowed".to_string(),
+            ));
         }
     }
 

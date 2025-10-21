@@ -1,6 +1,5 @@
 mod orders;
 
-use crate::api::ContentTypeHeader;
 use crate::db::UserOperations;
 use actix_web::middleware::NormalizePath;
 use actix_web::web;

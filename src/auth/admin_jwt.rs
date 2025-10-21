@@ -31,8 +31,12 @@ pub fn issue_admin_jwt(canteen_id: i32, cfg: &AdminJwtConfig) -> Result<String, 
         exp: now + cfg.expiry_secs,
     };
     let header = Header::new(Algorithm::HS256);
-    encode(&header, &claims, &EncodingKey::from_secret(cfg.secret.as_bytes()))
-        .map_err(|e| AdminJwtError::Verify(e.to_string()))
+    encode(
+        &header,
+        &claims,
+        &EncodingKey::from_secret(cfg.secret.as_bytes()),
+    )
+    .map_err(|e| AdminJwtError::Verify(e.to_string()))
 }
 
 pub fn verify_admin_jwt(token: &str, cfg: &AdminJwtConfig) -> Result<i32, AdminJwtError> {
@@ -52,4 +56,3 @@ pub fn verify_admin_jwt(token: &str, cfg: &AdminJwtConfig) -> Result<i32, AdminJ
         .map_err(|e| AdminJwtError::Verify(format!("invalid sub: {e}")))?;
     Ok(id)
 }
-

@@ -13,8 +13,8 @@ pub struct FirebaseAuthConfig {
 
 impl FirebaseAuthConfig {
     pub fn from_env() -> Self {
-        let project_id = var("FIREBASE_PROJECT_ID")
-            .expect("FIREBASE_PROJECT_ID must be set for Firebase auth");
+        let project_id =
+            var("FIREBASE_PROJECT_ID").expect("FIREBASE_PROJECT_ID must be set for Firebase auth");
         let jwks_url = var("FIREBASE_JWKS_URL")
             .unwrap_or_else(|_| "https://www.googleapis.com/oauth2/v3/certs".to_string());
         let leeway_secs = var("FIREBASE_LEEWAY_SECS")
@@ -77,4 +77,3 @@ impl AdminJwtConfig {
         }
     }
 }
-

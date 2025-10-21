@@ -3,6 +3,7 @@ use actix_web::dev::Payload;
 use actix_web::{error::ErrorUnauthorized, Error, FromRequest, HttpMessage, HttpRequest};
 use futures::future::{ready, Ready};
 
+#[allow(dead_code)]
 pub struct PrincipalExtractor(pub Principal);
 
 impl FromRequest for PrincipalExtractor {
@@ -19,7 +20,7 @@ impl FromRequest for PrincipalExtractor {
 
 pub struct UserPrincipal {
     user_id: i32,
-    firebase_uid: String,
+    _firebase_uid: String,
     email: Option<String>,
 }
 
@@ -47,7 +48,7 @@ impl FromRequest for UserPrincipal {
             {
                 return ready(Ok(UserPrincipal {
                     user_id,
-                    firebase_uid,
+                    _firebase_uid: firebase_uid,
                     email,
                 }));
             }
@@ -58,6 +59,7 @@ impl FromRequest for UserPrincipal {
 }
 
 pub struct AdminPrincipal {
+    #[allow(dead_code)]
     pub canteen_id: i32,
 }
 

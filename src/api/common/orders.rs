@@ -10,12 +10,6 @@ use serde::Deserialize;
 use utoipa::IntoParams;
 
 #[derive(Deserialize, Debug, IntoParams)]
-struct UserOrderQuery {
-    user_id: Option<i32>,
-    rfid: Option<String>,
-}
-
-#[derive(Deserialize, Debug, IntoParams)]
 struct OrderCanteenQuery {
     canteen_id: i32,
 }
@@ -55,7 +49,8 @@ pub(super) async fn create_order(
         }));
     }
     let uid = user.user_id();
-    let result = web::block(move || order_ops.create_order(uid, item_ids_cl, deliver_at_cl)).await?;
+    let result =
+        web::block(move || order_ops.create_order(uid, item_ids_cl, deliver_at_cl)).await?;
     match result {
         Ok(_) => {
             debug!(
@@ -165,9 +160,6 @@ pub(super) async fn get_order_by_orderid(
 
 #[utoipa::path(
     tag = "Orders",
-    params(
-        UserOrderQuery,
-    ),
     responses(
         (status = 200, description = "Successfully retrieved order items for the specified user or RFID", body = OrderItemsResponse),
         (status = 500, description = "Failed to retrieve order items due to server error", body = OrderItemsResponse)

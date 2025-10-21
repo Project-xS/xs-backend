@@ -17,12 +17,8 @@ pub enum JwksError {
 #[derive(Clone, Deserialize)]
 pub struct Jwk {
     pub kid: String,
-    pub kty: String,
     pub n: String,
     pub e: String,
-    pub alg: Option<String>,
-    #[serde(rename = "use")]
-    pub use_: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -70,8 +66,12 @@ impl JwksCache {
             .map(Duration::from_secs)
             .unwrap_or(self.default_ttl);
 
-        let body = resp.text().await.map_err(|e| JwksError::Network(e.to_string()))?;
-        let jwks: JwksResp = serde_json::from_str(&body).map_err(|e| JwksError::Parse(e.to_string()))?;
+        let body = resp
+            .text()
+            .await
+            .map_err(|e| JwksError::Network(e.to_string()))?;
+        let jwks: JwksResp =
+            serde_json::from_str(&body).map_err(|e| JwksError::Parse(e.to_string()))?;
 
         let mut map = HashMap::new();
         for k in jwks.keys {
@@ -123,4 +123,3 @@ fn parse_max_age(header: &str) -> Option<u64> {
     }
     None
 }
-

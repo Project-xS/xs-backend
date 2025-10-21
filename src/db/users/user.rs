@@ -26,6 +26,7 @@ impl UserOperations {
         }
     }
 
+    #[allow(dead_code)]
     pub fn create_user(&self, new_user: NewUser) -> Result<User, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!("create_user: failed to acquire DB connection: {}", e);
@@ -67,6 +68,7 @@ impl UserOperations {
             })
     }
 
+    #[allow(dead_code)]
     pub fn get_user_by_email(&self, email_addr: &str) -> Result<User, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool)?;
 

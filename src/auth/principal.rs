@@ -9,4 +9,3 @@ pub enum Principal {
         canteen_id: i32,
     },
 }
-

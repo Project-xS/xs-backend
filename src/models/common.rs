@@ -61,6 +61,7 @@ impl TimeBandEnum {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Queryable, Selectable, Serialize, Deserialize, ToSchema, Associations, Debug)]
 #[diesel(table_name = crate::db::schema::active_order_items)]
 #[diesel(belongs_to(ActiveOrder, foreign_key = order_id))]

@@ -15,11 +15,11 @@ use crate::db::{
     MenuOperations, OrderOperations, SearchOperations, UserOperations,
 };
 use actix_web::{middleware, web, App, HttpServer};
+use auth::{AdminJwtConfig, AuthLayer, FirebaseAuthConfig, JwksCache};
 use dotenvy::dotenv;
 use utoipa::OpenApi;
 use utoipa_actix_web::AppExt;
 use utoipa_swagger_ui::SwaggerUi;
-use auth::{AdminJwtConfig, AuthLayer, FirebaseAuthConfig, JwksCache};
 
 #[derive(Clone)]
 pub(crate) struct AppState {
