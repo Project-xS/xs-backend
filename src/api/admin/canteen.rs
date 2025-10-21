@@ -64,10 +64,10 @@ pub(super) async fn create_canteen(
 #[put("/upload_pic/{canteen_id}")]
 pub(super) async fn upload_canteen_pic(
     canteen_ops: web::Data<CanteenOperations>,
-    _admin: crate::auth::AdminPrincipal,
-    path: web::Path<(i32,)>,
+    admin: crate::auth::AdminPrincipal,
+    _path: web::Path<(i32,)>,
 ) -> actix_web::Result<impl Responder> {
-    let canteen_id_to_set = path.into_inner().0;
+    let canteen_id_to_set = admin.canteen_id;
     let result = canteen_ops.upload_canteen_pic(&canteen_id_to_set).await;
     match result {
         Ok(res) => {
@@ -111,10 +111,10 @@ pub(super) async fn upload_canteen_pic(
 #[put("/set_pic/{canteen_id}")]
 pub(super) async fn set_canteen_pic_link(
     canteen_ops: web::Data<CanteenOperations>,
-    _admin: crate::auth::AdminPrincipal,
-    path: web::Path<(i32,)>,
+    admin: crate::auth::AdminPrincipal,
+    _path: web::Path<(i32,)>,
 ) -> actix_web::Result<impl Responder> {
-    let canteen_id_to_set = path.into_inner().0;
+    let canteen_id_to_set = admin.canteen_id;
     let result = canteen_ops.set_canteen_pic(&canteen_id_to_set).await;
     match result {
         Ok(_res) => {
@@ -189,9 +189,10 @@ pub(super) async fn get_all_canteens(
 #[get("/{id}/items")]
 pub(super) async fn get_canteen_menu(
     menu_ops: web::Data<CanteenOperations>,
-    path: web::Path<(i32,)>,
+    _path: web::Path<(i32,)>,
+    admin: crate::auth::AdminPrincipal,
 ) -> actix_web::Result<impl Responder> {
-    let search_canteen_id = path.into_inner().0;
+    let search_canteen_id = admin.canteen_id;
     let result = menu_ops.get_canteen_items(search_canteen_id).await;
     match result {
         Ok(x) => {

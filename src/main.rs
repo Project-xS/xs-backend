@@ -19,7 +19,7 @@ use auth::{AdminJwtConfig, AuthLayer, FirebaseAuthConfig, JwksCache};
 use dotenvy::dotenv;
 use utoipa::OpenApi;
 use utoipa_actix_web::AppExt;
-use utoipa_swagger_ui::SwaggerUi;
+use utoipa_swagger_ui::{BasicAuth, Config, SwaggerUi};
 
 #[derive(Clone)]
 pub(crate) struct AppState {
@@ -118,7 +118,18 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(admin_cfg.clone()))
             .app_data(web::JsonConfig::default().error_handler(default_error_handler))
             .openapi_service(|api| {
-                SwaggerUi::new("/swagger-ui/{_:.*}").url("/api-docs/openapi.json", api)
+                let ui = SwaggerUi::new("/swagger-ui/{_:.*}").url("/api-docs/openapi.json", api);
+                if let (Ok(u), Ok(p)) = (
+                    std::env::var("SWAGGER_BASIC_USERNAME"),
+                    std::env::var("SWAGGER_BASIC_PASSWORD"),
+                ) {
+                    ui.config(Config::default().basic_auth(BasicAuth {
+                        username: u,
+                        password: p,
+                    }))
+                } else {
+                    ui
+                }
             })
             .into_app()
     })

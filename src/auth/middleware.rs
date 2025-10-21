@@ -3,11 +3,10 @@ use std::rc::Rc;
 
 use actix_web::dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform};
 use actix_web::{error::ErrorUnauthorized, http::header, Error, HttpMessage};
-use base64::Engine;
 use futures::future::LocalBoxFuture;
 
 use crate::auth::admin_jwt::verify_admin_jwt;
-use crate::auth::config::{AdminJwtConfig, FirebaseAuthConfig, SwaggerUiAuthConfig};
+use crate::auth::config::{AdminJwtConfig, FirebaseAuthConfig};
 use crate::auth::firebase::verify_firebase_token;
 use crate::auth::jwks::JwksCache;
 use crate::auth::Principal;
@@ -19,7 +18,6 @@ pub struct AuthLayer {
     admin_cfg: AdminJwtConfig,
     jwks: JwksCache,
     user_ops: UserOperations,
-    swagger_basic: Option<SwaggerUiAuthConfig>,
 }
 
 impl AuthLayer {
@@ -34,7 +32,6 @@ impl AuthLayer {
             admin_cfg,
             jwks,
             user_ops,
-            swagger_basic: SwaggerUiAuthConfig::from_env(),
         }
     }
 }
@@ -81,32 +78,11 @@ where
             return Box::pin(async move { fut.await });
         }
 
-        // Allow Swagger UI via Basic auth if configured
+        // Bypass swagger so Utoipa's built-in BasicAuth can handle it
         if path.starts_with("/swagger-ui/") || path == "/api-docs/openapi.json" {
-            if let Some(cfg) = &self.inner.swagger_basic {
-                if let Some(header) = req.headers().get(header::AUTHORIZATION) {
-                    if let Ok(value) = header.to_str() {
-                        if let Some(b64) = value.strip_prefix("Basic ") {
-                            if let Ok(decoded) =
-                                base64::engine::general_purpose::STANDARD.decode(b64.as_bytes())
-                            {
-                                if let Ok(pair) = String::from_utf8(decoded) {
-                                    let mut parts = pair.splitn(2, ':');
-                                    let u = parts.next().unwrap_or("");
-                                    let p = parts.next().unwrap_or("");
-                                    if u == cfg.username && p == cfg.password {
-                                        let fut = self.service.call(req);
-                                        #[allow(clippy::redundant_async_block)]
-                                        return Box::pin(async move { fut.await });
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                return Box::pin(async { Err(ErrorUnauthorized("swagger basic auth required")) });
-            }
-            // If not configured, fallthrough to JWT/Firebase checks below
+            let fut = self.service.call(req);
+            #[allow(clippy::redundant_async_block)]
+            return Box::pin(async move { fut.await });
         }
 
         let token_opt = req
