@@ -126,4 +126,5 @@ pub struct LoginResponse {
     pub status: String,
     pub error: Option<String>,
     pub data: Option<CanteenLoginSuccess>,
+    pub token: Option<String>,
 }

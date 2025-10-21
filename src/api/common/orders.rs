@@ -1,3 +1,4 @@
+use crate::auth::{AdminPrincipal, UserPrincipal};
 use crate::db::OrderOperations;
 use crate::enums::common::{
     OrderItemContainer, OrderItemsResponse, OrderRequest, OrderResponse, OrdersItemsResponse,
@@ -31,10 +32,11 @@ struct OrderCanteenQuery {
 #[post("")]
 pub(super) async fn create_order(
     order_ops: web::Data<OrderOperations>,
+    user: UserPrincipal,
     req_data: web::Json<OrderRequest>,
 ) -> actix_web::Result<impl Responder> {
     let OrderRequest {
-        user_id,
+        user_id: _ignored,
         deliver_at,
         item_ids,
     } = req_data.into_inner();
@@ -52,13 +54,13 @@ pub(super) async fn create_order(
             )),
         }));
     }
-    let result =
-        web::block(move || order_ops.create_order(user_id, item_ids_cl, deliver_at_cl)).await?;
+    let uid = user.user_id();
+    let result = web::block(move || order_ops.create_order(uid, item_ids_cl, deliver_at_cl)).await?;
     match result {
         Ok(_) => {
             debug!(
                 "create_order: successfully created order for user {} for time {:?} with item_ids {:?}",
-                user_id, deliver_at.unwrap_or(String::from("Instant")), item_ids
+                uid, deliver_at.unwrap_or(String::from("Instant")), item_ids
             );
             Ok(HttpResponse::Ok().json(OrderResponse {
                 status: "ok".to_string(),
@@ -68,7 +70,7 @@ pub(super) async fn create_order(
         Err(e) => {
             error!(
                 "create_order: failed to create order for user {} for time {:?} with item_ids {:?}: {}",
-                user_id, deliver_at.unwrap_or(String::from("Instant")), item_ids, e
+                uid, deliver_at.unwrap_or(String::from("Instant")), item_ids, e
             );
             Ok(HttpResponse::Conflict().json(OrderResponse {
                 status: "error".to_string(),
@@ -91,6 +93,7 @@ pub(super) async fn create_order(
 #[get("")]
 pub(super) async fn get_all_orders(
     order_ops: web::Data<OrderOperations>,
+    _admin: AdminPrincipal,
     params: web::Query<OrderCanteenQuery>,
 ) -> actix_web::Result<impl Responder> {
     let search_canteen_id = params.canteen_id;
@@ -126,6 +129,7 @@ pub(super) async fn get_all_orders(
 )]
 #[get("/{id}")]
 pub(super) async fn get_order_by_orderid(
+    _admin: AdminPrincipal,
     order_ops: web::Data<OrderOperations>,
     path: web::Path<(i32,)>,
 ) -> actix_web::Result<impl Responder> {
@@ -173,81 +177,36 @@ pub(super) async fn get_order_by_orderid(
 #[get("/by_user")]
 pub(super) async fn get_orders_by_user(
     order_ops: web::Data<OrderOperations>,
-    params: web::Query<UserOrderQuery>,
+    user: UserPrincipal,
 ) -> actix_web::Result<impl Responder> {
-    if params.user_id.is_some() && params.rfid.is_some() {
-        return Ok(HttpResponse::BadRequest().json(OrdersItemsResponse {
-            status: "error".to_string(),
-            error: Option::from("Cannot provide both user_id and rfid parameters".to_string()),
-            data: Vec::new(),
-        }));
-    }
-    if let Some(search_user_id) = &params.user_id {
-        let search_user_id_cl = *search_user_id;
-        let result = order_ops.get_orders_by_userid(&search_user_id_cl).await;
-        match result {
-            Ok(data) => {
-                debug!(
-                    "get_orders_by_user: retrieved {} orders for user_id {}",
-                    data.len(),
-                    search_user_id
-                );
-                Ok(HttpResponse::Ok().json(OrdersItemsResponse {
-                    status: "ok".to_string(),
-                    data,
-                    error: None,
-                }))
-            }
-            Err(e) => {
-                error!(
-                    "get_orders_by_user: error retrieving orders for user_id {}: {}",
-                    search_user_id, e
-                );
-                Ok(
-                    HttpResponse::InternalServerError().json(OrdersItemsResponse {
-                        status: "error".to_string(),
-                        data: Vec::new(),
-                        error: Some(e.to_string()),
-                    }),
-                )
-            }
+    let search_user_id = user.user_id();
+    let result = order_ops.get_orders_by_userid(&search_user_id).await;
+    match result {
+        Ok(data) => {
+            debug!(
+                "get_orders_by_user: retrieved {} orders for user_id {}",
+                data.len(),
+                search_user_id
+            );
+            Ok(HttpResponse::Ok().json(OrdersItemsResponse {
+                status: "ok".to_string(),
+                data,
+                error: None,
+            }))
         }
-    } else if let Some(search_rfid) = &params.rfid {
-        let search_rfid_cl = search_rfid.clone();
-        let result = order_ops.get_orders_by_rfid(&search_rfid_cl).await;
-        match result {
-            Ok(data) => {
-                debug!(
-                    "get_orders_by_user: retrieved {} orders for rfid '{}'",
-                    data.len(),
-                    search_rfid
-                );
-                Ok(HttpResponse::Ok().json(OrdersItemsResponse {
-                    status: "ok".to_string(),
-                    data,
-                    error: None,
-                }))
-            }
-            Err(e) => {
-                error!(
-                    "get_orders_by_user: error retrieving orders for rfid '{}': {}",
-                    search_rfid, e
-                );
-                Ok(
-                    HttpResponse::InternalServerError().json(OrdersItemsResponse {
-                        status: "error".to_string(),
-                        data: Vec::new(),
-                        error: Some(e.to_string()),
-                    }),
-                )
-            }
+        Err(e) => {
+            error!(
+                "get_orders_by_user: error retrieving orders for user_id {}: {}",
+                search_user_id, e
+            );
+            Ok(
+                HttpResponse::InternalServerError().json(OrdersItemsResponse {
+                    status: "error".to_string(),
+                    data: Vec::new(),
+                    error: Some(e.to_string()),
+                }),
+            )
         }
-    } else {
-        Ok(HttpResponse::BadRequest().json(OrdersItemsResponse {
-            status: "error".to_string(),
-            error: Option::from("Either user_id or rfid must be provided".to_string()),
-            data: Vec::new(),
-        }))
     }
 }
 
@@ -266,6 +225,7 @@ pub(super) async fn get_orders_by_user(
 #[put("/{id}/{action}")]
 pub(super) async fn order_actions(
     order_ops: web::Data<OrderOperations>,
+    _admin: AdminPrincipal,
     path: web::Path<(i32, String)>,
 ) -> actix_web::Result<impl Responder> {
     let (order_id, status) = path.into_inner();

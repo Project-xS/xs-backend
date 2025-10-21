@@ -1,3 +1,4 @@
+use crate::auth::AdminPrincipal;
 use crate::db::MenuOperations;
 use crate::enums::admin::{
     AllItemsResponse, CreateMenuItemResponse, GeneralMenuResponse, ItemResponse, MenuItemWithPic,
@@ -19,6 +20,7 @@ use log::{debug, error};
 #[post("/create")]
 pub(super) async fn create_menu_item(
     menu_ops: web::Data<MenuOperations>,
+    _admin: AdminPrincipal,
     req_data: web::Json<NewMenuItem>,
 ) -> actix_web::Result<impl Responder> {
     let req_data = req_data.into_inner();
@@ -63,6 +65,7 @@ pub(super) async fn create_menu_item(
 #[delete("/delete/{id}")]
 pub(super) async fn remove_menu_item(
     menu_ops: web::Data<MenuOperations>,
+    _admin: AdminPrincipal,
     path: web::Path<(i32,)>,
 ) -> actix_web::Result<impl Responder> {
     let req_data = path.into_inner().0;
@@ -105,6 +108,7 @@ pub(super) async fn remove_menu_item(
 #[put("/upload_pic/{item_id}")]
 pub(super) async fn upload_menu_item_pic(
     menu_ops: web::Data<MenuOperations>,
+    _admin: AdminPrincipal,
     path: web::Path<(i32,)>,
 ) -> actix_web::Result<impl Responder> {
     let item_id_to_set = path.into_inner().0;
@@ -151,6 +155,7 @@ pub(super) async fn upload_menu_item_pic(
 #[put("/set_pic/{item_id}")]
 pub(super) async fn set_menu_pic_link(
     menu_ops: web::Data<MenuOperations>,
+    _admin: AdminPrincipal,
     path: web::Path<(i32,)>,
 ) -> actix_web::Result<impl Responder> {
     let item_id_to_set = path.into_inner().0;
@@ -191,6 +196,7 @@ pub(super) async fn set_menu_pic_link(
 #[put("/update")]
 pub(super) async fn update_menu_item(
     menu_ops: web::Data<MenuOperations>,
+    _admin: AdminPrincipal,
     req_data: web::Json<UpdateItemRequest>,
 ) -> actix_web::Result<impl Responder> {
     let req_data = req_data.into_inner();
@@ -233,6 +239,7 @@ pub(super) async fn update_menu_item(
 #[get("/items")]
 pub(super) async fn get_all_menu_items(
     menu_ops: web::Data<MenuOperations>,
+    _admin: AdminPrincipal,
 ) -> actix_web::Result<impl Responder> {
     let result = menu_ops.get_all_menu_items().await;
     match result {

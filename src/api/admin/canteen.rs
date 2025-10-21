@@ -1,3 +1,5 @@
+use crate::auth::AdminJwtConfig;
+use crate::auth::admin_jwt::issue_admin_jwt;
 use crate::db::CanteenOperations;
 use crate::enums::admin::{
     AllCanteenResponse, AllItemsResponse, GeneralMenuResponse, LoginRequest, LoginResponse,
@@ -19,6 +21,7 @@ use log::{debug, error};
 #[post("/create")]
 pub(super) async fn create_canteen(
     canteen_ops: web::Data<CanteenOperations>,
+    _admin: crate::auth::AdminPrincipal,
     req_data: web::Json<NewCanteen>,
 ) -> actix_web::Result<impl Responder> {
     let item_name = req_data.canteen_name.clone();
@@ -61,6 +64,7 @@ pub(super) async fn create_canteen(
 #[put("/upload_pic/{canteen_id}")]
 pub(super) async fn upload_canteen_pic(
     canteen_ops: web::Data<CanteenOperations>,
+    _admin: crate::auth::AdminPrincipal,
     path: web::Path<(i32,)>,
 ) -> actix_web::Result<impl Responder> {
     let canteen_id_to_set = path.into_inner().0;
@@ -107,6 +111,7 @@ pub(super) async fn upload_canteen_pic(
 #[put("/set_pic/{canteen_id}")]
 pub(super) async fn set_canteen_pic_link(
     canteen_ops: web::Data<CanteenOperations>,
+    _admin: crate::auth::AdminPrincipal,
     path: web::Path<(i32,)>,
 ) -> actix_web::Result<impl Responder> {
     let canteen_id_to_set = path.into_inner().0;
@@ -230,6 +235,7 @@ pub(super) async fn get_canteen_menu(
 #[post("/login")]
 pub(super) async fn login_canteen(
     menu_ops: web::Data<CanteenOperations>,
+    admin_cfg: web::Data<AdminJwtConfig>,
     req_data: web::Json<LoginRequest>,
 ) -> actix_web::Result<impl Responder> {
     let username_cl = req_data.username.clone();
@@ -237,14 +243,17 @@ pub(super) async fn login_canteen(
     let result = web::block(move || menu_ops.login_canteen(&username_cl, &password_cl)).await?;
     match result {
         Ok(login_status) => {
-            if login_status.is_some() {
+            if let Some(login_ok) = login_status {
                 debug!(
                     "login_canteen: successfully logged in canteen {}",
                     &req_data.username
                 );
+                let token = issue_admin_jwt(login_ok.canteen_id, &admin_cfg)
+                    .map_err(|_| actix_web::error::ErrorInternalServerError("jwt"))?;
                 Ok(HttpResponse::Ok().json(LoginResponse {
                     status: "ok".to_string(),
-                    data: login_status,
+                    data: Some(login_ok),
+                    token: Some(token),
                     error: None,
                 }))
             } else {
@@ -255,6 +264,7 @@ pub(super) async fn login_canteen(
                 Ok(HttpResponse::Unauthorized().json(LoginResponse {
                     status: "invalid_credentials".to_string(),
                     data: None,
+                    token: None,
                     error: None,
                 }))
             }
