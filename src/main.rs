@@ -3,6 +3,7 @@ extern crate log;
 extern crate pretty_env_logger;
 
 mod api;
+mod auth;
 mod db;
 mod enums;
 mod models;
@@ -18,6 +19,7 @@ use dotenvy::dotenv;
 use utoipa::OpenApi;
 use utoipa_actix_web::AppExt;
 use utoipa_swagger_ui::SwaggerUi;
+use auth::{AdminJwtConfig, AuthLayer, FirebaseAuthConfig, JwksCache};
 
 #[derive(Clone)]
 pub(crate) struct AppState {
@@ -79,6 +81,11 @@ async fn main() -> std::io::Result<()> {
     // App State initialization & App Connection
     let state = AppState::new(database_url.as_str()).await;
 
+    // Auth config
+    let fb_cfg = FirebaseAuthConfig::from_env();
+    let admin_cfg = AdminJwtConfig::from_env();
+    let jwks_cache = JwksCache::new(fb_cfg.jwks_url.clone(), fb_cfg.cache_ttl_secs);
+
     // Server configuration
     const HOST: &str = if cfg!(debug_assertions) {
         "127.0.0.1"
@@ -96,7 +103,19 @@ async fn main() -> std::io::Result<()> {
             .configure(|cfg| {
                 api::configure(cfg, &state);
             })
-            .map(|app| app.wrap(middleware::Logger::new("%r - %s - %Dms")))
+            .map(|app| {
+                app.wrap(AuthLayer::new(
+                    fb_cfg.clone(),
+                    admin_cfg.clone(),
+                    jwks_cache.clone(),
+                    state.user_ops.clone(),
+                ))
+                .wrap(middleware::Logger::new("%r - %s - %Dms"))
+            })
+            .app_data(web::Data::new(fb_cfg.clone()))
+            .app_data(web::Data::new(jwks_cache.clone()))
+            .app_data(web::Data::new(state.user_ops.clone()))
+            .app_data(web::Data::new(admin_cfg.clone()))
             .app_data(web::JsonConfig::default().error_handler(default_error_handler))
             .openapi_service(|api| {
                 SwaggerUi::new("/swagger-ui/{_:.*}").url("/api-docs/openapi.json", api)

@@ -22,6 +22,19 @@ async fn root_endpoint() -> impl Responder {
     HttpResponse::Ok().body("Server up!")
 }
 
+#[utoipa::path(
+    get,
+    path = "/health",
+    responses(
+        (status = 200, description = "Health check successful")
+    ),
+    summary = "Health check"
+)]
+#[get("/health")]
+async fn health_endpoint() -> impl Responder {
+    HttpResponse::Ok().body("OK")
+}
+
 pub struct ContentTypeHeader;
 
 // Hacky route to account for utf-8 on header for flutteer
@@ -43,6 +56,7 @@ impl Guard for ContentTypeHeader {
 
 pub(crate) fn configure(cfg: &mut ServiceConfig, state: &AppState) {
     cfg.service(root_endpoint)
+        .service(health_endpoint)
         .configure(|cfg| admin::config(cfg, &state.menu_ops, &state.canteen_ops, &state.asset_ops))
         .configure(|cfg| users::config(cfg, &state.user_ops))
         .configure(|cfg| common::config(cfg, &state.order_ops, &state.search_ops));
