@@ -77,3 +77,20 @@ impl AdminJwtConfig {
         }
     }
 }
+
+#[derive(Clone)]
+pub struct SwaggerUiAuthConfig {
+    pub username: String,
+    pub password: String,
+}
+
+impl SwaggerUiAuthConfig {
+    pub fn from_env() -> Option<Self> {
+        let user = var("SWAGGER_BASIC_USERNAME").ok()?;
+        let pass = var("SWAGGER_BASIC_PASSWORD").ok()?;
+        Some(Self {
+            username: user,
+            password: pass,
+        })
+    }
+}

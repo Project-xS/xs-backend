@@ -6,13 +6,7 @@ use crate::enums::common::{
 };
 use actix_web::{get, post, put, web, HttpResponse, Responder};
 use log::{debug, error};
-use serde::Deserialize;
-use utoipa::IntoParams;
-
-#[derive(Deserialize, Debug, IntoParams)]
-struct OrderCanteenQuery {
-    canteen_id: i32,
-}
+// No request params used now; admin canteen_id derived from JWT
 
 #[utoipa::path(
     tag = "Orders",
@@ -77,9 +71,6 @@ pub(super) async fn create_order(
 
 #[utoipa::path(
     tag = "Orders",
-    params(
-        OrderCanteenQuery,
-    ),
     responses(
         (status = 200, description = "Successfully fetched aggregated counts of active ordered items", body = TimedActiveItemCountResponse)
     ),
@@ -88,10 +79,9 @@ pub(super) async fn create_order(
 #[get("")]
 pub(super) async fn get_all_orders(
     order_ops: web::Data<OrderOperations>,
-    _admin: AdminPrincipal,
-    params: web::Query<OrderCanteenQuery>,
+    admin: AdminPrincipal,
 ) -> actix_web::Result<impl Responder> {
-    let search_canteen_id = params.canteen_id;
+    let search_canteen_id = admin.canteen_id;
     let result = web::block(move || order_ops.get_all_orders_by_count(search_canteen_id)).await?;
     match result {
         Ok(data) => {

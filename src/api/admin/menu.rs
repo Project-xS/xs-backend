@@ -20,10 +20,11 @@ use log::{debug, error};
 #[post("/create")]
 pub(super) async fn create_menu_item(
     menu_ops: web::Data<MenuOperations>,
-    _admin: AdminPrincipal,
+    admin: AdminPrincipal,
     req_data: web::Json<NewMenuItem>,
 ) -> actix_web::Result<impl Responder> {
-    let req_data = req_data.into_inner();
+    let mut req_data = req_data.into_inner();
+    req_data.canteen_id = admin.canteen_id;
     let item_name = req_data.name.clone();
     let result = web::block(move || menu_ops.add_menu_item(req_data)).await?;
     match result {
