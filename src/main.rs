@@ -17,7 +17,8 @@ use crate::db::{
 use actix_web::{middleware, web, App, HttpServer};
 use auth::{AdminJwtConfig, AuthLayer, FirebaseAuthConfig, JwksCache};
 use dotenvy::dotenv;
-use utoipa::OpenApi;
+use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
+use utoipa::{Modify, OpenApi};
 use utoipa_actix_web::AppExt;
 use utoipa_swagger_ui::{BasicAuth, Config, SwaggerUi};
 
@@ -54,11 +55,43 @@ impl AppState {
     }
 }
 
+struct SecurityAddon;
+
+impl Modify for SecurityAddon {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        if let Some(components) = openapi.components.as_mut() {
+            components.add_security_scheme(
+                "bearer_auth",
+                SecurityScheme::Http(
+                    HttpBuilder::new()
+                        .scheme(HttpAuthScheme::Bearer)
+                        .bearer_format("JWT")
+                        .build(),
+                ),
+            );
+        } else {
+            openapi.components = Some(
+                utoipa::openapi::ComponentsBuilder::new()
+                    .security_scheme(
+                        "bearer_auth",
+                        SecurityScheme::Http(
+                            HttpBuilder::new()
+                                .scheme(HttpAuthScheme::Bearer)
+                                .bearer_format("JWT")
+                                .build(),
+                        ),
+                    )
+                    .build(),
+            );
+        }
+    }
+}
+
 #[derive(OpenApi)]
 #[openapi(
-    tags(
-        (name = "Proj-xS", description = "endpoints.")
-    )
+    modifiers(&SecurityAddon),
+    security(("bearer_auth" = [])),
+    tags((name = "Proj-xS", description = "endpoints."))
 )]
 struct ApiDoc;
 
@@ -118,18 +151,22 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(admin_cfg.clone()))
             .app_data(web::JsonConfig::default().error_handler(default_error_handler))
             .openapi_service(|api| {
-                let ui = SwaggerUi::new("/swagger-ui/{_:.*}").url("/api-docs/openapi.json", api);
-                if let (Ok(u), Ok(p)) = (
+                let base_cfg = Config::default().persist_authorization(true);
+                let cfg = if let (Ok(u), Ok(p)) = (
                     std::env::var("SWAGGER_BASIC_USERNAME"),
                     std::env::var("SWAGGER_BASIC_PASSWORD"),
                 ) {
-                    ui.config(Config::default().basic_auth(BasicAuth {
+                    base_cfg.basic_auth(BasicAuth {
                         username: u,
                         password: p,
-                    }))
+                    })
                 } else {
-                    ui
-                }
+                    base_cfg
+                };
+
+                SwaggerUi::new("/swagger-ui/{_:.*}")
+                    .url("/api-docs/openapi.json", api)
+                    .config(cfg)
             })
             .into_app()
     })
