@@ -70,14 +70,28 @@ impl JwksCache {
             .text()
             .await
             .map_err(|e| JwksError::Network(e.to_string()))?;
-        let jwks: JwksResp =
-            serde_json::from_str(&body).map_err(|e| JwksError::Parse(e.to_string()))?;
 
+        // Try JWKS first (OAuth2 style: {"keys": [...]})
         let mut map = HashMap::new();
-        for k in jwks.keys {
-            // Only RSA is expected
-            if let Ok(key) = jsonwebtoken::DecodingKey::from_rsa_components(&k.n, &k.e) {
-                map.insert(k.kid, key);
+        let parse_result: Result<JwksResp, _> = serde_json::from_str(&body);
+        match parse_result {
+            Ok(jwks) => {
+                for k in jwks.keys {
+                    if let Ok(key) = jsonwebtoken::DecodingKey::from_rsa_components(&k.n, &k.e) {
+                        map.insert(k.kid, key);
+                    }
+                }
+            }
+            Err(_) => {
+                // Fallback to Firebase X.509 map: { "kid": "-----BEGIN CERTIFICATE-----..." }
+                let x509_map_result: Result<HashMap<String, String>, _> =
+                    serde_json::from_str(&body);
+                let x509_map = x509_map_result.map_err(|e| JwksError::Parse(e.to_string()))?;
+                for (kid, pem) in x509_map {
+                    if let Ok(key) = jsonwebtoken::DecodingKey::from_rsa_pem(pem.as_bytes()) {
+                        map.insert(kid, key);
+                    }
+                }
             }
         }
 

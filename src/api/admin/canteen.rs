@@ -1,4 +1,6 @@
 use crate::auth::admin_jwt::issue_admin_jwt;
+use crate::auth::extractors::PrincipalExtractor;
+use crate::auth::principal::Principal;
 use crate::auth::AdminJwtConfig;
 use crate::db::CanteenOperations;
 use crate::enums::admin::{
@@ -189,10 +191,16 @@ pub(super) async fn get_all_canteens(
 #[get("/{id}/items")]
 pub(super) async fn get_canteen_menu(
     menu_ops: web::Data<CanteenOperations>,
-    _path: web::Path<(i32,)>,
-    admin: crate::auth::AdminPrincipal,
+    path: web::Path<(i32,)>,
+    principal: PrincipalExtractor,
 ) -> actix_web::Result<impl Responder> {
-    let search_canteen_id = admin.canteen_id;
+    let requested_canteen_id = path.into_inner().0;
+
+    // Admins are restricted to their own canteen; users can query by path id
+    let search_canteen_id = match principal.0 {
+        Principal::Admin { canteen_id } => canteen_id,
+        Principal::User { .. } => requested_canteen_id,
+    };
     let result = menu_ops.get_canteen_items(search_canteen_id).await;
     match result {
         Ok(x) => {

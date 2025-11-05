@@ -15,8 +15,12 @@ impl FirebaseAuthConfig {
     pub fn from_env() -> Self {
         let project_id =
             var("FIREBASE_PROJECT_ID").expect("FIREBASE_PROJECT_ID must be set for Firebase auth");
-        let jwks_url = var("FIREBASE_JWKS_URL")
-            .unwrap_or_else(|_| "https://www.googleapis.com/oauth2/v3/certs".to_string());
+        let jwks_url = var("FIREBASE_JWKS_URL").unwrap_or_else(|_| {
+            // Use Google's JWKS for the Firebase SecureToken service account.
+            // This matches our JWKS parser, while we also support the X.509 JSON map as a fallback.
+            "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"
+                .to_string()
+        });
         let leeway_secs = var("FIREBASE_LEEWAY_SECS")
             .ok()
             .and_then(|v| v.parse::<u64>().ok())
