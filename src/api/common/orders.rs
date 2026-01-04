@@ -1,4 +1,5 @@
-use crate::auth::{AdminPrincipal, UserPrincipal};
+use crate::auth::extractors::PrincipalExtractor;
+use crate::auth::{AdminPrincipal, Principal, UserPrincipal};
 use crate::db::OrderOperations;
 use crate::enums::common::{
     OrderItemContainer, OrderItemsResponse, OrderRequest, OrderResponse, OrdersItemsResponse,
@@ -6,7 +7,8 @@ use crate::enums::common::{
 };
 use actix_web::{get, post, put, web, HttpResponse, Responder};
 use log::{debug, error};
-// No request params used now; admin canteen_id derived from JWT
+use serde::Deserialize;
+use utoipa::IntoParams;
 
 #[utoipa::path(
     tag = "Orders",
@@ -148,46 +150,137 @@ pub(super) async fn get_order_by_orderid(
     }
 }
 
+#[derive(Deserialize, Debug, IntoParams)]
+struct UserOrderQuery {
+    user_id: Option<i32>,
+    rfid: Option<String>,
+}
+
 #[utoipa::path(
     tag = "Orders",
-    responses(
-        (status = 200, description = "Successfully retrieved order items for the specified user or RFID", body = OrderItemsResponse),
-        (status = 500, description = "Failed to retrieve order items due to server error", body = OrderItemsResponse)
+    params(
+        UserOrderQuery,
     ),
-    summary = "Get active order items for a specified user or RFID"
+    responses(
+        (status = 200, description = "Successfully retrieved order items for the specified user or RFID", body = OrdersItemsResponse),
+        (status = 500, description = "Failed to retrieve order items due to server error", body = OrdersItemsResponse)
+    ),
+    summary = "Get active order items for a specified user or RFID",
+    description = "Users (Firebase) fetch their own orders (no query params). Admins must provide exactly one of user_id or rfid."
 )]
 #[get("/by_user")]
 pub(super) async fn get_orders_by_user(
     order_ops: web::Data<OrderOperations>,
-    user: UserPrincipal,
+    principal: PrincipalExtractor,
+    params: web::Query<UserOrderQuery>,
 ) -> actix_web::Result<impl Responder> {
-    let search_user_id = user.user_id();
-    let result = order_ops.get_orders_by_userid(&search_user_id).await;
-    match result {
-        Ok(data) => {
-            debug!(
-                "get_orders_by_user: retrieved {} orders for user_id {}",
-                data.len(),
-                search_user_id
-            );
-            Ok(HttpResponse::Ok().json(OrdersItemsResponse {
-                status: "ok".to_string(),
-                data,
-                error: None,
-            }))
-        }
-        Err(e) => {
-            error!(
-                "get_orders_by_user: error retrieving orders for user_id {}: {}",
-                search_user_id, e
-            );
-            Ok(
-                HttpResponse::InternalServerError().json(OrdersItemsResponse {
+    let params = params.into_inner();
+
+    match principal.0 {
+        Principal::Admin { .. } => {
+            if params.user_id.is_some() && params.rfid.is_some() {
+                return Ok(HttpResponse::BadRequest().json(OrdersItemsResponse {
                     status: "error".to_string(),
+                    error: Some("Cannot provide both user_id and rfid parameters".to_string()),
                     data: Vec::new(),
-                    error: Some(e.to_string()),
-                }),
-            )
+                }));
+            }
+
+            if let Some(search_user_id) = params.user_id {
+                let result = order_ops.get_orders_by_userid(&search_user_id).await;
+                match result {
+                    Ok(data) => {
+                        debug!(
+                            "get_orders_by_user: retrieved {} orders for user_id {}",
+                            data.len(),
+                            search_user_id
+                        );
+                        Ok(HttpResponse::Ok().json(OrdersItemsResponse {
+                            status: "ok".to_string(),
+                            data,
+                            error: None,
+                        }))
+                    }
+                    Err(e) => {
+                        error!(
+                            "get_orders_by_user: error retrieving orders for user_id {}: {}",
+                            search_user_id, e
+                        );
+                        Ok(
+                            HttpResponse::InternalServerError().json(OrdersItemsResponse {
+                                status: "error".to_string(),
+                                data: Vec::new(),
+                                error: Some(e.to_string()),
+                            }),
+                        )
+                    }
+                }
+            } else if let Some(search_rfid) = params.rfid {
+                let result = order_ops.get_orders_by_rfid(&search_rfid).await;
+                match result {
+                    Ok(data) => {
+                        debug!(
+                            "get_orders_by_user: retrieved {} orders for rfid '{}'",
+                            data.len(),
+                            search_rfid
+                        );
+                        Ok(HttpResponse::Ok().json(OrdersItemsResponse {
+                            status: "ok".to_string(),
+                            data,
+                            error: None,
+                        }))
+                    }
+                    Err(e) => {
+                        error!(
+                            "get_orders_by_user: error retrieving orders for rfid '{}': {}",
+                            search_rfid, e
+                        );
+                        Ok(
+                            HttpResponse::InternalServerError().json(OrdersItemsResponse {
+                                status: "error".to_string(),
+                                data: Vec::new(),
+                                error: Some(e.to_string()),
+                            }),
+                        )
+                    }
+                }
+            } else {
+                Ok(HttpResponse::BadRequest().json(OrdersItemsResponse {
+                    status: "error".to_string(),
+                    error: Some("Either user_id or rfid must be provided".to_string()),
+                    data: Vec::new(),
+                }))
+            }
+        }
+        Principal::User { user_id, .. } => {
+            let result = order_ops.get_orders_by_userid(&user_id).await;
+            match result {
+                Ok(data) => {
+                    debug!(
+                        "get_orders_by_user: retrieved {} orders for user_id {}",
+                        data.len(),
+                        user_id
+                    );
+                    Ok(HttpResponse::Ok().json(OrdersItemsResponse {
+                        status: "ok".to_string(),
+                        data,
+                        error: None,
+                    }))
+                }
+                Err(e) => {
+                    error!(
+                        "get_orders_by_user: error retrieving orders for user_id {}: {}",
+                        user_id, e
+                    );
+                    Ok(
+                        HttpResponse::InternalServerError().json(OrdersItemsResponse {
+                            status: "error".to_string(),
+                            data: Vec::new(),
+                            error: Some(e.to_string()),
+                        }),
+                    )
+                }
+            }
         }
     }
 }
