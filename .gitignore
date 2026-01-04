@@ -21,7 +21,6 @@ target/
 .idea/
 .env
 .vscode/
-.github/
 
 # Nix Build Result
 result
