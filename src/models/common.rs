@@ -107,3 +107,36 @@ pub struct OrderItems {
     pub pic_etag: Option<String>,
     pub description: Option<String>,
 }
+
+#[derive(Queryable, Debug, Identifiable, Serialize, Deserialize)]
+#[diesel(table_name = crate::db::schema::held_orders)]
+#[diesel(primary_key(hold_id))]
+pub struct HeldOrder {
+    pub hold_id: i32,
+    pub user_id: i32,
+    pub canteen_id: i32,
+    pub total_price: i32,
+    pub deliver_at: Option<TimeBandEnum>,
+    pub held_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
+}
+
+#[derive(Insertable, Debug)]
+#[diesel(table_name = crate::db::schema::held_orders)]
+pub struct NewHeldOrder {
+    pub user_id: i32,
+    pub canteen_id: i32,
+    pub total_price: i32,
+    pub deliver_at: Option<TimeBandEnum>,
+    pub expires_at: DateTime<Utc>,
+}
+
+#[allow(dead_code)]
+#[derive(Queryable, Selectable, Debug, Associations)]
+#[diesel(table_name = crate::db::schema::held_order_items)]
+#[diesel(belongs_to(HeldOrder, foreign_key = hold_id))]
+pub struct HeldOrderItem {
+    pub hold_id: i32,
+    pub item_id: i32,
+    pub quantity: i16,
+}

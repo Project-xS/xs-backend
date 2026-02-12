@@ -1,75 +1,14 @@
 use crate::auth::extractors::PrincipalExtractor;
-use crate::auth::{AdminPrincipal, Principal, UserPrincipal};
+use crate::auth::{AdminPrincipal, Principal};
 use crate::db::OrderOperations;
 use crate::enums::common::{
-    OrderItemContainer, OrderItemsResponse, OrderRequest, OrderResponse, OrdersItemsResponse,
+    OrderItemContainer, OrderItemsResponse, OrderResponse, OrdersItemsResponse,
     TimedActiveItemCount, TimedActiveItemCountResponse,
 };
-use actix_web::{get, post, put, web, HttpResponse, Responder};
+use actix_web::{get, put, web, HttpResponse, Responder};
 use log::{debug, error};
 use serde::Deserialize;
 use utoipa::IntoParams;
-
-#[utoipa::path(
-    tag = "Orders",
-    request_body = OrderRequest,
-    responses(
-        (status = 200, description = "Order successfully created", body = OrderResponse),
-        (status = 409, description = "Failed to create order due to conflict or invalid items", body = OrderResponse)
-    ),
-    summary = "Place a new order"
-)]
-#[post("")]
-pub(super) async fn create_order(
-    order_ops: web::Data<OrderOperations>,
-    user: UserPrincipal,
-    req_data: web::Json<OrderRequest>,
-) -> actix_web::Result<impl Responder> {
-    let OrderRequest {
-        user_id: _ignored,
-        deliver_at,
-        item_ids,
-    } = req_data.into_inner();
-    let deliver_at_cl = deliver_at.clone();
-    let item_ids_cl = item_ids.clone();
-    if deliver_at.is_some()
-        && (deliver_at != Some(String::from("11:00am - 12:00pm"))
-            && deliver_at != Some(String::from("12:00pm - 01:00pm")))
-    {
-        return Ok(HttpResponse::BadRequest().json(OrderResponse {
-            status: "error".to_string(),
-            error: Some(format!(
-                "Invalid time band: {}",
-                deliver_at.unwrap_or(String::new())
-            )),
-        }));
-    }
-    let uid = user.user_id();
-    let result =
-        web::block(move || order_ops.create_order(uid, item_ids_cl, deliver_at_cl)).await?;
-    match result {
-        Ok(_) => {
-            debug!(
-                "create_order: successfully created order for user {} for time {:?} with item_ids {:?}",
-                uid, deliver_at.unwrap_or(String::from("Instant")), item_ids
-            );
-            Ok(HttpResponse::Ok().json(OrderResponse {
-                status: "ok".to_string(),
-                error: None,
-            }))
-        }
-        Err(e) => {
-            error!(
-                "create_order: failed to create order for user {} for time {:?} with item_ids {:?}: {}",
-                uid, deliver_at.unwrap_or(String::from("Instant")), item_ids, e
-            );
-            Ok(HttpResponse::Conflict().json(OrderResponse {
-                status: "error".to_string(),
-                error: Some(e.to_string()),
-            }))
-        }
-    }
-}
 
 #[utoipa::path(
     tag = "Orders",

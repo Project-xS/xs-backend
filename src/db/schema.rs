@@ -21,8 +21,8 @@ diesel::table! {
     active_orders (order_id) {
         order_id -> Int4,
         user_id -> Int4,
-        ordered_at -> Timestamptz,
         total_price -> Int4,
+        ordered_at -> Timestamptz,
         canteen_id -> Int4,
         deliver_at -> Nullable<TimeBand>,
     }
@@ -37,6 +37,29 @@ diesel::table! {
         password -> Varchar,
         has_pic -> Bool,
         pic_etag -> Nullable<Varchar>,
+    }
+}
+
+diesel::table! {
+    held_order_items (hold_id, item_id) {
+        hold_id -> Int4,
+        item_id -> Int4,
+        quantity -> Int2,
+    }
+}
+
+diesel::table! {
+    use diesel::sql_types::*;
+    use super::sql_types::TimeBand;
+
+    held_orders (hold_id) {
+        hold_id -> Int4,
+        user_id -> Int4,
+        canteen_id -> Int4,
+        total_price -> Int4,
+        deliver_at -> Nullable<TimeBand>,
+        held_at -> Timestamptz,
+        expires_at -> Timestamptz,
     }
 }
 
@@ -85,6 +108,10 @@ diesel::joinable!(active_order_items -> active_orders (order_id));
 diesel::joinable!(active_order_items -> menu_items (item_id));
 diesel::joinable!(active_orders -> canteens (canteen_id));
 diesel::joinable!(active_orders -> users (user_id));
+diesel::joinable!(held_order_items -> held_orders (hold_id));
+diesel::joinable!(held_order_items -> menu_items (item_id));
+diesel::joinable!(held_orders -> canteens (canteen_id));
+diesel::joinable!(held_orders -> users (user_id));
 diesel::joinable!(menu_items -> canteens (canteen_id));
 diesel::joinable!(past_orders -> users (user_id));
 
@@ -92,6 +119,8 @@ diesel::allow_tables_to_appear_in_same_query!(
     active_order_items,
     active_orders,
     canteens,
+    held_order_items,
+    held_orders,
     menu_items,
     past_orders,
     users,

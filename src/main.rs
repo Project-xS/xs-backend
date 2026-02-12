@@ -12,7 +12,7 @@ mod traits;
 use crate::api::default_error_handler;
 use crate::db::{
     establish_connection_pool, run_db_migrations, AssetOperations, CanteenOperations,
-    MenuOperations, OrderOperations, SearchOperations, UserOperations,
+    HoldOperations, MenuOperations, OrderOperations, SearchOperations, UserOperations,
 };
 use actix_web::{middleware, web, App, HttpServer};
 use auth::{AdminJwtConfig, AuthLayer, FirebaseAuthConfig, JwksCache};
@@ -28,6 +28,7 @@ pub(crate) struct AppState {
     menu_ops: MenuOperations,
     canteen_ops: CanteenOperations,
     order_ops: OrderOperations,
+    hold_ops: HoldOperations,
     search_ops: SearchOperations,
     asset_ops: AssetOperations,
 }
@@ -36,10 +37,17 @@ impl AppState {
     pub(crate) async fn new(url: &str) -> Self {
         let db = establish_connection_pool(url);
         run_db_migrations(db.clone()).expect("Unable to run migrations");
+
+        let hold_ttl_secs: i64 = std::env::var("ORDER_HOLD_TTL_SECS")
+            .ok()
+            .and_then(|v| v.parse::<i64>().ok())
+            .unwrap_or(300); // 5 minutes default
+
         let user_ops = UserOperations::new(db.clone()).await;
         let menu_ops = MenuOperations::new(db.clone()).await;
         let canteen_ops = CanteenOperations::new(db.clone()).await;
         let order_ops = OrderOperations::new(db.clone()).await;
+        let hold_ops = HoldOperations::new(db.clone(), hold_ttl_secs);
         let search_ops = SearchOperations::new(db.clone()).await;
         let asset_ops = AssetOperations::new()
             .await
@@ -49,6 +57,7 @@ impl AppState {
             menu_ops,
             canteen_ops,
             order_ops,
+            hold_ops,
             search_ops,
             asset_ops,
         }
@@ -119,6 +128,43 @@ async fn main() -> std::io::Result<()> {
     let admin_cfg = AdminJwtConfig::from_env();
     let jwks_cache = JwksCache::new(fb_cfg.jwks_url.clone(), fb_cfg.cache_ttl_secs);
 
+    // QR config
+    let qr_secret =
+        std::env::var("DELIVER_QR_HASH_SECRET").expect("DELIVER_QR_HASH_SECRET must be set");
+    let qr_max_age: u64 = std::env::var("QR_TOKEN_MAX_AGE_SECS")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(86400); // 24 hours default
+
+    // Spawn background task to clean up expired holds
+    {
+        let hold_ops = state.hold_ops.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(60));
+            loop {
+                interval.tick().await;
+                match web::block({
+                    let hold_ops = hold_ops.clone();
+                    move || hold_ops.cleanup_expired_holds()
+                })
+                .await
+                {
+                    Ok(Ok(count)) => {
+                        if count > 0 {
+                            info!("Background cleanup: released {} expired order holds", count);
+                        }
+                    }
+                    Ok(Err(e)) => {
+                        error!("Background cleanup error: {}", e);
+                    }
+                    Err(e) => {
+                        error!("Background cleanup blocking error: {}", e);
+                    }
+                }
+            }
+        });
+    }
+
     // Server configuration
     const HOST: &str = if cfg!(debug_assertions) {
         "127.0.0.1"
@@ -130,11 +176,16 @@ async fn main() -> std::io::Result<()> {
     info!("Starting server at {}:{}", HOST, PORT);
 
     HttpServer::new(move || {
+        let qr_cfg = api::common::qr::QrConfig {
+            secret: qr_secret.clone(),
+            max_age_secs: qr_max_age,
+        };
+
         App::new()
             .into_utoipa_app()
             .openapi(ApiDoc::openapi())
             .configure(|cfg| {
-                api::configure(cfg, &state);
+                api::configure(cfg, &state, qr_cfg);
             })
             .map(|app| {
                 app.wrap(AuthLayer::new(

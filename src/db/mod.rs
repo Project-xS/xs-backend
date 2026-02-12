@@ -10,6 +10,7 @@ mod users;
 pub use admin::asset_management::AssetOperations;
 pub use admin::canteen::CanteenOperations;
 pub use admin::menu::MenuOperations;
+pub use common::hold::HoldOperations;
 pub use common::orders::OrderOperations;
 pub use common::search::SearchOperations;
 pub use errors::RepositoryError;

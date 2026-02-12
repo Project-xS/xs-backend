@@ -53,6 +53,7 @@ impl OrderOperations {
             asset_ops: AssetOperations::new().await.unwrap(),
         }
     }
+    #[allow(dead_code)]
     pub fn create_order(
         &self,
         userid: i32,
@@ -263,27 +264,19 @@ impl OrderOperations {
 
         let mut resp = TimedActiveItemCount::new();
         for item in db_resp {
-            let deliver_time_string: String = if item.deliver_at.is_some() {
-                item.deliver_at.unwrap().human_readable().to_string()
-            } else {
-                "Instant".to_string()
-            };
-            if let Some(val) = resp.get_mut(&deliver_time_string) {
-                (*val).push(ActiveItemCount {
+            let deliver_time_string: String = item
+                .deliver_at
+                .as_ref()
+                .map(|dt| dt.human_readable().to_string())
+                .unwrap_or_else(|| "Instant".to_string());
+
+            resp.entry(deliver_time_string)
+                .or_default()
+                .push(ActiveItemCount {
                     item_id: item.item_id,
                     item_name: item.item_name,
                     num_ordered: item.total_quantity.unwrap_or(1),
                 });
-            } else {
-                resp.insert(
-                    deliver_time_string,
-                    vec![ActiveItemCount {
-                        item_id: item.item_id,
-                        item_name: item.item_name,
-                        num_ordered: item.total_quantity.unwrap_or(1),
-                    }],
-                );
-            }
         }
         Ok(resp)
     }

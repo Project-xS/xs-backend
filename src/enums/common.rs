@@ -82,3 +82,30 @@ pub struct OrderResponse {
     pub status: String,
     pub error: Option<String>,
 }
+
+#[derive(Serialize, ToSchema)]
+pub struct HoldOrderResponse {
+    pub status: String,
+    pub hold_id: Option<i32>,
+    pub expires_at: Option<i64>,
+    pub error: Option<String>,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct ConfirmHoldResponse {
+    pub status: String,
+    pub order_id: Option<i32>,
+    pub error: Option<String>,
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct ScanQrRequest {
+    pub token: String,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct ScanQrResponse {
+    pub status: String,
+    pub data: Option<OrderItemContainer>,
+    pub error: Option<String>,
+}

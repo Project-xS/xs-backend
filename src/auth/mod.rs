@@ -5,6 +5,7 @@ pub mod firebase;
 pub mod jwks;
 pub mod middleware;
 pub mod principal;
+pub mod qr_token;
 
 pub use config::{AdminJwtConfig, FirebaseAuthConfig};
 pub use extractors::{AdminPrincipal, UserPrincipal};

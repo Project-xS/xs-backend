@@ -1,29 +1,50 @@
+use crate::api::common::qr::QrConfig;
 use crate::api::ContentTypeHeader;
-use crate::db::{OrderOperations, SearchOperations};
+use crate::db::{HoldOperations, OrderOperations, SearchOperations};
 use actix_web::middleware::NormalizePath;
 use actix_web::web;
+use hold::*;
 use orders::*;
+use qr::*;
 use search::*;
 use utoipa_actix_web::scope;
 use utoipa_actix_web::service_config::ServiceConfig;
 
+mod hold;
 mod orders;
+pub(crate) mod qr;
 mod search;
 
 pub(super) fn config(
     cfg: &mut ServiceConfig,
     order_ops: &OrderOperations,
+    hold_ops: &HoldOperations,
     search_ops: &SearchOperations,
+    qr_cfg: QrConfig,
 ) {
     cfg.service(
         scope::scope("/orders")
             .wrap(NormalizePath::trim())
             .app_data(web::Data::new(order_ops.clone()))
+            .app_data(web::Data::new(hold_ops.clone()))
+            .app_data(web::Data::new(qr_cfg))
+            // Hold routes (require JSON content type)
             .service(
-                scope::scope("")
+                scope::scope("/hold")
                     .guard(ContentTypeHeader)
-                    .service(create_order),
+                    .service(hold_order)
+                    .service(confirm_hold)
+                    .service(cancel_hold),
             )
+            // QR routes
+            .service(
+                scope::scope("").service(generate_order_qr).service(
+                    scope::scope("")
+                        .guard(ContentTypeHeader)
+                        .service(scan_order_qr),
+                ),
+            )
+            // Existing order routes
             .service(
                 scope::scope("")
                     .service(get_all_orders)
