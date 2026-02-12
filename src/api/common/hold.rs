@@ -20,7 +20,6 @@ pub(super) async fn hold_order(
     req_data: web::Json<OrderRequest>,
 ) -> actix_web::Result<impl Responder> {
     let OrderRequest {
-        user_id: _ignored,
         deliver_at,
         item_ids,
     } = req_data.into_inner();

@@ -76,66 +76,67 @@ impl HoldOperations {
             *qty += 1;
         }
 
-        // Validate items
-        let items_in_order: Vec<MenuItemCheck>;
-        let canteen_id_in_order: i32;
-        {
-            use crate::db::schema::*;
-            items_in_order = menu_items::table
-                .filter(menu_items::item_id.eq_any(itemids.clone()))
-                .select(MenuItemCheck::as_select())
-                .load::<MenuItemCheck>(conn.connection())
-                .map_err(|e| {
-                    error!(
-                        "hold_order: error loading menu items for item_ids {:?}: {}",
-                        itemids, e
-                    );
-                    match e {
-                        Error::NotFound => RepositoryError::NotFound(format!(
-                            "menu_items: No menu item matched for {:?}",
-                            &itemids
-                        )),
-                        other => RepositoryError::DatabaseError(other),
-                    }
-                })?;
-
-            if ordered_qty.len() != items_in_order.len() {
-                return Err(RepositoryError::ValidationError(format!(
-                    "Order contains missing menu items: {:?}",
-                    &itemids
-                )));
-            }
-
-            canteen_id_in_order = items_in_order.first().unwrap().canteen_id;
-
-            for item in &items_in_order {
-                if canteen_id_in_order != item.canteen_id {
-                    return Err(RepositoryError::ValidationError(format!(
-                        "Order contains items from multiple canteens: {:?} for user: {}",
-                        &itemids, userid
-                    )));
-                }
-                if !item.is_available {
-                    return Err(RepositoryError::NotAvailable(
-                        item.item_id,
-                        item.name.clone(),
-                        "Not available".to_string(),
-                    ));
-                } else if item.stock != -1
-                    && (item.stock as i64) < *ordered_qty.get(&item.item_id).unwrap_or(&1)
-                {
-                    return Err(RepositoryError::NotAvailable(
-                        item.item_id,
-                        item.name.clone(),
-                        "Out of stock".to_string(),
-                    ));
-                }
-            }
-        }
-
         let expires_at = Utc::now() + Duration::seconds(self.hold_ttl_secs);
 
         conn.connection().transaction(|conn| {
+            // Validate items and lock rows to prevent concurrent oversells.
+            let items_in_order: Vec<MenuItemCheck>;
+            let canteen_id_in_order: i32;
+            {
+                use crate::db::schema::*;
+                items_in_order = menu_items::table
+                    .filter(menu_items::item_id.eq_any(itemids.clone()))
+                    .for_update()
+                    .select(MenuItemCheck::as_select())
+                    .load::<MenuItemCheck>(conn)
+                    .map_err(|e| {
+                        error!(
+                            "hold_order: error loading menu items for item_ids {:?}: {}",
+                            itemids, e
+                        );
+                        match e {
+                            Error::NotFound => RepositoryError::NotFound(format!(
+                                "menu_items: No menu item matched for {:?}",
+                                &itemids
+                            )),
+                            other => RepositoryError::DatabaseError(other),
+                        }
+                    })?;
+
+                if ordered_qty.len() != items_in_order.len() {
+                    return Err(RepositoryError::ValidationError(format!(
+                        "Order contains missing menu items: {:?}",
+                        &itemids
+                    )));
+                }
+
+                canteen_id_in_order = items_in_order.first().unwrap().canteen_id;
+
+                for item in &items_in_order {
+                    if canteen_id_in_order != item.canteen_id {
+                        return Err(RepositoryError::ValidationError(format!(
+                            "Order contains items from multiple canteens: {:?} for user: {}",
+                            &itemids, userid
+                        )));
+                    }
+                    if !item.is_available {
+                        return Err(RepositoryError::NotAvailable(
+                            item.item_id,
+                            item.name.clone(),
+                            "Not available".to_string(),
+                        ));
+                    } else if item.stock != -1
+                        && (item.stock as i64) < *ordered_qty.get(&item.item_id).unwrap_or(&1)
+                    {
+                        return Err(RepositoryError::NotAvailable(
+                            item.item_id,
+                            item.name.clone(),
+                            "Out of stock".to_string(),
+                        ));
+                    }
+                }
+            }
+
             let order_total_price = items_in_order
                 .iter()
                 .map(|e| e.price * *ordered_qty.get(&e.item_id).unwrap_or(&1) as i32)

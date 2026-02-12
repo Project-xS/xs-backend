@@ -28,30 +28,26 @@ pub(super) fn config(
             .app_data(web::Data::new(order_ops.clone()))
             .app_data(web::Data::new(hold_ops.clone()))
             .app_data(web::Data::new(qr_cfg))
-            // Hold routes (require JSON content type)
             .service(
                 scope::scope("/hold")
-                    .guard(ContentTypeHeader)
-                    .service(hold_order)
+                    .service(
+                        scope::scope("")
+                            .guard(ContentTypeHeader)
+                            .service(hold_order),
+                    )
                     .service(confirm_hold)
                     .service(cancel_hold),
             )
-            // QR routes
-            .service(
-                scope::scope("").service(generate_order_qr).service(
-                    scope::scope("")
-                        .guard(ContentTypeHeader)
-                        .service(scan_order_qr),
-                ),
-            )
-            // Existing order routes
+            .service(generate_order_qr)
             .service(
                 scope::scope("")
-                    .service(get_all_orders)
-                    .service(get_orders_by_user)
-                    .service(get_order_by_orderid)
-                    .service(order_actions),
-            ),
+                    .guard(ContentTypeHeader)
+                    .service(scan_order_qr),
+            )
+            .service(get_all_orders)
+            .service(get_orders_by_user)
+            .service(get_order_by_orderid)
+            .service(order_actions),
     )
     // Search Routes
     .service(
