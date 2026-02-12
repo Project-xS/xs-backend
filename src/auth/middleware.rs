@@ -96,6 +96,52 @@ where
         }
 
         let token = token_opt.unwrap();
+
+        // Dev-only bypass: compile-time gated to debug builds only.
+        // Set DEV_BYPASS_TOKEN in .env and send it as Bearer token.
+        // Format: "dev-user-{user_id}" or "dev-admin-{canteen_id}"
+        if cfg!(debug_assertions) {
+            if let Ok(bypass) = std::env::var("DEV_BYPASS_TOKEN") {
+                if !bypass.is_empty() && token == bypass {
+                    // Parse the bypass token to determine principal type.
+                    // Use query param ?as=user-{id} or ?as=admin-{id}
+                    let query = req.query_string().to_string();
+                    let as_param = query
+                        .split('&')
+                        .find_map(|p| p.strip_prefix("as="))
+                        .unwrap_or("user-1");
+
+                    if let Some(id_str) = as_param.strip_prefix("admin-") {
+                        let canteen_id: i32 = id_str.parse().unwrap_or(1);
+                        warn!(
+                            "[DEV BYPASS] Authenticated as Admin (canteen_id={})",
+                            canteen_id
+                        );
+                        req.extensions_mut().insert(Principal::Admin { canteen_id });
+                    } else if let Some(id_str) = as_param.strip_prefix("user-") {
+                        let user_id: i32 = id_str.parse().unwrap_or(1);
+                        warn!("[DEV BYPASS] Authenticated as User (user_id={})", user_id);
+                        req.extensions_mut().insert(Principal::User {
+                            user_id,
+                            firebase_uid: format!("dev-bypass-{}", user_id),
+                            email: Some(format!("dev{}@bypass.local", user_id)),
+                        });
+                    } else {
+                        warn!("[DEV BYPASS] Authenticated as User (user_id=1, default)");
+                        req.extensions_mut().insert(Principal::User {
+                            user_id: 1,
+                            firebase_uid: "dev-bypass-1".to_string(),
+                            email: Some("dev1@bypass.local".to_string()),
+                        });
+                    }
+
+                    let fut = self.service.call(req);
+                    #[allow(clippy::redundant_async_block)]
+                    return Box::pin(async move { fut.await });
+                }
+            }
+        }
+
         let inner = self.inner.clone();
         let srv = self.service.clone();
         Box::pin(async move {
