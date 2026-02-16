@@ -85,6 +85,17 @@ pub struct UpdateItemRequest {
     pub update: UpdateMenuItem,
 }
 
+#[derive(Deserialize, ToSchema)]
+pub struct CreateMenuItemRequest {
+    pub name: String,
+    pub is_veg: bool,
+    pub price: i32,
+    pub stock: i32,
+    pub is_available: bool,
+    pub description: Option<String>,
+    pub has_pic: bool,
+}
+
 // ---------- CANTEEN ---------- //
 
 #[derive(Serialize, ToSchema)]

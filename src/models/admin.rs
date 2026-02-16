@@ -50,7 +50,7 @@ pub struct MenuItem {
     pub pic_etag: Option<String>,
 }
 
-#[derive(Insertable, Debug, Serialize, Deserialize, ToSchema, Selectable)]
+#[derive(Insertable, Debug, Serialize, Deserialize, Selectable)]
 #[diesel(table_name = crate::db::schema::menu_items)]
 pub struct NewMenuItem {
     pub canteen_id: i32,
@@ -84,6 +84,80 @@ pub struct UpdateMenuItem {
     pub stock: Option<i32>,
     pub is_available: Option<bool>,
     pub description: Option<String>,
+}
+
+pub const MENU_ITEM_NAME_MAX_LEN: usize = 120;
+pub const MENU_ITEM_DESC_MAX_LEN: usize = 500;
+
+fn sanitize_name(name: &str) -> Result<String, String> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err("name must not be empty".to_string());
+    }
+    if trimmed.chars().count() > MENU_ITEM_NAME_MAX_LEN {
+        return Err(format!(
+            "name must be at most {MENU_ITEM_NAME_MAX_LEN} characters"
+        ));
+    }
+    Ok(trimmed.to_string())
+}
+
+fn sanitize_description(description: &Option<String>) -> Result<Option<String>, String> {
+    match description.as_deref() {
+        None => Ok(None),
+        Some(desc) => {
+            let trimmed = desc.trim();
+            if trimmed.is_empty() {
+                return Ok(None);
+            }
+            if trimmed.chars().count() > MENU_ITEM_DESC_MAX_LEN {
+                return Err(format!(
+                    "description must be at most {MENU_ITEM_DESC_MAX_LEN} characters"
+                ));
+            }
+            Ok(Some(trimmed.to_string()))
+        }
+    }
+}
+
+fn validate_price(price: i32) -> Result<(), String> {
+    if price <= 0 {
+        return Err("price must be greater than 0".to_string());
+    }
+    Ok(())
+}
+
+fn validate_stock(stock: i32) -> Result<(), String> {
+    if stock < -1 {
+        return Err("stock must be greater than or equal to -1".to_string());
+    }
+    Ok(())
+}
+
+impl NewMenuItem {
+    pub fn sanitize_and_validate(mut self) -> Result<Self, String> {
+        self.name = sanitize_name(&self.name)?;
+        self.description = sanitize_description(&self.description)?;
+        validate_price(self.price)?;
+        validate_stock(self.stock)?;
+        Ok(self)
+    }
+}
+
+impl UpdateMenuItem {
+    pub fn sanitize_and_validate(mut self) -> Result<Self, String> {
+        if let Some(name) = self.name.as_ref() {
+            self.name = Some(sanitize_name(name)?);
+        }
+        if let Some(price) = self.price {
+            validate_price(price)?;
+        }
+        if let Some(stock) = self.stock {
+            validate_stock(stock)?;
+        }
+        self.description = sanitize_description(&self.description)?;
+        Ok(self)
+    }
 }
 
 #[derive(Debug, Selectable, Queryable, Serialize, ToSchema)]

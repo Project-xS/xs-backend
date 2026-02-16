@@ -11,10 +11,9 @@ use actix_web::{get, web, HttpResponse, Responder};
     ),
     summary = "Get past orders of specified user id",
 )]
-#[get("/get_past_orders/{user_id}")]
+#[get("/get_past_orders")]
 pub(super) async fn get_past_orders_of_user(
     user_ops: web::Data<UserOperations>,
-    _path: web::Path<(i32,)>,
     user: UserPrincipal,
 ) -> actix_web::Result<impl Responder> {
     let search_user_id = user.user_id();

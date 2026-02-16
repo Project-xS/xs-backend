@@ -54,20 +54,16 @@ pub(super) async fn create_canteen(
 
 #[utoipa::path(
     tag = "Canteen",
-    params(
-        ("canteen_id", description = "The unique identifier of the canteen to upload pic for."),
-    ),
     responses(
         (status = 200, description = "Presigned URL generated successfully", body = NewCanteenResponse),
         (status = 409, description = "Failed to generate presigned url", body = NewCanteenResponse)
     ),
     summary = "Get presigned URL for uploading the canteen picture. Call the resulting URL with PUT to upload the image."
 )]
-#[put("/upload_pic/{canteen_id}")]
+#[put("/upload_pic")]
 pub(super) async fn upload_canteen_pic(
     canteen_ops: web::Data<CanteenOperations>,
     admin: crate::auth::AdminPrincipal,
-    _path: web::Path<(i32,)>,
 ) -> actix_web::Result<impl Responder> {
     let canteen_id_to_set = admin.canteen_id;
     let result = canteen_ops.upload_canteen_pic(&canteen_id_to_set).await;
@@ -101,20 +97,16 @@ pub(super) async fn upload_canteen_pic(
 
 #[utoipa::path(
     tag = "Canteen",
-    params(
-        ("canteen_id", description = "The unique identifier of the canteen to set pic for."),
-    ),
     responses(
         (status = 200, description = "Canteen pic set successfully", body = NewCanteenResponse),
         (status = 409, description = "Failed to set pic for canteen due to conflict", body = NewCanteenResponse)
     ),
     summary = "Set picture link for a menu item after uploading the asset."
 )]
-#[put("/set_pic/{canteen_id}")]
+#[put("/set_pic")]
 pub(super) async fn set_canteen_pic_link(
     canteen_ops: web::Data<CanteenOperations>,
     admin: crate::auth::AdminPrincipal,
-    _path: web::Path<(i32,)>,
 ) -> actix_web::Result<impl Responder> {
     let canteen_id_to_set = admin.canteen_id;
     let result = canteen_ops.set_canteen_pic(&canteen_id_to_set).await;

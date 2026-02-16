@@ -23,6 +23,9 @@ impl MenuOperations {
     }
 
     pub fn add_menu_item(&self, menu_item: NewMenuItem) -> Result<MenuItem, RepositoryError> {
+        let menu_item = menu_item
+            .sanitize_and_validate()
+            .map_err(RepositoryError::ValidationError)?;
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!("add_menu_item: failed to acquire DB connection: {}", e);
             e
@@ -141,6 +144,9 @@ impl MenuOperations {
         itemid: i32,
         changed_menu_item: UpdateMenuItem,
     ) -> Result<MenuItem, RepositoryError> {
+        let changed_menu_item = changed_menu_item
+            .sanitize_and_validate()
+            .map_err(RepositoryError::ValidationError)?;
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!(
                 "update_menu_item: failed to acquire DB connection for id {}: {}",

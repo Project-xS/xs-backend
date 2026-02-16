@@ -1,16 +1,17 @@
 use crate::auth::AdminPrincipal;
-use crate::db::MenuOperations;
+use crate::db::{MenuOperations, RepositoryError};
 use crate::enums::admin::{
-    AllItemsResponse, CreateMenuItemResponse, GeneralMenuResponse, ItemResponse, MenuItemWithPic,
-    UpdateItemRequest, UploadMenuItemPicPresignedResponse,
+    AllItemsResponse, CreateMenuItemRequest, CreateMenuItemResponse, GeneralMenuResponse,
+    ItemResponse, MenuItemWithPic, UpdateItemRequest, UploadMenuItemPicPresignedResponse,
 };
 use crate::models::admin::NewMenuItem;
+use actix_web::http::StatusCode;
 use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
 use log::{debug, error};
 
 #[utoipa::path(
     tag = "Menu",
-    request_body = NewMenuItem,
+    request_body = CreateMenuItemRequest,
     responses(
         (status = 200, description = "Menu item successfully created", body = CreateMenuItemResponse),
         (status = 409, description = "Failed to create menu item due to conflict", body = GeneralMenuResponse)
@@ -21,10 +22,28 @@ use log::{debug, error};
 pub(super) async fn create_menu_item(
     menu_ops: web::Data<MenuOperations>,
     admin: AdminPrincipal,
-    req_data: web::Json<NewMenuItem>,
+    req_data: web::Json<CreateMenuItemRequest>,
 ) -> actix_web::Result<impl Responder> {
-    let mut req_data = req_data.into_inner();
-    req_data.canteen_id = admin.canteen_id;
+    let req_data = req_data.into_inner();
+    let new_item = NewMenuItem {
+        canteen_id: admin.canteen_id,
+        name: req_data.name,
+        is_veg: req_data.is_veg,
+        price: req_data.price,
+        stock: req_data.stock,
+        is_available: req_data.is_available,
+        description: req_data.description,
+        has_pic: req_data.has_pic,
+    };
+    let req_data = match new_item.sanitize_and_validate() {
+        Ok(data) => data,
+        Err(message) => {
+            return Ok(HttpResponse::BadRequest().json(GeneralMenuResponse {
+                status: "error".to_string(),
+                error: Some(message),
+            }));
+        }
+    };
     let item_name = req_data.name.clone();
     let result = web::block(move || menu_ops.add_menu_item(req_data)).await?;
     match result {
@@ -44,9 +63,13 @@ pub(super) async fn create_menu_item(
                 "create_menu_item: failed to create menu item '{}' due to error: {}",
                 item_name, e
             );
-            Ok(HttpResponse::Conflict().json(GeneralMenuResponse {
+            let (status, message) = match e {
+                RepositoryError::ValidationError(message) => (StatusCode::BAD_REQUEST, message),
+                other => (StatusCode::CONFLICT, other.to_string()),
+            };
+            Ok(HttpResponse::build(status).json(GeneralMenuResponse {
                 status: "error".to_string(),
-                error: Some(e.to_string()),
+                error: Some(message),
             }))
         }
     }
@@ -201,7 +224,15 @@ pub(super) async fn update_menu_item(
     req_data: web::Json<UpdateItemRequest>,
 ) -> actix_web::Result<impl Responder> {
     let req_data = req_data.into_inner();
-    let update_data = req_data.update;
+    let update_data = match req_data.update.sanitize_and_validate() {
+        Ok(data) => data,
+        Err(message) => {
+            return Ok(HttpResponse::BadRequest().json(GeneralMenuResponse {
+                status: "error".to_string(),
+                error: Some(message),
+            }));
+        }
+    };
     let update_data_cl = update_data.clone();
     let result =
         web::block(move || menu_ops.update_menu_item(req_data.item_id, update_data_cl)).await?;
@@ -221,9 +252,13 @@ pub(super) async fn update_menu_item(
                 "update_menu_item: failed to update menu item with id {}: {}",
                 req_data.item_id, e
             );
-            Ok(HttpResponse::Conflict().json(GeneralMenuResponse {
+            let (status, message) = match e {
+                RepositoryError::ValidationError(message) => (StatusCode::BAD_REQUEST, message),
+                other => (StatusCode::CONFLICT, other.to_string()),
+            };
+            Ok(HttpResponse::build(status).json(GeneralMenuResponse {
                 status: "error".to_string(),
-                error: Some(e.to_string()),
+                error: Some(message),
             }))
         }
     }
