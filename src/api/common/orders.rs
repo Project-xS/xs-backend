@@ -2,8 +2,8 @@ use crate::auth::extractors::PrincipalExtractor;
 use crate::auth::{AdminPrincipal, Principal};
 use crate::db::OrderOperations;
 use crate::enums::common::{
-    OrderItemContainer, OrderItemsResponse, OrderResponse, OrdersItemsResponse,
-    TimedActiveItemCount, TimedActiveItemCountResponse,
+    OrderItemsResponse, OrderResponse, OrdersItemsResponse, TimedActiveItemCount,
+    TimedActiveItemCountResponse,
 };
 use actix_web::{get, put, web, HttpResponse, Responder};
 use log::{debug, error};
@@ -63,11 +63,18 @@ pub(super) async fn get_order_by_orderid(
     let result = order_ops.get_orders_by_orderid(&search_order_id).await;
     match result {
         Ok(data) => {
-            debug!(
-                "get_order_by_orderid: retrieved {} items for order_id {}",
-                data.items.len(),
-                search_order_id
-            );
+            if let Some(ref order) = data {
+                debug!(
+                    "get_order_by_orderid: retrieved {} items for order_id {}",
+                    order.items.len(),
+                    search_order_id
+                );
+            } else {
+                debug!(
+                    "get_order_by_orderid: no active order found for order_id {}",
+                    search_order_id
+                );
+            }
             Ok(HttpResponse::Ok().json(OrderItemsResponse {
                 status: "ok".to_string(),
                 data,
@@ -77,12 +84,7 @@ pub(super) async fn get_order_by_orderid(
         Err(e) => Ok(
             HttpResponse::InternalServerError().json(OrderItemsResponse {
                 status: "error".to_string(),
-                data: OrderItemContainer {
-                    order_id: search_order_id,
-                    total_price: 0,
-                    deliver_at: String::new(),
-                    items: Vec::new(),
-                },
+                data: None,
                 error: Option::from(e.to_string()),
             }),
         ),
@@ -121,7 +123,7 @@ pub(super) async fn get_orders_by_user(
                 return Ok(HttpResponse::BadRequest().json(OrdersItemsResponse {
                     status: "error".to_string(),
                     error: Some("Cannot provide both user_id and rfid parameters".to_string()),
-                    data: Vec::new(),
+                    data: None,
                 }));
             }
 
@@ -136,7 +138,7 @@ pub(super) async fn get_orders_by_user(
                         );
                         Ok(HttpResponse::Ok().json(OrdersItemsResponse {
                             status: "ok".to_string(),
-                            data,
+                            data: Some(data),
                             error: None,
                         }))
                     }
@@ -148,7 +150,7 @@ pub(super) async fn get_orders_by_user(
                         Ok(
                             HttpResponse::InternalServerError().json(OrdersItemsResponse {
                                 status: "error".to_string(),
-                                data: Vec::new(),
+                                data: None,
                                 error: Some(e.to_string()),
                             }),
                         )
@@ -165,7 +167,7 @@ pub(super) async fn get_orders_by_user(
                         );
                         Ok(HttpResponse::Ok().json(OrdersItemsResponse {
                             status: "ok".to_string(),
-                            data,
+                            data: Some(data),
                             error: None,
                         }))
                     }
@@ -177,7 +179,7 @@ pub(super) async fn get_orders_by_user(
                         Ok(
                             HttpResponse::InternalServerError().json(OrdersItemsResponse {
                                 status: "error".to_string(),
-                                data: Vec::new(),
+                                data: None,
                                 error: Some(e.to_string()),
                             }),
                         )
@@ -187,7 +189,7 @@ pub(super) async fn get_orders_by_user(
                 Ok(HttpResponse::BadRequest().json(OrdersItemsResponse {
                     status: "error".to_string(),
                     error: Some("Either user_id or rfid must be provided".to_string()),
-                    data: Vec::new(),
+                    data: None,
                 }))
             }
         }
@@ -202,7 +204,7 @@ pub(super) async fn get_orders_by_user(
                     );
                     Ok(HttpResponse::Ok().json(OrdersItemsResponse {
                         status: "ok".to_string(),
-                        data,
+                        data: Some(data),
                         error: None,
                     }))
                 }
@@ -214,7 +216,7 @@ pub(super) async fn get_orders_by_user(
                     Ok(
                         HttpResponse::InternalServerError().json(OrdersItemsResponse {
                             status: "error".to_string(),
-                            data: Vec::new(),
+                            data: None,
                             error: Some(e.to_string()),
                         }),
                     )

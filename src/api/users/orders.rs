@@ -1,6 +1,5 @@
 use crate::auth::UserPrincipal;
 use crate::db::UserOperations;
-use crate::enums::common::OrdersItemsResponse;
 use crate::enums::users::PastOrdersItemResponse;
 use actix_web::{get, web, HttpResponse, Responder};
 
@@ -39,7 +38,7 @@ pub(super) async fn get_past_orders_of_user(
                 search_user_id, e
             );
             Ok(
-                HttpResponse::InternalServerError().json(OrdersItemsResponse {
+                HttpResponse::InternalServerError().json(PastOrdersItemResponse {
                     status: "error".to_string(),
                     data: Vec::new(),
                     error: Some(e.to_string()),

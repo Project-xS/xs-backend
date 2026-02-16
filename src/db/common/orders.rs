@@ -283,13 +283,18 @@ impl OrderOperations {
 
     fn group_order_items(items: Vec<OrderItemsWithPic>) -> Vec<OrderItemContainer> {
         debug!("Ungrouped order items: {:?}", &items);
-        let mut grouped: HashMap<i32, (i32, Option<TimeBandEnum>, Vec<ItemContainer>)> =
-            HashMap::new();
+        type GroupedOrder = (i32, Option<TimeBandEnum>, DateTime<Utc>, Vec<ItemContainer>);
+        let mut grouped: HashMap<i32, GroupedOrder> = HashMap::new();
 
         for item in items {
-            let (_, _, new_item) = grouped
-                .entry(item.order_id)
-                .or_insert_with(|| (item.total_price, item.deliver_at, Vec::new()));
+            let (_, _, _, new_item) = grouped.entry(item.order_id).or_insert_with(|| {
+                (
+                    item.total_price,
+                    item.deliver_at,
+                    item.ordered_at,
+                    Vec::new(),
+                )
+            });
 
             new_item.push(ItemContainer {
                 canteen_id: item.canteen_id,
@@ -306,16 +311,18 @@ impl OrderOperations {
 
         grouped
             .into_iter()
-            .map(|(order_id, (total_price, deliver_at, items))| {
+            .map(|(order_id, (total_price, deliver_at, ordered_at, items))| {
                 let order_deliver_time_string = match deliver_at.as_ref() {
                     Some(deliver_at) => deliver_at.human_readable().to_string(),
                     None => "Instant".to_string(),
                 };
+                let order_ordered_at_epoch = ordered_at.timestamp();
                 OrderItemContainer {
                     order_id,
                     items,
                     total_price,
                     deliver_at: order_deliver_time_string,
+                    ordered_at: order_ordered_at_epoch,
                 }
             })
             .collect()
@@ -349,6 +356,7 @@ impl OrderOperations {
                 menu_items::item_id,
                 active_orders::total_price,
                 active_orders::deliver_at,
+                active_orders::ordered_at,
                 menu_items::name,
                 active_order_items::quantity,
                 menu_items::is_veg,
@@ -410,6 +418,7 @@ impl OrderOperations {
                 menu_items::item_id,
                 active_orders::total_price,
                 active_orders::deliver_at,
+                active_orders::ordered_at,
                 menu_items::name,
                 active_order_items::quantity,
                 menu_items::is_veg,
@@ -447,7 +456,7 @@ impl OrderOperations {
     pub async fn get_orders_by_orderid(
         &self,
         search_order_id: &i32,
-    ) -> Result<OrderItemContainer, RepositoryError> {
+    ) -> Result<Option<OrderItemContainer>, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!(
                 "get_orders_by_orderid: failed to acquire DB connection for order_id {}: {}",
@@ -469,6 +478,7 @@ impl OrderOperations {
                 menu_items::item_id,
                 active_orders::total_price,
                 active_orders::deliver_at,
+                active_orders::ordered_at,
                 menu_items::name,
                 active_order_items::quantity,
                 menu_items::is_veg,
@@ -502,12 +512,7 @@ impl OrderOperations {
         let results = join_all(futures).await;
 
         let resp = Self::group_order_items(results);
-        Ok(resp.into_iter().next().unwrap_or(OrderItemContainer {
-            order_id: *search_order_id,
-            total_price: 0,
-            deliver_at: String::new(),
-            items: Vec::new(),
-        }))
+        Ok(resp.into_iter().next())
     }
 
     pub fn order_actions(

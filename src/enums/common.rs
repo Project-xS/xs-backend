@@ -1,4 +1,5 @@
 use crate::models::common::{OrderItems, TimeBandEnum};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use utoipa::ToSchema;
@@ -33,13 +34,14 @@ pub struct ItemContainer {
 }
 
 #[with_pic(OrderItems)]
-#[derive(Serialize, ToSchema, Debug, WithPic)]
+#[derive(Serialize, Debug, WithPic)]
 pub struct OrderItemsWithPic {
     pub order_id: i32,
     pub canteen_id: i32,
     pub item_id: i32,
     pub total_price: i32,
     pub deliver_at: Option<TimeBandEnum>,
+    pub ordered_at: DateTime<Utc>,
     pub name: String,
     pub quantity: i16,
     pub is_veg: bool,
@@ -53,20 +55,21 @@ pub struct OrderItemContainer {
     pub order_id: i32,
     pub total_price: i32,
     pub deliver_at: String,
+    pub ordered_at: i64,
     pub items: Vec<ItemContainer>,
 }
 
 #[derive(Serialize, ToSchema)]
 pub struct OrdersItemsResponse {
     pub status: String,
-    pub data: Vec<OrderItemContainer>,
+    pub data: Option<Vec<OrderItemContainer>>,
     pub error: Option<String>,
 }
 
 #[derive(Serialize, ToSchema)]
 pub struct OrderItemsResponse {
     pub status: String,
-    pub data: OrderItemContainer,
+    pub data: Option<OrderItemContainer>,
     pub error: Option<String>,
 }
 

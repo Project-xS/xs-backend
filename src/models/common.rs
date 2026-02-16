@@ -92,7 +92,7 @@ pub struct NewActiveOrder {
     pub deliver_at: Option<TimeBandEnum>,
 }
 
-#[derive(Queryable, Serialize, ToSchema, Debug)]
+#[derive(Queryable, Serialize, Debug)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct OrderItems {
     pub order_id: i32,
@@ -100,6 +100,7 @@ pub struct OrderItems {
     pub item_id: i32,
     pub total_price: i32,
     pub deliver_at: Option<TimeBandEnum>,
+    pub ordered_at: DateTime<Utc>,
     pub name: String,
     pub quantity: i16,
     pub is_veg: bool,

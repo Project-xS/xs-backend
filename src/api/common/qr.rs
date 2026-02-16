@@ -2,7 +2,7 @@ use crate::auth::extractors::AdminPrincipal;
 use crate::auth::qr_token;
 use crate::auth::UserPrincipal;
 use crate::db::OrderOperations;
-use crate::enums::common::{OrderItemContainer, OrderItemsResponse, ScanQrRequest, ScanQrResponse};
+use crate::enums::common::{OrderItemsResponse, ScanQrRequest, ScanQrResponse};
 use actix_web::{get, post, web, HttpResponse, Responder};
 use image::ImageEncoder;
 use log::{debug, error};
@@ -39,15 +39,17 @@ pub(super) async fn generate_order_qr(
     // Verify the order exists and belongs to this user
     let order_data = order_ops.get_orders_by_orderid(&order_id).await;
     match order_data {
-        Ok(ref data) if data.items.is_empty() => {
+        Ok(Some(ref data)) if data.items.is_empty() => {
             return Ok(HttpResponse::NotFound().json(OrderItemsResponse {
                 status: "error".to_string(),
-                data: OrderItemContainer {
-                    order_id,
-                    total_price: 0,
-                    deliver_at: String::new(),
-                    items: Vec::new(),
-                },
+                data: None,
+                error: Some("Order not found".to_string()),
+            }));
+        }
+        Ok(None) => {
+            return Ok(HttpResponse::NotFound().json(OrderItemsResponse {
+                status: "error".to_string(),
+                data: None,
                 error: Some("Order not found".to_string()),
             }));
         }
@@ -59,17 +61,12 @@ pub(super) async fn generate_order_qr(
             return Ok(
                 HttpResponse::InternalServerError().json(OrderItemsResponse {
                     status: "error".to_string(),
-                    data: OrderItemContainer {
-                        order_id,
-                        total_price: 0,
-                        deliver_at: String::new(),
-                        items: Vec::new(),
-                    },
+                    data: None,
                     error: Some(e.to_string()),
                 }),
             );
         }
-        _ => {}
+        Ok(Some(_)) => {}
     }
 
     // Verify ownership by checking if user has this order
@@ -156,7 +153,7 @@ pub(super) async fn scan_order_qr(
     // Fetch order details
     let order_data = order_ops.get_orders_by_orderid(&order_id).await;
     match order_data {
-        Ok(data) => {
+        Ok(Some(data)) => {
             if data.items.is_empty() {
                 debug!("scan_order_qr: order {} not found or empty", order_id);
                 return Ok(HttpResponse::BadRequest().json(ScanQrResponse {
@@ -174,6 +171,14 @@ pub(super) async fn scan_order_qr(
                 status: "ok".to_string(),
                 data: Some(data),
                 error: None,
+            }))
+        }
+        Ok(None) => {
+            debug!("scan_order_qr: order {} not found", order_id);
+            Ok(HttpResponse::BadRequest().json(ScanQrResponse {
+                status: "error".to_string(),
+                data: None,
+                error: Some("Order not found or already completed".to_string()),
             }))
         }
         Err(e) => {
