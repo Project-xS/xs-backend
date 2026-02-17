@@ -37,7 +37,7 @@ pub(super) async fn generate_order_qr(
     let uid = user.user_id();
 
     // Verify the order exists and belongs to this user
-    let order_data = order_ops.get_orders_by_orderid(&order_id).await;
+    let order_data = order_ops.get_orders_by_orderid_no_pics(&order_id).await;
     match order_data {
         Ok(Some(ref data)) if data.items.is_empty() => {
             return Ok(HttpResponse::NotFound().json(OrderItemsResponse {
@@ -125,6 +125,7 @@ pub(super) async fn generate_order_qr(
     responses(
         (status = 200, description = "Order details from QR scan", body = ScanQrResponse),
         (status = 400, description = "Invalid or expired QR token", body = ScanQrResponse),
+        (status = 403, description = "Valid QR but order is for a different canteen", body = ScanQrResponse),
     ),
     summary = "Scan a QR code to retrieve order details (merchant only)"
 )]
@@ -132,7 +133,7 @@ pub(super) async fn generate_order_qr(
 pub(super) async fn scan_order_qr(
     order_ops: web::Data<OrderOperations>,
     qr_cfg: web::Data<QrConfig>,
-    _admin: AdminPrincipal,
+    admin: AdminPrincipal,
     req_data: web::Json<ScanQrRequest>,
 ) -> actix_web::Result<impl Responder> {
     let token = &req_data.token;
@@ -151,7 +152,7 @@ pub(super) async fn scan_order_qr(
         };
 
     // Fetch order details
-    let order_data = order_ops.get_orders_by_orderid(&order_id).await;
+    let order_data = order_ops.get_orders_by_orderid_no_pics(&order_id).await;
     match order_data {
         Ok(Some(data)) => {
             if data.items.is_empty() {
@@ -160,6 +161,18 @@ pub(super) async fn scan_order_qr(
                     status: "error".to_string(),
                     data: None,
                     error: Some("Order not found or already completed".to_string()),
+                }));
+            }
+            let order_canteen_id = data.items.first().map(|item| item.canteen_id).unwrap_or(0);
+            if order_canteen_id != admin.canteen_id {
+                debug!(
+                    "scan_order_qr: order {} belongs to canteen {}, not admin canteen {}",
+                    order_id, order_canteen_id, admin.canteen_id
+                );
+                return Ok(HttpResponse::Forbidden().json(ScanQrResponse {
+                    status: "error".to_string(),
+                    data: None,
+                    error: Some("QR is valid but does not belong to this shop's order".to_string()),
                 }));
             }
             debug!(

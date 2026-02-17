@@ -466,6 +466,23 @@ impl OrderOperations {
         &self,
         search_order_id: &i32,
     ) -> Result<Option<OrderItemContainer>, RepositoryError> {
+        self.get_orders_by_orderid_internal(search_order_id, true)
+            .await
+    }
+
+    pub async fn get_orders_by_orderid_no_pics(
+        &self,
+        search_order_id: &i32,
+    ) -> Result<Option<OrderItemContainer>, RepositoryError> {
+        self.get_orders_by_orderid_internal(search_order_id, false)
+            .await
+    }
+
+    async fn get_orders_by_orderid_internal(
+        &self,
+        search_order_id: &i32,
+        include_pics: bool,
+    ) -> Result<Option<OrderItemContainer>, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!(
                 "get_orders_by_orderid: failed to acquire DB connection for order_id {}: {}",
@@ -511,15 +528,18 @@ impl OrderOperations {
                 }
             })?;
 
-        let futures = order_items.iter().map(async |item| {
-            let mut item_with_pic: OrderItemsWithPic = item.into();
-            item_with_pic
-                .populate_pic_link_from(&self.asset_ops, item)
-                .await;
-            item_with_pic
-        });
-
-        let results = join_all(futures).await;
+        let results: Vec<OrderItemsWithPic> = if include_pics {
+            let futures = order_items.iter().map(async |item| {
+                let mut item_with_pic: OrderItemsWithPic = item.into();
+                item_with_pic
+                    .populate_pic_link_from(&self.asset_ops, item)
+                    .await;
+                item_with_pic
+            });
+            join_all(futures).await
+        } else {
+            order_items.iter().map(|item| item.into()).collect()
+        };
 
         let resp = Self::group_order_items(results);
         Ok(resp.into_iter().next())
