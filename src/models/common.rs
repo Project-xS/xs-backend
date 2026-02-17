@@ -69,6 +69,7 @@ pub struct ActiveOrderItems {
     pub order_id: i32,
     pub item_id: i32,
     pub quantity: i32,
+    pub price: i32,
 }
 
 #[derive(Queryable, Debug, Identifiable, Serialize, Deserialize)]
@@ -103,6 +104,7 @@ pub struct OrderItems {
     pub ordered_at: DateTime<Utc>,
     pub name: String,
     pub quantity: i16,
+    pub price: i32,
     pub is_veg: bool,
     pub has_pic: bool,
     pub pic_etag: Option<String>,
@@ -140,4 +142,5 @@ pub struct HeldOrderItem {
     pub hold_id: i32,
     pub item_id: i32,
     pub quantity: i16,
+    pub price: i32,
 }

@@ -51,12 +51,12 @@ pub struct User {
     pub rfid: Option<String>,
     pub name: String,
     pub email: String,
+    pub created_at: DateTime<Utc>,
     pub firebase_uid: String,
     pub auth_provider: String,
     pub email_verified: bool,
     pub display_name: Option<String>,
     pub photo_url: Option<String>,
-    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Insertable, Debug, Serialize, Deserialize, ToSchema)]

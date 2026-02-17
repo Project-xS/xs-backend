@@ -109,6 +109,7 @@ impl UserOperations {
                 item_id: item.item_id,
                 name: item.name,
                 quantity: item.quantity,
+                price: None,
                 is_veg: item.is_veg,
                 pic_link: item.pic_link,
                 pic_etag: item.pic_etag,

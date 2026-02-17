@@ -16,6 +16,7 @@ struct HeldOrderItemInsert {
     hold_id: i32,
     item_id: i32,
     quantity: i16,
+    price: i32,
 }
 
 #[derive(Queryable, Debug)]
@@ -34,6 +35,7 @@ struct HeldOrderWithItems {
     deliver_at: Option<TimeBandEnum>,
     item_id: i32,
     quantity: i16,
+    price: i32,
 }
 
 #[derive(Clone)]
@@ -71,6 +73,7 @@ impl HoldOperations {
         }
 
         let mut ordered_qty: HashMap<i32, i64> = HashMap::new();
+        let mut item_prices: HashMap<i32, i32> = HashMap::new();
         for &item in &itemids {
             let qty = ordered_qty.entry(item).or_insert(0);
             *qty += 1;
@@ -113,6 +116,7 @@ impl HoldOperations {
                 canteen_id_in_order = items_in_order.first().unwrap().canteen_id;
 
                 for item in &items_in_order {
+                    item_prices.insert(item.item_id, item.price);
                     if canteen_id_in_order != item.canteen_id {
                         return Err(RepositoryError::ValidationError(format!(
                             "Order contains items from multiple canteens: {:?} for user: {}",
@@ -171,6 +175,9 @@ impl HoldOperations {
                         hold_id: new_hold_id,
                         item_id: *item,
                         quantity: *qty as i16,
+                        price: *item_prices
+                            .get(item)
+                            .expect("hold_order: missing price for item"),
                     });
                 }
 
@@ -252,6 +259,7 @@ impl HoldOperations {
                         held_orders::deliver_at,
                         held_order_items::item_id,
                         held_order_items::quantity,
+                        held_order_items::price,
                     ))
                     .load::<HeldOrderWithItems>(conn)
                     .map_err(|e| {
@@ -325,6 +333,7 @@ impl HoldOperations {
                             order_id.eq(new_order_id),
                             item_id.eq(row.item_id),
                             quantity.eq(row.quantity),
+                            price.eq(row.price),
                         ))
                         .execute(conn)
                         .map_err(RepositoryError::DatabaseError)?;

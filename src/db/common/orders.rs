@@ -21,6 +21,7 @@ struct OrderItem {
     order_id: i32,
     item_id: i32,
     quantity: i16,
+    price: i32,
 }
 
 #[derive(Queryable, Debug)]
@@ -73,6 +74,7 @@ impl OrderOperations {
         }
 
         let mut ordered_qty: HashMap<i32, i64> = HashMap::new();
+        let mut item_prices: HashMap<i32, i32> = HashMap::new();
         let items_in_order: Vec<MenuItemCheck>;
         let canteen_id_in_order: i32;
 
@@ -112,6 +114,7 @@ impl OrderOperations {
             canteen_id_in_order = items_in_order.first().unwrap().canteen_id;
 
             for item in &items_in_order {
+                item_prices.insert(item.item_id, item.price);
                 if canteen_id_in_order != item.canteen_id {
                     return Err(RepositoryError::ValidationError(format!(
                         "Order contains items from multiple canteens: {:?} for user: {}",
@@ -168,6 +171,9 @@ impl OrderOperations {
                         order_id: new_order_id,
                         item_id: *item,
                         quantity: *qty as i16,
+                        price: *item_prices
+                            .get(item)
+                            .expect("create_order: missing price for item"),
                     })
                 }
 
@@ -301,6 +307,7 @@ impl OrderOperations {
                 item_id: item.item_id,
                 name: item.name,
                 quantity: item.quantity,
+                price: Some(item.price),
                 is_veg: item.is_veg,
                 pic_link: item.pic_link,
                 pic_etag: item.pic_etag,
@@ -359,6 +366,7 @@ impl OrderOperations {
                 active_orders::ordered_at,
                 menu_items::name,
                 active_order_items::quantity,
+                active_order_items::price,
                 menu_items::is_veg,
                 menu_items::has_pic,
                 menu_items::pic_etag,
@@ -421,6 +429,7 @@ impl OrderOperations {
                 active_orders::ordered_at,
                 menu_items::name,
                 active_order_items::quantity,
+                active_order_items::price,
                 menu_items::is_veg,
                 menu_items::has_pic,
                 menu_items::pic_etag,
@@ -481,6 +490,7 @@ impl OrderOperations {
                 active_orders::ordered_at,
                 menu_items::name,
                 active_order_items::quantity,
+                active_order_items::price,
                 menu_items::is_veg,
                 menu_items::has_pic,
                 menu_items::pic_etag,

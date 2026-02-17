@@ -27,6 +27,8 @@ pub struct ItemContainer {
     pub item_id: i32,
     pub name: String,
     pub quantity: i16,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub price: Option<i32>,
     pub is_veg: bool,
     pub pic_link: Option<String>,
     pub pic_etag: Option<String>,
@@ -44,6 +46,7 @@ pub struct OrderItemsWithPic {
     pub ordered_at: DateTime<Utc>,
     pub name: String,
     pub quantity: i16,
+    pub price: i32,
     pub is_veg: bool,
     pub pic_link: Option<String>,
     pub pic_etag: Option<String>,

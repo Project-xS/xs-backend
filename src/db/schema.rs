@@ -11,6 +11,7 @@ diesel::table! {
         order_id -> Int4,
         item_id -> Int4,
         quantity -> Int2,
+        price -> Int4,
     }
 }
 
@@ -45,6 +46,7 @@ diesel::table! {
         hold_id -> Int4,
         item_id -> Int4,
         quantity -> Int2,
+        price -> Int4,
     }
 }
 
@@ -83,9 +85,9 @@ diesel::table! {
         order_id -> Int4,
         user_id -> Int4,
         items -> Array<Nullable<Int4>>,
+        price -> Int4,
         order_status -> Bool,
         ordered_at -> Timestamptz,
-        price -> Int4,
     }
 }
 
@@ -95,12 +97,12 @@ diesel::table! {
         rfid -> Nullable<Varchar>,
         name -> Varchar,
         email -> Varchar,
+        created_at -> Timestamptz,
         firebase_uid -> Text,
         auth_provider -> Text,
         email_verified -> Bool,
         display_name -> Nullable<Text>,
         photo_url -> Nullable<Text>,
-        created_at -> Timestamptz,
     }
 }
 
