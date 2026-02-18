@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Test conventions:
 //! - Use testcontainers for Postgres when `DATABASE_URL` is not set.
 //! - Use dummy S3/AWS env vars via `proj_xs::test_utils::init_test_env`.

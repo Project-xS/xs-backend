@@ -106,3 +106,30 @@ async fn get_orders_by_user_admin_and_user() {
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), StatusCode::OK);
 }
+
+#[actix_rt::test]
+async fn get_orders_by_user_admin_rfid_and_missing_params() {
+    let (app, fixtures, db_url) = common::setup_api_app().await;
+    let pool = build_test_pool(&db_url);
+    let order_ops = OrderOperations::new(pool.clone()).await;
+    order_ops
+        .create_order(fixtures.user_id, vec![fixtures.menu_item_ids[0]], None)
+        .expect("create order");
+
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/orders/by_user?as=admin-{}&rfid=rfid-1",
+            fixtures.canteen_id
+        ))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let req = test::TestRequest::get()
+        .uri(&format!("/orders/by_user?as=admin-{}", fixtures.canteen_id))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+}

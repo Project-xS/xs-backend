@@ -403,3 +403,75 @@ fn cleanup_expired_holds_restores_stock_and_deletes() {
     assert_eq!(stock_a, 2);
     assert_eq!(stock_b, 1);
 }
+
+#[test]
+fn release_held_order_keeps_unlimited_stock() {
+    let (pool, fixtures) = common::setup_pool_with_fixtures();
+    let mut conn = DbConnection::new(&pool).expect("db connection");
+
+    let item_id_val = fixtures.menu_item_ids[0];
+    use proj_xs::db::schema::menu_items::dsl as menu_items_dsl;
+    diesel::update(menu_items_dsl::menu_items.filter(menu_items_dsl::item_id.eq(item_id_val)))
+        .set((
+            menu_items_dsl::stock.eq(-1),
+            menu_items_dsl::is_available.eq(true),
+        ))
+        .execute(conn.connection())
+        .expect("set stock");
+
+    let hold_ops = HoldOperations::new(pool.clone(), 300);
+    let (hold_id_val, _) = hold_ops
+        .hold_order(fixtures.user_id, vec![item_id_val], None)
+        .expect("hold order");
+
+    hold_ops
+        .release_held_order(hold_id_val, fixtures.user_id)
+        .expect("release hold");
+
+    let (stock_val, available_val) = menu_item_state(conn.connection(), item_id_val);
+    assert_eq!(stock_val, -1);
+    assert!(available_val);
+}
+
+#[test]
+fn confirm_expired_hold_keeps_unlimited_stock() {
+    let (pool, fixtures) = common::setup_pool_with_fixtures();
+    let mut conn = DbConnection::new(&pool).expect("db connection");
+
+    let item_id_val = fixtures.menu_item_ids[0];
+    use proj_xs::db::schema::menu_items::dsl as menu_items_dsl;
+    diesel::update(menu_items_dsl::menu_items.filter(menu_items_dsl::item_id.eq(item_id_val)))
+        .set((
+            menu_items_dsl::stock.eq(-1),
+            menu_items_dsl::is_available.eq(true),
+        ))
+        .execute(conn.connection())
+        .expect("set stock");
+
+    let hold_ops = HoldOperations::new(pool.clone(), -1);
+    let (hold_id_val, _) = hold_ops
+        .hold_order(fixtures.user_id, vec![item_id_val], None)
+        .expect("hold order");
+
+    let err = hold_ops
+        .confirm_held_order(hold_id_val, fixtures.user_id)
+        .expect_err("expired hold");
+    assert!(matches!(err, RepositoryError::ValidationError(_)));
+
+    let (stock_val, available_val) = menu_item_state(conn.connection(), item_id_val);
+    assert_eq!(stock_val, -1);
+    assert!(available_val);
+}
+
+#[test]
+fn cleanup_expired_holds_returns_zero_when_none_expired() {
+    let (pool, fixtures) = common::setup_pool_with_fixtures();
+    let hold_ops = HoldOperations::new(pool.clone(), 300);
+
+    hold_ops
+        .hold_order(fixtures.user_id, vec![fixtures.menu_item_ids[0]], None)
+        .expect("hold order");
+
+    let cleaned = hold_ops.cleanup_expired_holds().expect("cleanup");
+    assert_eq!(cleaned, 0);
+}

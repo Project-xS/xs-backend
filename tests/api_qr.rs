@@ -121,3 +121,20 @@ async fn scan_qr_requires_content_type() {
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 }
+
+#[actix_rt::test]
+async fn scan_qr_missing_order_returns_bad_request() {
+    let (app, fixtures, _db_url) = common::setup_api_app().await;
+
+    let secret = std::env::var("DELIVER_QR_HASH_SECRET").expect("DELIVER_QR_HASH_SECRET");
+    let token = qr_token::generate_qr_token(9999, fixtures.user_id, &secret);
+
+    let req = test::TestRequest::post()
+        .uri(&format!("/orders/scan?as=admin-{}", fixtures.canteen_id))
+        .insert_header(auth_header())
+        .insert_header((header::CONTENT_TYPE, "application/json"))
+        .set_json(&serde_json::json!({ "token": token }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+}
