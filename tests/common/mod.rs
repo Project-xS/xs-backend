@@ -6,6 +6,11 @@
 use std::env;
 use std::sync::OnceLock;
 
+use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::PgConnection;
+use proj_xs::test_utils::{
+    build_test_pool, init_test_env, reset_db, seed_basic_fixtures, TestFixtures,
+};
 use testcontainers::clients::Cli;
 use testcontainers::images::generic::GenericImage;
 use testcontainers::Container;
@@ -42,4 +47,18 @@ pub fn setup_test_db() -> &'static TestDb {
             _container: Some(container),
         }
     })
+}
+
+pub fn setup_pool() -> Pool<ConnectionManager<PgConnection>> {
+    init_test_env();
+    let db = setup_test_db();
+    let pool = build_test_pool(&db.database_url);
+    reset_db(&pool).expect("reset db");
+    pool
+}
+
+pub fn setup_pool_with_fixtures() -> (Pool<ConnectionManager<PgConnection>>, TestFixtures) {
+    let pool = setup_pool();
+    let fixtures = seed_basic_fixtures(&pool).expect("seed fixtures");
+    (pool, fixtures)
 }
