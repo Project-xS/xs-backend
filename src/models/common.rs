@@ -98,6 +98,7 @@ pub struct NewActiveOrder {
 pub struct OrderItems {
     pub order_id: i32,
     pub canteen_id: i32,
+    pub canteen_name: String,
     pub item_id: i32,
     pub total_price: i32,
     pub deliver_at: Option<TimeBandEnum>,

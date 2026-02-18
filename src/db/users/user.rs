@@ -11,7 +11,16 @@ use futures::future::join_all;
 use log::error;
 use std::collections::{HashMap, HashSet};
 
-type MenuItemInfo = (i32, String, bool, bool, Option<String>, Option<String>);
+type MenuItemInfo = (String, String, bool, bool, Option<String>, Option<String>);
+
+#[derive(Debug)]
+struct GroupedPastOrder {
+    total_price: i32,
+    order_status: bool,
+    ordered_at: DateTime<Utc>,
+    canteen_name: String,
+    items: Vec<ItemContainer>,
+}
 
 pub struct UserOperations {
     pool: Pool<ConnectionManager<PgConnection>>,
@@ -91,22 +100,21 @@ impl UserOperations {
 
     fn group_order_items(items: Vec<PastOrderItemWithPic>) -> Vec<PastOrderItemContainer> {
         debug!("Ungrouped order items: {:?}", &items);
-        let mut grouped: HashMap<i32, (i32, bool, DateTime<Utc>, Vec<ItemContainer>)> =
-            HashMap::new();
+        let mut grouped: HashMap<i32, GroupedPastOrder> = HashMap::new();
 
         for item in items {
-            let (_, _, _, new_item) = grouped.entry(item.order_id).or_insert_with(|| {
-                (
-                    item.total_price,
-                    item.order_status,
-                    item.ordered_at,
-                    Vec::new(),
-                )
-            });
+            let new_item = &mut grouped
+                .entry(item.order_id)
+                .or_insert_with(|| GroupedPastOrder {
+                    total_price: item.total_price,
+                    order_status: item.order_status,
+                    ordered_at: item.ordered_at,
+                    canteen_name: item.canteen_name.clone(),
+                    items: Vec::new(),
+                })
+                .items;
 
             new_item.push(ItemContainer {
-                canteen_id: item.canteen_id,
-                item_id: item.item_id,
                 name: item.name,
                 quantity: item.quantity,
                 price: None,
@@ -120,18 +128,17 @@ impl UserOperations {
 
         grouped
             .into_iter()
-            .map(
-                |(order_id, (total_price, order_status, ordered_at, items))| {
-                    let epoch_date = ordered_at.timestamp();
-                    PastOrderItemContainer {
-                        order_id,
-                        items,
-                        total_price,
-                        order_status,
-                        ordered_at: epoch_date,
-                    }
-                },
-            )
+            .map(|(order_id, grouped_order)| {
+                let epoch_date = grouped_order.ordered_at.timestamp();
+                PastOrderItemContainer {
+                    order_id,
+                    canteen_name: grouped_order.canteen_name,
+                    items: grouped_order.items,
+                    total_price: grouped_order.total_price,
+                    order_status: grouped_order.order_status,
+                    ordered_at: epoch_date,
+                }
+            })
             .collect()
     }
 
@@ -184,9 +191,13 @@ impl UserOperations {
             use crate::db::schema::menu_items::dsl::*;
 
             let order_items = menu_items
+                .inner_join(
+                    crate::db::schema::canteens::table
+                        .on(crate::db::schema::canteens::canteen_id.eq(canteen_id)),
+                )
                 .select((
                     item_id,
-                    canteen_id,
+                    crate::db::schema::canteens::canteen_name,
                     name,
                     is_veg,
                     has_pic,
@@ -194,9 +205,15 @@ impl UserOperations {
                     description,
                 ))
                 .filter(item_id.eq_any(all_items))
-                .load::<(i32, i32, String, bool, bool, Option<String>, Option<String>)>(
-                    conn.connection(),
-                )
+                .load::<(
+                    i32,
+                    String,
+                    String,
+                    bool,
+                    bool,
+                    Option<String>,
+                    Option<String>,
+                )>(conn.connection())
                 .map_err(|e| {
                     error!(
                         "get_past_orders_by_userid: error loading item details for user_id {}: {}",
@@ -213,7 +230,7 @@ impl UserOperations {
             order_items.iter().for_each(|item| {
                 menu_items_in_orders.entry(item.0).or_insert_with(|| {
                     (
-                        item.1,
+                        item.1.clone(),
                         item.2.clone(),
                         item.3,
                         item.4,
@@ -237,7 +254,7 @@ impl UserOperations {
                 }
                 orders_items_with_pic.push(PastOrderItem {
                     order_id: order.order_id,
-                    canteen_id: menu_items_in_orders.get(&item_unwrap).unwrap().0,
+                    canteen_name: menu_items_in_orders.get(&item_unwrap).unwrap().0.clone(),
                     order_status: order.order_status,
                     ordered_at: order.ordered_at,
                     total_price: order.price,

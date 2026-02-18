@@ -41,6 +41,15 @@ struct OrderDeliverItems {
     ordered_at: DateTime<Utc>,
 }
 
+#[derive(Debug)]
+struct GroupedOrder {
+    total_price: i32,
+    deliver_at: Option<TimeBandEnum>,
+    ordered_at: DateTime<Utc>,
+    canteen_name: String,
+    items: Vec<ItemContainer>,
+}
+
 #[derive(Clone)]
 pub struct OrderOperations {
     pool: Pool<ConnectionManager<PgConnection>>,
@@ -289,22 +298,21 @@ impl OrderOperations {
 
     fn group_order_items(items: Vec<OrderItemsWithPic>) -> Vec<OrderItemContainer> {
         debug!("Ungrouped order items: {:?}", &items);
-        type GroupedOrder = (i32, Option<TimeBandEnum>, DateTime<Utc>, Vec<ItemContainer>);
         let mut grouped: HashMap<i32, GroupedOrder> = HashMap::new();
 
         for item in items {
-            let (_, _, _, new_item) = grouped.entry(item.order_id).or_insert_with(|| {
-                (
-                    item.total_price,
-                    item.deliver_at,
-                    item.ordered_at,
-                    Vec::new(),
-                )
-            });
+            let new_item = &mut grouped
+                .entry(item.order_id)
+                .or_insert_with(|| GroupedOrder {
+                    total_price: item.total_price,
+                    deliver_at: item.deliver_at,
+                    ordered_at: item.ordered_at,
+                    canteen_name: item.canteen_name.clone(),
+                    items: Vec::new(),
+                })
+                .items;
 
             new_item.push(ItemContainer {
-                canteen_id: item.canteen_id,
-                item_id: item.item_id,
                 name: item.name,
                 quantity: item.quantity,
                 price: Some(item.price),
@@ -318,16 +326,17 @@ impl OrderOperations {
 
         grouped
             .into_iter()
-            .map(|(order_id, (total_price, deliver_at, ordered_at, items))| {
-                let order_deliver_time_string = match deliver_at.as_ref() {
+            .map(|(order_id, grouped_order)| {
+                let order_deliver_time_string = match grouped_order.deliver_at.as_ref() {
                     Some(deliver_at) => deliver_at.human_readable().to_string(),
                     None => "Instant".to_string(),
                 };
-                let order_ordered_at_epoch = ordered_at.timestamp();
+                let order_ordered_at_epoch = grouped_order.ordered_at.timestamp();
                 OrderItemContainer {
                     order_id,
-                    items,
-                    total_price,
+                    canteen_name: grouped_order.canteen_name,
+                    items: grouped_order.items,
+                    total_price: grouped_order.total_price,
                     deliver_at: order_deliver_time_string,
                     ordered_at: order_ordered_at_epoch,
                 }
@@ -359,7 +368,8 @@ impl OrderOperations {
             .filter(users::rfid.eq(&search_rfid))
             .select((
                 active_orders::order_id,
-                canteens::canteen_id,
+                active_orders::canteen_id,
+                canteens::canteen_name,
                 menu_items::item_id,
                 active_orders::total_price,
                 active_orders::deliver_at,
@@ -422,7 +432,8 @@ impl OrderOperations {
             .filter(active_orders::user_id.eq(search_user_id))
             .select((
                 active_orders::order_id,
-                canteens::canteen_id,
+                active_orders::canteen_id,
+                canteens::canteen_name,
                 menu_items::item_id,
                 active_orders::total_price,
                 active_orders::deliver_at,
@@ -466,23 +477,33 @@ impl OrderOperations {
         &self,
         search_order_id: &i32,
     ) -> Result<Option<OrderItemContainer>, RepositoryError> {
-        self.get_orders_by_orderid_internal(search_order_id, true)
+        self.get_orders_by_orderid_internal_with_canteen_id(search_order_id, true)
             .await
+            .map(|resp| resp.map(|(_, data)| data))
     }
 
     pub async fn get_orders_by_orderid_no_pics(
         &self,
         search_order_id: &i32,
     ) -> Result<Option<OrderItemContainer>, RepositoryError> {
-        self.get_orders_by_orderid_internal(search_order_id, false)
+        self.get_orders_by_orderid_internal_with_canteen_id(search_order_id, false)
+            .await
+            .map(|resp| resp.map(|(_, data)| data))
+    }
+
+    pub async fn get_orders_by_orderid_no_pics_with_canteen_id(
+        &self,
+        search_order_id: &i32,
+    ) -> Result<Option<(i32, OrderItemContainer)>, RepositoryError> {
+        self.get_orders_by_orderid_internal_with_canteen_id(search_order_id, false)
             .await
     }
 
-    async fn get_orders_by_orderid_internal(
+    async fn get_orders_by_orderid_internal_with_canteen_id(
         &self,
         search_order_id: &i32,
         include_pics: bool,
-    ) -> Result<Option<OrderItemContainer>, RepositoryError> {
+    ) -> Result<Option<(i32, OrderItemContainer)>, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!(
                 "get_orders_by_orderid: failed to acquire DB connection for order_id {}: {}",
@@ -500,7 +521,8 @@ impl OrderOperations {
             .filter(active_order_items::order_id.eq(search_order_id))
             .select((
                 active_order_items::order_id,
-                canteens::canteen_id,
+                active_orders::canteen_id,
+                canteens::canteen_name,
                 menu_items::item_id,
                 active_orders::total_price,
                 active_orders::deliver_at,
@@ -528,6 +550,12 @@ impl OrderOperations {
                 }
             })?;
 
+        if order_items.is_empty() {
+            return Ok(None);
+        }
+
+        let canteen_id_in_order = order_items.first().map(|item| item.canteen_id).unwrap_or(0);
+
         let results: Vec<OrderItemsWithPic> = if include_pics {
             let futures = order_items.iter().map(async |item| {
                 let mut item_with_pic: OrderItemsWithPic = item.into();
@@ -542,7 +570,10 @@ impl OrderOperations {
         };
 
         let resp = Self::group_order_items(results);
-        Ok(resp.into_iter().next())
+        Ok(resp
+            .into_iter()
+            .next()
+            .map(|data| (canteen_id_in_order, data)))
     }
 
     pub fn order_actions(

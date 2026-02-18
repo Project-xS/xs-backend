@@ -19,7 +19,7 @@ pub struct PastOrder {
 #[derive(Serialize, Debug)]
 pub struct PastOrderItem {
     pub order_id: i32,
-    pub canteen_id: i32,
+    pub canteen_name: String,
     pub order_status: bool,
     pub ordered_at: DateTime<Utc>,
     pub total_price: i32,

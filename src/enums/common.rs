@@ -23,8 +23,6 @@ pub struct TimedActiveItemCountResponse {
 
 #[derive(Serialize, ToSchema, Debug)]
 pub struct ItemContainer {
-    pub canteen_id: i32,
-    pub item_id: i32,
     pub name: String,
     pub quantity: i16,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -39,7 +37,7 @@ pub struct ItemContainer {
 #[derive(Serialize, Debug, WithPic)]
 pub struct OrderItemsWithPic {
     pub order_id: i32,
-    pub canteen_id: i32,
+    pub canteen_name: String,
     pub item_id: i32,
     pub total_price: i32,
     pub deliver_at: Option<TimeBandEnum>,
@@ -56,6 +54,7 @@ pub struct OrderItemsWithPic {
 #[derive(Serialize, ToSchema, Debug)]
 pub struct OrderItemContainer {
     pub order_id: i32,
+    pub canteen_name: String,
     pub total_price: i32,
     pub deliver_at: String,
     pub ordered_at: i64,

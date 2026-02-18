@@ -151,19 +151,11 @@ pub(super) async fn scan_order_qr(
             }
         };
 
-    // Fetch order details
-    let order_data = order_ops.get_orders_by_orderid_no_pics(&order_id).await;
+    let order_data = order_ops
+        .get_orders_by_orderid_no_pics_with_canteen_id(&order_id)
+        .await;
     match order_data {
-        Ok(Some(data)) => {
-            if data.items.is_empty() {
-                debug!("scan_order_qr: order {} not found or empty", order_id);
-                return Ok(HttpResponse::BadRequest().json(ScanQrResponse {
-                    status: "error".to_string(),
-                    data: None,
-                    error: Some("Order not found or already completed".to_string()),
-                }));
-            }
-            let order_canteen_id = data.items.first().map(|item| item.canteen_id).unwrap_or(0);
+        Ok(Some((order_canteen_id, data))) => {
             if order_canteen_id != admin.canteen_id {
                 debug!(
                     "scan_order_qr: order {} belongs to canteen {}, not admin canteen {}",
@@ -173,6 +165,14 @@ pub(super) async fn scan_order_qr(
                     status: "error".to_string(),
                     data: None,
                     error: Some("QR is valid but does not belong to this shop's order".to_string()),
+                }));
+            }
+            if data.items.is_empty() {
+                debug!("scan_order_qr: order {} not found or empty", order_id);
+                return Ok(HttpResponse::BadRequest().json(ScanQrResponse {
+                    status: "error".to_string(),
+                    data: None,
+                    error: Some("Order not found or already completed".to_string()),
                 }));
             }
             debug!(

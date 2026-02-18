@@ -9,7 +9,7 @@ use with_pic_macro::{with_pic, WithPic};
 #[derive(Serialize, Debug, WithPic)]
 pub struct PastOrderItemWithPic {
     pub order_id: i32,
-    pub canteen_id: i32,
+    pub canteen_name: String,
     pub order_status: bool,
     pub ordered_at: DateTime<Utc>,
     pub total_price: i32,
@@ -25,6 +25,7 @@ pub struct PastOrderItemWithPic {
 #[derive(Serialize, ToSchema, Debug)]
 pub struct PastOrderItemContainer {
     pub order_id: i32,
+    pub canteen_name: String,
     pub total_price: i32,
     pub order_status: bool,
     pub ordered_at: i64,
