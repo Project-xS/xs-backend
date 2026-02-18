@@ -6,7 +6,9 @@
 use std::env;
 use std::sync::OnceLock;
 
-use actix_web::dev::{Service, ServiceRequest, ServiceResponse};
+use actix_http::Request;
+use actix_web::body::BoxBody;
+use actix_web::dev::{Service, ServiceResponse};
 use actix_web::{test, web, App, Error};
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::PgConnection;
@@ -16,8 +18,9 @@ use proj_xs::test_utils::{
 };
 use proj_xs::{api, AppState};
 use testcontainers::clients::Cli;
-use testcontainers::images::generic::GenericImage;
 use testcontainers::Container;
+use testcontainers::GenericImage;
+use utoipa_actix_web::AppExt;
 
 pub struct TestDb {
     pub database_url: String,
@@ -68,7 +71,7 @@ pub fn setup_pool_with_fixtures() -> (Pool<ConnectionManager<PgConnection>>, Tes
 }
 
 pub async fn setup_api_app() -> (
-    impl Service<ServiceRequest, Response = ServiceResponse, Error = Error>,
+    impl Service<Request, Response = ServiceResponse<BoxBody>, Error = Error>,
     TestFixtures,
     String,
 ) {
@@ -96,10 +99,11 @@ pub async fn setup_api_app() -> (
         max_age_secs: qr_max_age,
     };
 
-    let app = test::init_service(
-        App::new()
-            .configure(|cfg| api::configure(cfg, &state, qr_cfg))
-            .wrap(AuthLayer::new(
+    let app = App::new()
+        .into_utoipa_app()
+        .configure(|cfg| api::configure(cfg, &state, qr_cfg))
+        .map(|app| {
+            app.wrap(AuthLayer::new(
                 fb_cfg.clone(),
                 admin_cfg.clone(),
                 jwks_cache.clone(),
@@ -109,9 +113,11 @@ pub async fn setup_api_app() -> (
             .app_data(web::Data::new(jwks_cache))
             .app_data(web::Data::new(state.user_ops.clone()))
             .app_data(web::Data::new(admin_cfg))
-            .app_data(web::JsonConfig::default().error_handler(api::default_error_handler)),
-    )
-    .await;
+            .app_data(web::JsonConfig::default().error_handler(api::default_error_handler))
+        })
+        .into_app();
+
+    let app = test::init_service(app).await;
 
     (app, fixtures, db.database_url.clone())
 }

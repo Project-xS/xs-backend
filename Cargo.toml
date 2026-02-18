@@ -40,6 +40,7 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 [dev-dependencies]
 testcontainers = "0.15.0"
 actix-rt = "2.10.0"
+actix-http = "3.10.0"
 
 [workspace]
 members = [".", "with_pic_macro"]

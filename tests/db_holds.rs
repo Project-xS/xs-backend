@@ -51,13 +51,19 @@ fn hold_order_success_decrements_stock_and_creates_rows() {
     let veg_item = fixtures.menu_item_ids[0];
     let non_veg_item = fixtures.menu_item_ids[1];
 
-    use proj_xs::db::schema::menu_items::dsl::*;
-    diesel::update(menu_items.filter(item_id.eq(veg_item)))
-        .set((stock.eq(2), is_available.eq(true)))
+    use proj_xs::db::schema::menu_items::dsl as menu_items_dsl;
+    diesel::update(menu_items_dsl::menu_items.filter(menu_items_dsl::item_id.eq(veg_item)))
+        .set((
+            menu_items_dsl::stock.eq(2),
+            menu_items_dsl::is_available.eq(true),
+        ))
         .execute(conn.connection())
         .expect("set veg stock");
-    diesel::update(menu_items.filter(item_id.eq(non_veg_item)))
-        .set((stock.eq(5), is_available.eq(true)))
+    diesel::update(menu_items_dsl::menu_items.filter(menu_items_dsl::item_id.eq(non_veg_item)))
+        .set((
+            menu_items_dsl::stock.eq(5),
+            menu_items_dsl::is_available.eq(true),
+        ))
         .execute(conn.connection())
         .expect("set non-veg stock");
 
@@ -70,19 +76,23 @@ fn hold_order_success_decrements_stock_and_creates_rows() {
         )
         .expect("hold order");
 
-    use proj_xs::db::schema::held_orders::dsl::*;
-    let (total_price_val, deliver_at_val) = held_orders
-        .filter(hold_id.eq(hold_id_val))
-        .select((total_price, deliver_at))
+    use proj_xs::db::schema::held_orders::dsl as held_orders_dsl;
+    let (total_price_val, deliver_at_val) = held_orders_dsl::held_orders
+        .filter(held_orders_dsl::hold_id.eq(hold_id_val))
+        .select((held_orders_dsl::total_price, held_orders_dsl::deliver_at))
         .first::<(i32, Option<TimeBandEnum>)>(conn.connection())
         .expect("held order");
     assert_eq!(total_price_val, 2 * 120 + 180);
     assert_eq!(deliver_at_val, Some(TimeBandEnum::ElevenAM));
 
-    use proj_xs::db::schema::held_order_items::dsl::*;
-    let items = held_order_items
-        .filter(hold_id.eq(hold_id_val))
-        .select((item_id, quantity, price))
+    use proj_xs::db::schema::held_order_items::dsl as held_order_items_dsl;
+    let items = held_order_items_dsl::held_order_items
+        .filter(held_order_items_dsl::hold_id.eq(hold_id_val))
+        .select((
+            held_order_items_dsl::item_id,
+            held_order_items_dsl::quantity,
+            held_order_items_dsl::price,
+        ))
         .load::<(i32, i16, i32)>(conn.connection())
         .expect("held order items");
     assert_eq!(items.len(), 2);
@@ -267,9 +277,9 @@ fn confirm_held_order_moves_to_active_orders() {
     assert_eq!(active_orders_count(conn.connection()), 1);
     assert_eq!(active_order_items_count(conn.connection()), 1);
 
-    use proj_xs::db::schema::active_orders::dsl::*;
-    let stored_order_id = active_orders
-        .select(order_id)
+    use proj_xs::db::schema::active_orders::dsl as active_orders_dsl;
+    let stored_order_id = active_orders_dsl::active_orders
+        .select(active_orders_dsl::order_id)
         .first::<i32>(conn.connection())
         .expect("active order id");
     assert_eq!(stored_order_id, order_id_val);

@@ -2526,6 +2526,7 @@ dependencies = [
 name = "proj-xs"
 version = "0.1.0"
 dependencies = [
+ "actix-http",
  "actix-rt",
  "actix-web",
  "aws-config",

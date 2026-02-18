@@ -44,13 +44,19 @@ async fn create_order_success_decrements_stock_and_creates_rows() {
     let veg_item = fixtures.menu_item_ids[0];
     let non_veg_item = fixtures.menu_item_ids[1];
 
-    use proj_xs::db::schema::menu_items::dsl::*;
-    diesel::update(menu_items.filter(item_id.eq(veg_item)))
-        .set((stock.eq(2), is_available.eq(true)))
+    use proj_xs::db::schema::menu_items::dsl as menu_items_dsl;
+    diesel::update(menu_items_dsl::menu_items.filter(menu_items_dsl::item_id.eq(veg_item)))
+        .set((
+            menu_items_dsl::stock.eq(2),
+            menu_items_dsl::is_available.eq(true),
+        ))
         .execute(conn.connection())
         .expect("set veg stock");
-    diesel::update(menu_items.filter(item_id.eq(non_veg_item)))
-        .set((stock.eq(5), is_available.eq(true)))
+    diesel::update(menu_items_dsl::menu_items.filter(menu_items_dsl::item_id.eq(non_veg_item)))
+        .set((
+            menu_items_dsl::stock.eq(5),
+            menu_items_dsl::is_available.eq(true),
+        ))
         .execute(conn.connection())
         .expect("set non-veg stock");
 
@@ -63,18 +69,26 @@ async fn create_order_success_decrements_stock_and_creates_rows() {
         )
         .expect("create order");
 
-    use proj_xs::db::schema::active_orders::dsl::*;
-    let (order_id_val, total_price_val, deliver_at_val) = active_orders
-        .select((order_id, total_price, deliver_at))
+    use proj_xs::db::schema::active_orders::dsl as active_orders_dsl;
+    let (order_id_val, total_price_val, deliver_at_val) = active_orders_dsl::active_orders
+        .select((
+            active_orders_dsl::order_id,
+            active_orders_dsl::total_price,
+            active_orders_dsl::deliver_at,
+        ))
         .first::<(i32, i32, Option<TimeBandEnum>)>(conn.connection())
         .expect("active order");
     assert_eq!(total_price_val, 2 * 120 + 180);
     assert_eq!(deliver_at_val, Some(TimeBandEnum::ElevenAM));
 
-    use proj_xs::db::schema::active_order_items::dsl::*;
-    let items = active_order_items
-        .filter(order_id.eq(order_id_val))
-        .select((item_id, quantity, price))
+    use proj_xs::db::schema::active_order_items::dsl as active_order_items_dsl;
+    let items = active_order_items_dsl::active_order_items
+        .filter(active_order_items_dsl::order_id.eq(order_id_val))
+        .select((
+            active_order_items_dsl::item_id,
+            active_order_items_dsl::quantity,
+            active_order_items_dsl::price,
+        ))
         .load::<(i32, i16, i32)>(conn.connection())
         .expect("order items");
 
@@ -357,9 +371,9 @@ async fn order_actions_moves_to_past_orders() {
         .expect("create order");
 
     let mut conn = DbConnection::new(&pool).expect("db connection");
-    use proj_xs::db::schema::active_orders::dsl::*;
-    let order_id_val = active_orders
-        .select(order_id)
+    use proj_xs::db::schema::active_orders::dsl as active_orders_dsl;
+    let order_id_val = active_orders_dsl::active_orders
+        .select(active_orders_dsl::order_id)
         .first::<i32>(conn.connection())
         .expect("order id");
 
@@ -371,10 +385,10 @@ async fn order_actions_moves_to_past_orders() {
     assert_eq!(active_order_items_count(conn.connection()), 0);
     assert_eq!(past_orders_count(conn.connection()), 1);
 
-    use proj_xs::db::schema::past_orders::dsl::*;
-    let order_status_val = past_orders
-        .filter(order_id.eq(order_id_val))
-        .select(order_status)
+    use proj_xs::db::schema::past_orders::dsl as past_orders_dsl;
+    let order_status_val = past_orders_dsl::past_orders
+        .filter(past_orders_dsl::order_id.eq(order_id_val))
+        .select(past_orders_dsl::order_status)
         .first::<bool>(conn.connection())
         .expect("past order status");
     assert!(order_status_val);
