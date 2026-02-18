@@ -160,6 +160,50 @@ impl UpdateMenuItem {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sanitize_name_trims_and_validates_length() {
+        assert_eq!(sanitize_name("  Burger ").unwrap(), "Burger");
+        assert!(sanitize_name("   ").is_err());
+
+        let long_name = "a".repeat(MENU_ITEM_NAME_MAX_LEN + 1);
+        assert!(sanitize_name(&long_name).is_err());
+    }
+
+    #[test]
+    fn sanitize_description_trims_and_handles_empty() {
+        assert_eq!(sanitize_description(&None).unwrap(), None);
+        assert_eq!(
+            sanitize_description(&Some("  tasty  ".to_string())).unwrap(),
+            Some("tasty".to_string())
+        );
+        assert_eq!(
+            sanitize_description(&Some("   ".to_string())).unwrap(),
+            None
+        );
+
+        let long_desc = "a".repeat(MENU_ITEM_DESC_MAX_LEN + 1);
+        assert!(sanitize_description(&Some(long_desc)).is_err());
+    }
+
+    #[test]
+    fn validate_price_rejects_non_positive() {
+        assert!(validate_price(1).is_ok());
+        assert!(validate_price(0).is_err());
+        assert!(validate_price(-5).is_err());
+    }
+
+    #[test]
+    fn validate_stock_rejects_below_negative_one() {
+        assert!(validate_stock(0).is_ok());
+        assert!(validate_stock(-1).is_ok());
+        assert!(validate_stock(-2).is_err());
+    }
+}
+
 #[derive(Debug, Selectable, Queryable, Serialize, ToSchema)]
 #[diesel(table_name = crate::db::schema::canteens)]
 pub struct CanteenLoginSuccess {
