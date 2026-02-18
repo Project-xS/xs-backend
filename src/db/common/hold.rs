@@ -240,7 +240,12 @@ impl HoldOperations {
             e
         })?;
 
-        conn.connection().transaction(|conn| {
+        enum ConfirmOutcome {
+            Confirmed(i32),
+            Expired,
+        }
+
+        let outcome = conn.connection().transaction(|conn| {
             // Fetch held order with items
             let held_data: Vec<HeldOrderWithItems>;
             {
@@ -297,14 +302,12 @@ impl HoldOperations {
                     .map_err(RepositoryError::DatabaseError)?;
 
                 if Utc::now() > hold_expires {
-                    // Hold has expired — clean it up and return error
+                    // Hold has expired — clean it up but allow commit.
                     Self::restore_stock_for_hold(conn, search_hold_id)?;
                     diesel::delete(held_orders.filter(hold_id.eq(search_hold_id)))
                         .execute(conn)
                         .map_err(RepositoryError::DatabaseError)?;
-                    return Err(RepositoryError::ValidationError(
-                        "Hold has expired. Items have been released.".to_string(),
-                    ));
+                    return Ok(ConfirmOutcome::Expired);
                 }
             }
 
@@ -353,8 +356,15 @@ impl HoldOperations {
                 search_hold_id, new_order_id, requesting_user_id
             );
 
-            Ok(new_order_id)
-        })
+            Ok(ConfirmOutcome::Confirmed(new_order_id))
+        });
+
+        match outcome? {
+            ConfirmOutcome::Confirmed(order_id) => Ok(order_id),
+            ConfirmOutcome::Expired => Err(RepositoryError::ValidationError(
+                "Hold has expired. Items have been released.".to_string(),
+            )),
+        }
     }
 
     /// Release a held order: restore stock, delete from held tables.

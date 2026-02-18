@@ -81,7 +81,7 @@ async fn scan_qr_success_invalid_and_canteen_mismatch() {
     let token = qr_token::generate_qr_token(order_id_val, fixtures.user_id, &secret);
 
     let req = test::TestRequest::post()
-        .uri(&format!("/orders/qr/scan?as=admin-{}", fixtures.canteen_id))
+        .uri(&format!("/orders/scan?as=admin-{}", fixtures.canteen_id))
         .insert_header(auth_header())
         .insert_header((header::CONTENT_TYPE, "application/json"))
         .set_json(&serde_json::json!({ "token": token }))
@@ -92,7 +92,7 @@ async fn scan_qr_success_invalid_and_canteen_mismatch() {
     assert_eq!(body["status"], "ok");
 
     let req = test::TestRequest::post()
-        .uri(&format!("/orders/qr/scan?as=admin-{}", fixtures.canteen_id))
+        .uri(&format!("/orders/scan?as=admin-{}", fixtures.canteen_id))
         .insert_header(auth_header())
         .insert_header((header::CONTENT_TYPE, "application/json"))
         .set_json(&serde_json::json!({ "token": "bad-token" }))
@@ -101,7 +101,7 @@ async fn scan_qr_success_invalid_and_canteen_mismatch() {
     assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
 
     let req = test::TestRequest::post()
-        .uri("/orders/qr/scan?as=admin-999")
+        .uri("/orders/scan?as=admin-999")
         .insert_header(auth_header())
         .insert_header((header::CONTENT_TYPE, "application/json"))
         .set_json(&serde_json::json!({ "token": token }))
@@ -114,7 +114,7 @@ async fn scan_qr_success_invalid_and_canteen_mismatch() {
 async fn scan_qr_requires_content_type() {
     let (app, _fixtures, _db_url) = common::setup_api_app().await;
     let req = test::TestRequest::post()
-        .uri("/orders/qr/scan?as=admin-1")
+        .uri("/orders/scan?as=admin-1")
         .insert_header(auth_header())
         .set_payload(r#"{"token":"x"}"#)
         .to_request();
