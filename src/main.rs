@@ -2,67 +2,15 @@
 extern crate log;
 extern crate pretty_env_logger;
 
-mod api;
-mod auth;
-mod db;
-mod enums;
-mod models;
-mod traits;
-
-use crate::api::default_error_handler;
-use crate::db::{
-    establish_connection_pool, run_db_migrations, AssetOperations, CanteenOperations,
-    HoldOperations, MenuOperations, OrderOperations, SearchOperations, UserOperations,
-};
 use actix_web::{middleware, web, App, HttpServer};
-use auth::{AdminJwtConfig, AuthLayer, FirebaseAuthConfig, JwksCache};
 use dotenvy::dotenv;
+use proj_xs::api::default_error_handler;
+use proj_xs::auth::{AdminJwtConfig, AuthLayer, FirebaseAuthConfig, JwksCache};
+use proj_xs::{api, AppState};
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
 use utoipa_actix_web::AppExt;
 use utoipa_swagger_ui::{BasicAuth, Config, SwaggerUi};
-
-#[derive(Clone)]
-pub(crate) struct AppState {
-    user_ops: UserOperations,
-    menu_ops: MenuOperations,
-    canteen_ops: CanteenOperations,
-    order_ops: OrderOperations,
-    hold_ops: HoldOperations,
-    search_ops: SearchOperations,
-    asset_ops: AssetOperations,
-}
-
-impl AppState {
-    pub(crate) async fn new(url: &str) -> Self {
-        let db = establish_connection_pool(url);
-        run_db_migrations(db.clone()).expect("Unable to run migrations");
-
-        let hold_ttl_secs: i64 = std::env::var("ORDER_HOLD_TTL_SECS")
-            .ok()
-            .and_then(|v| v.parse::<i64>().ok())
-            .unwrap_or(300); // 5 minutes default
-
-        let user_ops = UserOperations::new(db.clone()).await;
-        let menu_ops = MenuOperations::new(db.clone()).await;
-        let canteen_ops = CanteenOperations::new(db.clone()).await;
-        let order_ops = OrderOperations::new(db.clone()).await;
-        let hold_ops = HoldOperations::new(db.clone(), hold_ttl_secs);
-        let search_ops = SearchOperations::new(db.clone()).await;
-        let asset_ops = AssetOperations::new()
-            .await
-            .expect("Unable to create asset_upload operations");
-        AppState {
-            user_ops,
-            menu_ops,
-            canteen_ops,
-            order_ops,
-            hold_ops,
-            search_ops,
-            asset_ops,
-        }
-    }
-}
 
 struct SecurityAddon;
 

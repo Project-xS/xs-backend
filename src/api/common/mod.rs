@@ -12,7 +12,7 @@ use utoipa_actix_web::service_config::ServiceConfig;
 
 mod hold;
 mod orders;
-pub(crate) mod qr;
+pub mod qr;
 mod search;
 
 pub(super) fn config(

@@ -1,13 +1,13 @@
-mod admin;
-pub(crate) mod common;
-mod errors;
-mod users;
+pub mod admin;
+pub mod common;
+pub mod errors;
+pub mod users;
 
 use crate::AppState;
 use actix_web::guard::{Guard, GuardContext};
 use actix_web::{get, HttpResponse, Responder};
 use common::qr::QrConfig;
-pub(crate) use errors::default_error_handler;
+pub use errors::default_error_handler;
 use utoipa_actix_web::service_config::ServiceConfig;
 
 #[utoipa::path(
@@ -55,7 +55,7 @@ impl Guard for ContentTypeHeader {
     }
 }
 
-pub(crate) fn configure(cfg: &mut ServiceConfig, state: &AppState, qr_cfg: QrConfig) {
+pub fn configure(cfg: &mut ServiceConfig, state: &AppState, qr_cfg: QrConfig) {
     cfg.service(root_endpoint)
         .service(health_endpoint)
         .configure(|cfg| admin::config(cfg, &state.menu_ops, &state.canteen_ops, &state.asset_ops))
