@@ -97,10 +97,10 @@ where
 
         let token = token_opt.unwrap();
 
-        // Dev-only bypass: compile-time gated to debug builds only.
+        // Dev-only bypass: compile-time gated to debug builds or the test-bypass feature.
         // Set DEV_BYPASS_TOKEN in .env and send it as Bearer token.
         // Format: "dev-user-{user_id}" or "dev-admin-{canteen_id}"
-        if cfg!(debug_assertions) {
+        if cfg!(debug_assertions) || cfg!(feature = "test-bypass") {
             if let Ok(bypass) = std::env::var("DEV_BYPASS_TOKEN") {
                 if !bypass.is_empty() && token == bypass {
                     // Parse the bypass token to determine principal type.
