@@ -1,5 +1,6 @@
 mod common;
 
+use actix_web::http::header;
 use actix_web::http::StatusCode;
 use actix_web::test;
 use common::auth_header;
@@ -215,4 +216,170 @@ async fn get_orders_by_user_admin_rfid_and_missing_params() {
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+}
+
+#[actix_rt::test]
+async fn get_order_by_id_not_found() {
+    let (app, fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::get()
+        .uri(&format!("/orders/99999?as=admin-{}", fixtures.canteen_id))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: Value = test::read_body_json(resp).await;
+    assert_eq!(body["status"], "ok");
+    assert!(
+        body["data"].is_null(),
+        "non-existent order should return null data"
+    );
+}
+
+#[actix_rt::test]
+async fn order_actions_nonexistent_order() {
+    let (app, fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::put()
+        .uri(&format!(
+            "/orders/99999/delivered?as=admin-{}",
+            fixtures.canteen_id
+        ))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::CONFLICT);
+}
+
+#[actix_rt::test]
+async fn get_orders_by_user_admin_both_params() {
+    let (app, fixtures, _db_url) = common::setup_api_app().await;
+
+    // Providing both user_id and rfid should return BAD_REQUEST
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/orders/by_user?as=admin-{}&user_id={}&rfid=rfid-1",
+            fixtures.canteen_id, fixtures.user_id
+        ))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+}
+
+#[actix_rt::test]
+async fn past_orders_after_cancellation() {
+    let (app, fixtures, db_url) = common::setup_api_app().await;
+    let pool = build_test_pool(&db_url);
+    let order_ops = OrderOperations::new(pool.clone()).await;
+
+    // Create an active order
+    order_ops
+        .create_order(fixtures.user_id, vec![fixtures.menu_item_ids[0]], None)
+        .expect("create order");
+
+    let mut conn = DbConnection::new(&pool).expect("db connection");
+    use proj_xs::db::schema::active_orders::dsl::*;
+    let order_id_val = active_orders
+        .select(order_id)
+        .first::<i32>(conn.connection())
+        .expect("order id");
+
+    // Cancel the order via API
+    let req = test::TestRequest::put()
+        .uri(&format!(
+            "/orders/{}/cancelled?as=admin-{}",
+            order_id_val, fixtures.canteen_id
+        ))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Check past orders
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/users/get_past_orders?as=user-{}",
+            fixtures.user_id
+        ))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: Value = test::read_body_json(resp).await;
+    let data = body["data"].as_array().expect("data array");
+    assert_eq!(data.len(), 1, "should have one past order");
+    assert!(
+        !data[0]["order_status"].as_bool().unwrap_or(true),
+        "cancelled order should have order_status: false"
+    );
+}
+
+#[actix_rt::test]
+async fn full_lifecycle_hold_confirm_deliver_past_orders() {
+    let (app, fixtures, db_url) = common::setup_api_app().await;
+    let pool = build_test_pool(&db_url);
+
+    // Step 1: Create hold via API
+    let req = test::TestRequest::post()
+        .uri(&format!("/orders/hold?as=user-{}", fixtures.user_id))
+        .insert_header(auth_header())
+        .insert_header((header::CONTENT_TYPE, "application/json"))
+        .set_json(&serde_json::json!({
+            "deliver_at": null,
+            "item_ids": [fixtures.menu_item_ids[0]]
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: Value = test::read_body_json(resp).await;
+    let hold_id = body["hold_id"].as_i64().expect("hold id");
+
+    // Step 2: Confirm hold
+    let req = test::TestRequest::post()
+        .uri(&format!(
+            "/orders/hold/{}/confirm?as=user-{}",
+            hold_id, fixtures.user_id
+        ))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Step 3: Get active order id
+    let mut conn = DbConnection::new(&pool).expect("db connection");
+    use proj_xs::db::schema::active_orders::dsl::*;
+    let order_id_val = active_orders
+        .select(order_id)
+        .first::<i32>(conn.connection())
+        .expect("order id");
+
+    // Step 4: Deliver via API
+    let req = test::TestRequest::put()
+        .uri(&format!(
+            "/orders/{}/delivered?as=admin-{}",
+            order_id_val, fixtures.canteen_id
+        ))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Step 5: Verify in past orders
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/users/get_past_orders?as=user-{}",
+            fixtures.user_id
+        ))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: Value = test::read_body_json(resp).await;
+    let data = body["data"].as_array().expect("data array");
+    assert_eq!(data.len(), 1, "should have one past order");
+    assert!(
+        data[0]["order_status"].as_bool().unwrap_or(false),
+        "delivered order should have order_status: true"
+    );
 }

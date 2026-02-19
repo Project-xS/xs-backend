@@ -200,3 +200,51 @@ async fn upload_and_set_canteen_pic_paths() {
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), StatusCode::CONFLICT);
 }
+
+#[actix_rt::test]
+async fn get_canteen_items_nonexistent_canteen() {
+    let (app, fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/canteen/99999/items?as=user-{}",
+            fixtures.user_id
+        ))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: Value = test::read_body_json(resp).await;
+    assert_eq!(body["status"], "ok");
+    let data = body["data"].as_array().expect("data array");
+    assert!(
+        data.is_empty(),
+        "non-existent canteen should return empty items"
+    );
+}
+
+#[actix_rt::test]
+async fn canteen_login_requires_content_type() {
+    let (app, _fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::post()
+        .uri("/canteen/login")
+        .insert_header(auth_header())
+        .set_payload(r#"{"username":"test","password":"test"}"#)
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+#[actix_rt::test]
+async fn create_canteen_requires_content_type() {
+    let (app, fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::post()
+        .uri(&format!("/canteen/create?as=admin-{}", fixtures.canteen_id))
+        .insert_header(auth_header())
+        .set_payload(r#"{"canteen_name":"X","location":"Y","has_pic":false}"#)
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
