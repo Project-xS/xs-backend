@@ -1,7 +1,7 @@
 mod common;
 
 use diesel::prelude::*;
-use proj_xs::db::{DbConnection, RepositoryError};
+use proj_xs::db::{CanteenOperations, DbConnection, RepositoryError};
 use proj_xs::test_utils::{insert_canteen, seed_menu_item};
 
 #[test]
@@ -118,4 +118,74 @@ fn create_canteen_and_add_item() {
 
     // Foreign key check: deleting the pool doesn't affect just the items query
     let _: Result<(), RepositoryError> = Ok(());
+}
+
+#[test]
+fn login_canteen_db_success() {
+    let (pool, fixtures) = common::setup_pool_with_fixtures();
+    let mut conn = DbConnection::new(&pool).expect("db connection");
+
+    // The trigger sets username = lower(replace(name,' ','_')) and
+    // password = username || '@' || lpad(id, 2, '0')
+    let (username_val, padded_id): (String, String) = proj_xs::db::schema::canteens::dsl::canteens
+        .filter(proj_xs::db::schema::canteens::dsl::canteen_id.eq(fixtures.canteen_id))
+        .select((
+            proj_xs::db::schema::canteens::dsl::username,
+            diesel::dsl::sql::<diesel::sql_types::Text>(&format!(
+                "LPAD({}::text, 2, '0')",
+                fixtures.canteen_id
+            )),
+        ))
+        .get_result(conn.connection())
+        .expect("fetch username");
+
+    let password_val = format!("{}@{}", username_val, padded_id);
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let canteen_ops = rt.block_on(CanteenOperations::new(pool.clone()));
+
+    let result = canteen_ops
+        .login_canteen(&username_val, &password_val)
+        .expect("login call");
+    assert!(
+        result.is_some(),
+        "login should succeed with correct credentials"
+    );
+    let success = result.unwrap();
+    assert_eq!(success.canteen_id, fixtures.canteen_id);
+}
+
+#[test]
+fn login_canteen_db_invalid_password() {
+    let (pool, fixtures) = common::setup_pool_with_fixtures();
+    let mut conn = DbConnection::new(&pool).expect("db connection");
+
+    let username_val: String = proj_xs::db::schema::canteens::dsl::canteens
+        .filter(proj_xs::db::schema::canteens::dsl::canteen_id.eq(fixtures.canteen_id))
+        .select(proj_xs::db::schema::canteens::dsl::username)
+        .get_result(conn.connection())
+        .expect("fetch username");
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let canteen_ops = rt.block_on(CanteenOperations::new(pool.clone()));
+
+    let result = canteen_ops
+        .login_canteen(&username_val, "wrong-password")
+        .expect("login call");
+    assert!(result.is_none(), "login should fail with wrong password");
+}
+
+#[test]
+fn login_canteen_db_unknown_user() {
+    let (pool, _fixtures) = common::setup_pool_with_fixtures();
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let canteen_ops = rt.block_on(CanteenOperations::new(pool.clone()));
+
+    let result = canteen_ops
+        .login_canteen("nonexistent_user", "any-password")
+        .expect("login call");
+    assert!(
+        result.is_none(),
+        "login should return None for unknown username"
+    );
 }
