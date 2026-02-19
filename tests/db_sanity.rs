@@ -2,14 +2,10 @@ mod common;
 
 use diesel::prelude::*;
 use proj_xs::db::DbConnection;
-use proj_xs::test_utils::{build_test_pool, init_test_env, reset_db};
 
 #[test]
 fn db_migrations_run_and_empty_state() {
-    init_test_env();
-    let db = common::setup_test_db();
-    let pool = build_test_pool(&db.database_url);
-    reset_db(&pool).expect("reset db");
+    let pool = common::setup_pool();
 
     let mut conn = DbConnection::new(&pool).expect("db connection");
 
