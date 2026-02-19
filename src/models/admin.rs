@@ -202,6 +202,94 @@ mod tests {
         assert!(validate_stock(-1).is_ok());
         assert!(validate_stock(-2).is_err());
     }
+
+    #[test]
+    fn update_menu_item_sanitize_all_none_passes() {
+        let update = UpdateMenuItem {
+            name: None,
+            is_veg: None,
+            price: None,
+            stock: None,
+            is_available: None,
+            description: None,
+        };
+        let result = update.sanitize_and_validate();
+        assert!(result.is_ok());
+        let validated = result.unwrap();
+        assert!(validated.name.is_none());
+        assert!(validated.price.is_none());
+        assert!(validated.stock.is_none());
+    }
+
+    #[test]
+    fn update_menu_item_sanitize_rejects_bad_price() {
+        let update = UpdateMenuItem {
+            name: None,
+            is_veg: None,
+            price: Some(0),
+            stock: None,
+            is_available: None,
+            description: None,
+        };
+        assert!(update.sanitize_and_validate().is_err());
+    }
+
+    #[test]
+    fn update_menu_item_sanitize_rejects_bad_stock() {
+        let update = UpdateMenuItem {
+            name: None,
+            is_veg: None,
+            price: None,
+            stock: Some(-2),
+            is_available: None,
+            description: None,
+        };
+        assert!(update.sanitize_and_validate().is_err());
+    }
+
+    #[test]
+    fn update_menu_item_sanitize_trims_name() {
+        let update = UpdateMenuItem {
+            name: Some("  Burger  ".to_string()),
+            is_veg: None,
+            price: None,
+            stock: None,
+            is_available: None,
+            description: None,
+        };
+        let result = update.sanitize_and_validate().unwrap();
+        assert_eq!(result.name, Some("Burger".to_string()));
+    }
+
+    #[test]
+    fn new_menu_item_sanitize_rejects_empty_name() {
+        let item = NewMenuItem {
+            canteen_id: 1,
+            name: "".to_string(),
+            is_veg: true,
+            price: 100,
+            stock: 10,
+            is_available: true,
+            description: None,
+            has_pic: false,
+        };
+        assert!(item.sanitize_and_validate().is_err());
+    }
+
+    #[test]
+    fn new_menu_item_sanitize_rejects_long_description() {
+        let item = NewMenuItem {
+            canteen_id: 1,
+            name: "Valid Name".to_string(),
+            is_veg: true,
+            price: 100,
+            stock: 10,
+            is_available: true,
+            description: Some("a".repeat(MENU_ITEM_DESC_MAX_LEN + 1)),
+            has_pic: false,
+        };
+        assert!(item.sanitize_and_validate().is_err());
+    }
 }
 
 #[derive(Debug, Selectable, Queryable, Serialize, ToSchema)]
