@@ -3,6 +3,7 @@ use crate::models::admin::{NewCanteen, NewMenuItem};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::PgConnection;
+use std::sync::Once;
 
 // Fixture strategy:
 // - Build users/canteens/menu items via helpers below.
@@ -16,6 +17,31 @@ const TEST_DEV_BYPASS_TOKEN: &str = "test-bypass-token";
 const TEST_FIREBASE_PROJECT_ID: &str = "test-project";
 const TEST_ADMIN_JWT_SECRET: &str = "test-admin-secret";
 const TEST_QR_HASH_SECRET: &str = "test-qr-secret";
+static TEST_THREADS_GUARD: Once = Once::new();
+
+fn ensure_single_threaded_tests() {
+    TEST_THREADS_GUARD.call_once(|| {
+        let threads = test_threads_from_args().or_else(|| std::env::var("RUST_TEST_THREADS").ok());
+        if threads.as_deref() != Some("1") {
+            panic!(
+                "Tests must run with --test-threads=1 or RUST_TEST_THREADS=1 because init_test_env mutates environment variables."
+            );
+        }
+    });
+}
+
+fn test_threads_from_args() -> Option<String> {
+    let mut args = std::env::args();
+    while let Some(arg) = args.next() {
+        if arg == "--test-threads" {
+            return args.next();
+        }
+        if let Some(value) = arg.strip_prefix("--test-threads=") {
+            return Some(value.to_string());
+        }
+    }
+    None
+}
 
 fn set_env_if_unset(key: &str, value: &str) {
     if std::env::var_os(key).is_none() {
@@ -24,6 +50,7 @@ fn set_env_if_unset(key: &str, value: &str) {
 }
 
 pub fn init_test_env() {
+    ensure_single_threaded_tests();
     set_env_if_unset("S3_ENDPOINT", TEST_S3_ENDPOINT);
     set_env_if_unset("S3_REGION", TEST_S3_REGION);
     set_env_if_unset("S3_ACCESS_KEY_ID", TEST_S3_ACCESS_KEY);
