@@ -441,3 +441,60 @@ fn cleanup_expired_holds_returns_zero_when_none_expired() {
     let cleaned = hold_ops.cleanup_expired_holds().expect("cleanup");
     assert_eq!(cleaned, 0);
 }
+
+#[test]
+fn concurrent_holds_on_last_stock_item_one_succeeds_one_conflicts() {
+    // Two concurrent hold_order calls on an item with stock=1.
+    // FOR UPDATE locking in hold_order serialises them: one gets the stock,
+    // the other sees stock=0 after the first commits and returns NotAvailable.
+    let (pool, fixtures) = common::setup_pool_with_fixtures();
+
+    // Set stock to exactly 1
+    {
+        let mut conn = DbConnection::new(&pool).expect("db connection");
+        use proj_xs::db::schema::menu_items::dsl as mi;
+        diesel::update(mi::menu_items.filter(mi::item_id.eq(fixtures.menu_item_ids[0])))
+            .set((mi::stock.eq(1), mi::is_available.eq(true)))
+            .execute(conn.connection())
+            .expect("set stock=1");
+    }
+
+    let item_id = fixtures.menu_item_ids[0];
+    let user_id = fixtures.user_id;
+
+    // Spawn two threads that both try to hold the same item simultaneously
+    let pool1 = pool.clone();
+    let pool2 = pool.clone();
+
+    let t1 = std::thread::spawn(move || {
+        let hold_ops = HoldOperations::new(pool1, 300);
+        hold_ops.hold_order(user_id, vec![item_id], None)
+    });
+
+    let t2 = std::thread::spawn(move || {
+        let hold_ops = HoldOperations::new(pool2, 300);
+        hold_ops.hold_order(user_id, vec![item_id], None)
+    });
+
+    let r1 = t1.join().expect("thread 1 panicked");
+    let r2 = t2.join().expect("thread 2 panicked");
+
+    let successes = [&r1, &r2].iter().filter(|r| r.is_ok()).count();
+    let failures = [&r1, &r2].iter().filter(|r| r.is_err()).count();
+
+    assert_eq!(successes, 1, "exactly one hold should succeed");
+    assert_eq!(
+        failures, 1,
+        "exactly one hold should fail (stock exhausted)"
+    );
+
+    // Verify stock is now 0
+    let mut conn = DbConnection::new(&pool).expect("db connection");
+    use proj_xs::db::schema::menu_items::dsl as mi;
+    let stock_val: i32 = mi::menu_items
+        .filter(mi::item_id.eq(item_id))
+        .select(mi::stock)
+        .first(conn.connection())
+        .expect("fetch stock");
+    assert_eq!(stock_val, 0, "stock should be fully consumed");
+}
