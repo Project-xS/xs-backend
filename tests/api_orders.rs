@@ -383,3 +383,129 @@ async fn full_lifecycle_hold_confirm_deliver_past_orders() {
         "delivered order should have order_status: true"
     );
 }
+
+#[actix_rt::test]
+async fn get_all_orders_unauthenticated() {
+    let (app, _fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::get().uri("/orders").to_request();
+    let result = test::try_call_service(&app, req).await;
+    let status = match result {
+        Ok(r) => r.status(),
+        Err(e) => e.as_response_error().status_code(),
+    };
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+#[actix_rt::test]
+async fn get_orders_by_user_no_orders() {
+    let (app, fixtures, _db_url) = common::setup_api_app().await;
+
+    // Admin queries a user that exists but has placed no orders
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/orders/by_user?as=admin-{}&user_id={}",
+            fixtures.canteen_id, fixtures.user_id
+        ))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: Value = test::read_body_json(resp).await;
+    assert_eq!(body["status"], "ok");
+    let data = body["data"].as_array().expect("data should be an array");
+    assert!(
+        data.is_empty(),
+        "user with no orders should return empty list"
+    );
+}
+
+#[actix_rt::test]
+async fn get_orders_by_user_unknown_user_id() {
+    let (app, fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/orders/by_user?as=admin-{}&user_id=99999",
+            fixtures.canteen_id
+        ))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: Value = test::read_body_json(resp).await;
+    assert_eq!(body["status"], "ok");
+    let data = body["data"].as_array().expect("data should be an array");
+    assert!(data.is_empty(), "unknown user should return empty list");
+}
+
+#[actix_rt::test]
+async fn get_orders_by_user_unauthenticated() {
+    let (app, _fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::get()
+        .uri("/orders/by_user?user_id=1")
+        .to_request();
+    let result = test::try_call_service(&app, req).await;
+    let status = match result {
+        Ok(r) => r.status(),
+        Err(e) => e.as_response_error().status_code(),
+    };
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+#[actix_rt::test]
+async fn get_order_by_id_user_forbidden() {
+    let (app, fixtures, db_url) = common::setup_api_app().await;
+
+    let pool = build_test_pool(&db_url);
+    let order_ops = OrderOperations::new(pool.clone()).await;
+    order_ops
+        .create_order(fixtures.user_id, vec![fixtures.menu_item_ids[0]], None)
+        .expect("create order");
+
+    let mut conn = DbConnection::new(&pool).expect("db connection");
+    use proj_xs::db::schema::active_orders::dsl::*;
+    let order_id_val = active_orders
+        .select(order_id)
+        .first::<i32>(conn.connection())
+        .expect("order id");
+
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/orders/{}?as=user-{}",
+            order_id_val, fixtures.user_id
+        ))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+}
+
+#[actix_rt::test]
+async fn get_order_by_id_unauthenticated() {
+    let (app, _fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::get().uri("/orders/1").to_request();
+    let result = test::try_call_service(&app, req).await;
+    let status = match result {
+        Ok(r) => r.status(),
+        Err(e) => e.as_response_error().status_code(),
+    };
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+#[actix_rt::test]
+async fn order_actions_unauthenticated() {
+    let (app, _fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::put()
+        .uri("/orders/1/delivered")
+        .to_request();
+    let result = test::try_call_service(&app, req).await;
+    let status = match result {
+        Ok(r) => r.status(),
+        Err(e) => e.as_response_error().status_code(),
+    };
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
