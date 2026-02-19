@@ -9,9 +9,9 @@ use serde_json::Value;
 async fn search_returns_matching_items() {
     let (app, _fixtures, _db_url) = common::setup_api_app().await;
 
-    // "Veg Sandwich" is seeded; "Sandwich" is trigram-similar enough to match
+    // "Veg Sandwich" is seeded; use the exact name to match regardless of pg_trgm defaults.
     let req = test::TestRequest::get()
-        .uri("/search/Sandwich")
+        .uri("/search/Veg%20Sandwich")
         .insert_header(auth_header())
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -28,8 +28,8 @@ async fn search_returns_matching_items() {
         .filter_map(|item| item["name"].as_str())
         .collect();
     assert!(
-        names.iter().any(|n| n.contains("Sandwich")),
-        "result names should include an item containing 'Sandwich'"
+        names.iter().any(|n| n == &"Veg Sandwich"),
+        "result names should include the seeded item"
     );
 }
 
@@ -55,7 +55,7 @@ async fn search_by_canteen_filters_correctly() {
 
     // Search scoped to the seeded canteen
     let req = test::TestRequest::get()
-        .uri(&format!("/search/{}/Sandwich", fixtures.canteen_id))
+        .uri(&format!("/search/{}/Veg%20Sandwich", fixtures.canteen_id))
         .insert_header(auth_header())
         .to_request();
     let resp = test::call_service(&app, req).await;
