@@ -56,6 +56,23 @@ async fn admin_on_user_endpoint_returns_forbidden() {
 }
 
 #[actix_rt::test]
+async fn dev_bypass_invalid_as_param_defaults_to_user() {
+    let (app, fixtures, _db_url) = common::setup_api_app().await;
+
+    // "?as=garbage" doesn't match "user-{id}" or "admin-{id}"; middleware defaults to user_id=1
+    // The user created during fixture setup has the lowest id. We just verify the request
+    // is handled (not rejected as 401/403) by a user endpoint.
+    let _ = fixtures; // suppress unused warning
+    let req = test::TestRequest::get()
+        .uri("/users/get_past_orders?as=garbage")
+        .insert_header(common::auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    // Should succeed (200) — defaulted to user_id=1 principal
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+#[actix_rt::test]
 async fn user_on_admin_endpoint_returns_forbidden() {
     let (app, fixtures, _db_url) = common::setup_api_app().await;
 
