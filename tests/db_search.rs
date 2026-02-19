@@ -1,5 +1,6 @@
 mod common;
 
+use diesel::RunQueryDsl;
 use proj_xs::db::SearchOperations;
 use proj_xs::test_utils::{insert_canteen, seed_menu_item};
 
@@ -80,4 +81,25 @@ async fn search_by_canteen_filters_correctly() {
             "all results should belong to the searched canteen"
         );
     }
+}
+
+#[test]
+fn pg_trgm_similarity_threshold_matches_migration() {
+    // Migration 2025-02-17-173826_add_search/up.sql installs pg_trgm and a GIN index
+    // but sets NO custom similarity_threshold, so the PostgreSQL default (0.3) is in effect.
+    // If a future migration explicitly sets pg_trgm.similarity_threshold, update this value.
+    let pool = common::setup_pool();
+    let mut conn = proj_xs::db::DbConnection::new(&pool).expect("db connection");
+
+    let threshold: String = diesel::dsl::sql::<diesel::sql_types::Text>(
+        "SELECT current_setting('pg_trgm.similarity_threshold')",
+    )
+    .get_result(conn.connection())
+    .expect("query pg_trgm.similarity_threshold");
+
+    assert_eq!(
+        threshold, "0.3",
+        "pg_trgm similarity_threshold should be 0.3 (PostgreSQL default; no migration override). \
+         If a migration changes this, update the expected value here."
+    );
 }
