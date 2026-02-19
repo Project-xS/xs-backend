@@ -251,3 +251,29 @@ async fn scan_qr_already_delivered_order() {
     let body: Value = test::read_body_json(resp).await;
     assert_eq!(body["status"], "error");
 }
+
+#[actix_rt::test]
+async fn admin_cannot_generate_order_qr() {
+    let (app, fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::get()
+        .uri(&format!("/orders/1/qr?as=admin-{}", fixtures.canteen_id))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+}
+
+#[actix_rt::test]
+async fn user_cannot_scan_qr() {
+    let (app, fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::post()
+        .uri(&format!("/orders/scan?as=user-{}", fixtures.user_id))
+        .insert_header(auth_header())
+        .insert_header((header::CONTENT_TYPE, "application/json"))
+        .set_json(&serde_json::json!({ "token": "sometoken" }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+}

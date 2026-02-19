@@ -523,3 +523,46 @@ async fn delete_hold_unauthenticated() {
     };
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
+
+#[actix_rt::test]
+async fn admin_cannot_post_hold() {
+    let (app, fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::post()
+        .uri(&format!("/orders/hold?as=admin-{}", fixtures.canteen_id))
+        .insert_header(auth_header())
+        .insert_header((header::CONTENT_TYPE, "application/json"))
+        .set_json(&serde_json::json!({
+            "item_ids": [fixtures.menu_item_ids[0]]
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+}
+
+#[actix_rt::test]
+async fn admin_cannot_confirm_hold() {
+    let (app, fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::post()
+        .uri(&format!(
+            "/orders/hold/1/confirm?as=admin-{}",
+            fixtures.canteen_id
+        ))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+}
+
+#[actix_rt::test]
+async fn admin_cannot_cancel_hold() {
+    let (app, fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::delete()
+        .uri(&format!("/orders/hold/1?as=admin-{}", fixtures.canteen_id))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+}
