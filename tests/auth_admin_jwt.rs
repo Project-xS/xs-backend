@@ -67,3 +67,17 @@ fn admin_jwt_wrong_issuer_fails() {
     };
     assert!(verify_admin_jwt(&token, &bad_cfg).is_err());
 }
+
+#[test]
+fn admin_jwt_wrong_audience_fails() {
+    let cfg = test_jwt_config();
+    let token = issue_admin_jwt(1, &cfg).expect("issue jwt");
+
+    let bad_cfg = AdminJwtConfig {
+        secret: cfg.secret.clone(),
+        issuer: cfg.issuer.clone(),
+        audience: "wrong-audience".to_string(),
+        expiry_secs: cfg.expiry_secs,
+    };
+    assert!(verify_admin_jwt(&token, &bad_cfg).is_err());
+}
