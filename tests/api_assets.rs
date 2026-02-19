@@ -39,3 +39,52 @@ async fn asset_get_returns_error_without_object() {
     let body: Value = test::read_body_json(resp).await;
     assert_eq!(body["status"], "error");
 }
+
+#[actix_rt::test]
+async fn upload_asset_user_forbidden() {
+    let (app, fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::post()
+        .uri(&format!(
+            "/assets/upload/{}?as=user-{}",
+            fixtures.menu_item_ids[0], fixtures.user_id
+        ))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+}
+
+#[actix_rt::test]
+async fn upload_asset_nonexistent_item_id_still_presigns() {
+    // The handler does not check whether item_id exists in the DB;
+    // it only generates a presigned S3 URL using the raw id as a key.
+    let (app, fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::post()
+        .uri(&format!(
+            "/assets/upload/99999?as=admin-{}",
+            fixtures.canteen_id
+        ))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: Value = test::read_body_json(resp).await;
+    assert_eq!(body["status"], "ok");
+}
+
+#[actix_rt::test]
+async fn get_asset_user_forbidden() {
+    let (app, fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/assets/{}?as=user-{}",
+            fixtures.menu_item_ids[0], fixtures.user_id
+        ))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+}
