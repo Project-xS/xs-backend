@@ -24,19 +24,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Nix
-        uses: cachix/install-nix-action@v31.9.0
-        with:
-          extra_nix_config: |
-            experimental-features = nix-command flakes
-            accept-flake-config = true
-            sandbox = false
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: Set up Nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v13
-
-      - name: Allow Docker access for testcontainers
-        run: sudo chmod 666 /var/run/docker.sock
+      - name: Cargo cache
+        uses: Swatinem/rust-cache@v2
 
       - name: Run tests
-        run: nix build .#tests --impure --option sandbox false
+        run: cargo test -- --test-threads=1
