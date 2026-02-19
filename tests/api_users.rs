@@ -81,3 +81,18 @@ async fn admin_cannot_get_past_orders() {
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 }
+
+#[actix_rt::test]
+async fn get_past_orders_unauthenticated() {
+    let (app, _fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::get()
+        .uri("/users/get_past_orders")
+        .to_request();
+    let result = test::try_call_service(&app, req).await;
+    let status = match result {
+        Ok(r) => r.status(),
+        Err(e) => e.as_response_error().status_code(),
+    };
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
