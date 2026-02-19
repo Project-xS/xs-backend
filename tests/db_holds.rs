@@ -1,47 +1,13 @@
 mod common;
 
+use common::{
+    active_order_items_count, active_orders_count, held_order_items_count, held_orders_count,
+    menu_item_state,
+};
 use diesel::prelude::*;
-use diesel::PgConnection;
 use proj_xs::db::{DbConnection, HoldOperations, RepositoryError};
 use proj_xs::models::common::TimeBandEnum;
 use proj_xs::test_utils::{insert_canteen, insert_user, seed_menu_item};
-
-fn held_orders_count(conn: &mut PgConnection) -> i64 {
-    proj_xs::db::schema::held_orders::table
-        .count()
-        .get_result(conn)
-        .expect("count held_orders")
-}
-
-fn held_order_items_count(conn: &mut PgConnection) -> i64 {
-    proj_xs::db::schema::held_order_items::table
-        .count()
-        .get_result(conn)
-        .expect("count held_order_items")
-}
-
-fn active_orders_count(conn: &mut PgConnection) -> i64 {
-    proj_xs::db::schema::active_orders::table
-        .count()
-        .get_result(conn)
-        .expect("count active_orders")
-}
-
-fn active_order_items_count(conn: &mut PgConnection) -> i64 {
-    proj_xs::db::schema::active_order_items::table
-        .count()
-        .get_result(conn)
-        .expect("count active_order_items")
-}
-
-fn menu_item_state(conn: &mut PgConnection, item_id_val: i32) -> (i32, bool) {
-    use proj_xs::db::schema::menu_items::dsl::*;
-    menu_items
-        .filter(item_id.eq(item_id_val))
-        .select((stock, is_available))
-        .first::<(i32, bool)>(conn)
-        .expect("menu item state")
-}
 
 #[test]
 fn hold_order_success_decrements_stock_and_creates_rows() {

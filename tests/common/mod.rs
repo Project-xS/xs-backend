@@ -10,7 +10,9 @@ use std::sync::OnceLock;
 use actix_http::Request;
 use actix_web::body::BoxBody;
 use actix_web::dev::{Service, ServiceResponse};
+use actix_web::http::header;
 use actix_web::{test, web, App, Error};
+use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::PgConnection;
 use proj_xs::auth::{AdminJwtConfig, AuthLayer, FirebaseAuthConfig, JwksCache};
@@ -29,6 +31,48 @@ pub struct TestDb {
 }
 
 static TEST_DB: OnceLock<TestDb> = OnceLock::new();
+
+pub fn auth_header() -> (header::HeaderName, String) {
+    let token = std::env::var("DEV_BYPASS_TOKEN").expect("DEV_BYPASS_TOKEN");
+    (header::AUTHORIZATION, format!("Bearer {}", token))
+}
+
+pub fn active_orders_count(conn: &mut PgConnection) -> i64 {
+    proj_xs::db::schema::active_orders::table
+        .count()
+        .get_result(conn)
+        .expect("count active_orders")
+}
+
+pub fn active_order_items_count(conn: &mut PgConnection) -> i64 {
+    proj_xs::db::schema::active_order_items::table
+        .count()
+        .get_result(conn)
+        .expect("count active_order_items")
+}
+
+pub fn held_orders_count(conn: &mut PgConnection) -> i64 {
+    proj_xs::db::schema::held_orders::table
+        .count()
+        .get_result(conn)
+        .expect("count held_orders")
+}
+
+pub fn held_order_items_count(conn: &mut PgConnection) -> i64 {
+    proj_xs::db::schema::held_order_items::table
+        .count()
+        .get_result(conn)
+        .expect("count held_order_items")
+}
+
+pub fn menu_item_state(conn: &mut PgConnection, item_id_val: i32) -> (i32, bool) {
+    use proj_xs::db::schema::menu_items::dsl::*;
+    menu_items
+        .filter(item_id.eq(item_id_val))
+        .select((stock, is_available))
+        .first::<(i32, bool)>(conn)
+        .expect("menu item state")
+}
 
 pub fn setup_test_db() -> &'static TestDb {
     TEST_DB.get_or_init(|| {

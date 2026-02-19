@@ -3,14 +3,10 @@ mod common;
 use actix_web::http::header;
 use actix_web::http::StatusCode;
 use actix_web::test;
+use common::auth_header;
 use proj_xs::db::HoldOperations;
 use proj_xs::test_utils::build_test_pool;
 use serde_json::Value;
-
-fn auth_header() -> (header::HeaderName, String) {
-    let token = std::env::var("DEV_BYPASS_TOKEN").expect("DEV_BYPASS_TOKEN");
-    (header::AUTHORIZATION, format!("Bearer {}", token))
-}
 
 #[actix_rt::test]
 async fn post_hold_valid_payload_and_invalid_deliver_at() {
