@@ -509,3 +509,25 @@ async fn order_actions_unauthenticated() {
     };
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
+
+#[actix_rt::test]
+async fn get_orders_by_user_unknown_rfid_empty() {
+    let (app, fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/orders/by_user?as=admin-{}&rfid=nonexistent-rfid-xyz",
+            fixtures.canteen_id
+        ))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: Value = test::read_body_json(resp).await;
+    assert_eq!(body["status"], "ok");
+    let data = body["data"].as_array().expect("data should be an array");
+    assert!(
+        data.is_empty(),
+        "unknown rfid should return empty order list"
+    );
+}

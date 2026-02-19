@@ -501,3 +501,33 @@ async fn get_canteen_items_unauthenticated() {
     };
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
+
+#[actix_rt::test]
+async fn upload_canteen_pic_unauthenticated() {
+    let (app, _fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::put()
+        .uri("/canteen/upload_pic")
+        .to_request();
+    let result = test::try_call_service(&app, req).await;
+    let status = match result {
+        Ok(r) => r.status(),
+        Err(e) => e.as_response_error().status_code(),
+    };
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+#[actix_rt::test]
+async fn set_canteen_pic_unauthenticated() {
+    let (app, _fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::put()
+        .uri("/canteen/set_pic")
+        .to_request();
+    let result = test::try_call_service(&app, req).await;
+    let status = match result {
+        Ok(r) => r.status(),
+        Err(e) => e.as_response_error().status_code(),
+    };
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}

@@ -814,3 +814,31 @@ async fn get_menu_item_has_pic_true() {
     assert_eq!(get_body["status"], "ok");
     assert!(get_body["data"]["pic_link"].is_null());
 }
+
+#[actix_rt::test]
+async fn upload_menu_item_pic_unauthenticated() {
+    let (app, _fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::put()
+        .uri("/menu/upload_pic/1")
+        .to_request();
+    let result = test::try_call_service(&app, req).await;
+    let status = match result {
+        Ok(r) => r.status(),
+        Err(e) => e.as_response_error().status_code(),
+    };
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+#[actix_rt::test]
+async fn set_menu_item_pic_unauthenticated() {
+    let (app, _fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::put().uri("/menu/set_pic/1").to_request();
+    let result = test::try_call_service(&app, req).await;
+    let status = match result {
+        Ok(r) => r.status(),
+        Err(e) => e.as_response_error().status_code(),
+    };
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}

@@ -88,3 +88,33 @@ async fn get_asset_user_forbidden() {
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 }
+
+#[actix_rt::test]
+async fn upload_asset_unauthenticated() {
+    let (app, _fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::post()
+        .uri("/assets/upload/1")
+        .to_request();
+    let result = test::try_call_service(&app, req).await;
+    let status = match result {
+        Ok(r) => r.status(),
+        Err(e) => e.as_response_error().status_code(),
+    };
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+#[actix_rt::test]
+async fn get_asset_unauthenticated() {
+    let (app, _fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::get()
+        .uri("/assets/some_key")
+        .to_request();
+    let result = test::try_call_service(&app, req).await;
+    let status = match result {
+        Ok(r) => r.status(),
+        Err(e) => e.as_response_error().status_code(),
+    };
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
