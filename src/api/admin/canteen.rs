@@ -26,8 +26,15 @@ pub(super) async fn create_canteen(
     _admin: crate::auth::AdminPrincipal,
     req_data: web::Json<NewCanteen>,
 ) -> actix_web::Result<impl Responder> {
+    let req_data = req_data.into_inner();
+    if req_data.canteen_name.trim().is_empty() {
+        return Ok(HttpResponse::BadRequest().json(NewCanteenResponse {
+            status: "error".to_string(),
+            error: Some("canteen_name must not be empty".to_string()),
+        }));
+    }
     let item_name = req_data.canteen_name.clone();
-    let result = web::block(move || canteen_ops.create_canteen(req_data.into_inner())).await?;
+    let result = web::block(move || canteen_ops.create_canteen(req_data)).await?;
     match result {
         Ok(_) => {
             debug!(
