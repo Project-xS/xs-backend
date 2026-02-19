@@ -212,3 +212,36 @@ async fn user_cannot_create_menu_item() {
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 }
+
+#[actix_rt::test]
+async fn upload_menu_item_pic_presign_success() {
+    let (app, fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::put()
+        .uri(&format!(
+            "/menu/upload_pic/{}?as=admin-{}",
+            fixtures.menu_item_ids[0], fixtures.canteen_id
+        ))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: Value = test::read_body_json(resp).await;
+    assert_eq!(body["status"], "ok");
+    assert!(body["presigned_url"].is_string());
+}
+
+#[actix_rt::test]
+async fn set_menu_item_pic_conflict_without_object() {
+    let (app, fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::put()
+        .uri(&format!(
+            "/menu/set_pic/{}?as=admin-{}",
+            fixtures.menu_item_ids[0], fixtures.canteen_id
+        ))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::CONFLICT);
+}
