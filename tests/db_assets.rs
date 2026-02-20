@@ -89,7 +89,8 @@ async fn menu_ops_set_menu_item_pic_success() {
         .mock_object_exists(&format!("items/{}", item_id))
         .await;
 
-    let menu_ops = MenuOperations::new(pool.clone()).await;
+    let asset_ops = AssetOperations::new().await.expect("AssetOperations::new");
+    let menu_ops = MenuOperations::new(pool.clone(), asset_ops).await;
     let rows = menu_ops
         .set_menu_item_pic(&item_id)
         .await
@@ -118,7 +119,8 @@ async fn menu_ops_set_menu_item_pic_not_found_key() {
         .mock_object_not_found(&format!("items/{}", item_id))
         .await;
 
-    let menu_ops = MenuOperations::new(pool.clone()).await;
+    let asset_ops = AssetOperations::new().await.expect("AssetOperations::new");
+    let menu_ops = MenuOperations::new(pool.clone(), asset_ops).await;
     let err = menu_ops
         .set_menu_item_pic(&item_id)
         .await
@@ -143,7 +145,8 @@ async fn canteen_ops_set_canteen_pic_success() {
         .mock_object_exists(&format!("canteens/{}", cid))
         .await;
 
-    let canteen_ops = CanteenOperations::new(pool.clone()).await;
+    let asset_ops = AssetOperations::new().await.expect("AssetOperations::new");
+    let canteen_ops = CanteenOperations::new(pool.clone(), asset_ops).await;
     let rows = canteen_ops
         .set_canteen_pic(&cid)
         .await
@@ -171,7 +174,8 @@ async fn canteen_ops_set_canteen_pic_not_found_key() {
         .mock_object_not_found(&format!("canteens/{}", cid))
         .await;
 
-    let canteen_ops = CanteenOperations::new(pool.clone()).await;
+    let asset_ops = AssetOperations::new().await.expect("AssetOperations::new");
+    let canteen_ops = CanteenOperations::new(pool.clone(), asset_ops).await;
     let err = canteen_ops
         .set_canteen_pic(&cid)
         .await

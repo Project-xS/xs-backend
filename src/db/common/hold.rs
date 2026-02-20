@@ -494,6 +494,7 @@ impl HoldOperations {
             // Only restore stock for items that don't have unlimited stock (-1)
             let current_stock: i32 = menu_items::table
                 .filter(menu_items::item_id.eq(item.item_id))
+                .for_update()
                 .select(menu_items::stock)
                 .first::<i32>(conn)
                 .map_err(RepositoryError::DatabaseError)?;

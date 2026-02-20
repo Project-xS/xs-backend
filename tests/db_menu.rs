@@ -1,12 +1,13 @@
 mod common;
 
-use proj_xs::db::{DbConnection, MenuOperations, RepositoryError};
+use proj_xs::db::{AssetOperations, DbConnection, MenuOperations, RepositoryError};
 use proj_xs::models::admin::{NewMenuItem, UpdateMenuItem};
 
 #[actix_rt::test]
 async fn add_menu_item_success() {
     let (pool, fixtures) = common::setup_pool_with_fixtures();
-    let menu_ops = MenuOperations::new(pool.clone()).await;
+    let asset_ops = AssetOperations::new().await.expect("AssetOperations::new");
+    let menu_ops = MenuOperations::new(pool.clone(), asset_ops).await;
 
     let new_item = NewMenuItem {
         canteen_id: fixtures.canteen_id,
@@ -31,7 +32,8 @@ async fn add_menu_item_success() {
 #[actix_rt::test]
 async fn add_menu_item_rejects_zero_price() {
     let (pool, fixtures) = common::setup_pool_with_fixtures();
-    let menu_ops = MenuOperations::new(pool.clone()).await;
+    let asset_ops = AssetOperations::new().await.expect("AssetOperations::new");
+    let menu_ops = MenuOperations::new(pool.clone(), asset_ops).await;
 
     let new_item = NewMenuItem {
         canteen_id: fixtures.canteen_id,
@@ -55,7 +57,8 @@ async fn add_menu_item_rejects_zero_price() {
 #[actix_rt::test]
 async fn add_menu_item_rejects_empty_name() {
     let (pool, fixtures) = common::setup_pool_with_fixtures();
-    let menu_ops = MenuOperations::new(pool.clone()).await;
+    let asset_ops = AssetOperations::new().await.expect("AssetOperations::new");
+    let menu_ops = MenuOperations::new(pool.clone(), asset_ops).await;
 
     let new_item = NewMenuItem {
         canteen_id: fixtures.canteen_id,
@@ -79,7 +82,8 @@ async fn add_menu_item_rejects_empty_name() {
 #[actix_rt::test]
 async fn update_menu_item_partial_name_only() {
     let (pool, fixtures) = common::setup_pool_with_fixtures();
-    let menu_ops = MenuOperations::new(pool.clone()).await;
+    let asset_ops = AssetOperations::new().await.expect("AssetOperations::new");
+    let menu_ops = MenuOperations::new(pool.clone(), asset_ops).await;
 
     let item_id = fixtures.menu_item_ids[0];
     let update = UpdateMenuItem {
@@ -103,7 +107,8 @@ async fn update_menu_item_partial_name_only() {
 #[actix_rt::test]
 async fn update_menu_item_not_found() {
     let (pool, _fixtures) = common::setup_pool_with_fixtures();
-    let menu_ops = MenuOperations::new(pool.clone()).await;
+    let asset_ops = AssetOperations::new().await.expect("AssetOperations::new");
+    let menu_ops = MenuOperations::new(pool.clone(), asset_ops).await;
 
     let update = UpdateMenuItem {
         name: Some("Ghost".to_string()),
@@ -122,7 +127,8 @@ async fn update_menu_item_not_found() {
 #[actix_rt::test]
 async fn remove_menu_item_success() {
     let (pool, fixtures) = common::setup_pool_with_fixtures();
-    let menu_ops = MenuOperations::new(pool.clone()).await;
+    let asset_ops = AssetOperations::new().await.expect("AssetOperations::new");
+    let menu_ops = MenuOperations::new(pool.clone(), asset_ops).await;
 
     let target_id = fixtures.menu_item_ids[0];
     let result = menu_ops.remove_menu_item(target_id);
@@ -144,7 +150,8 @@ async fn remove_menu_item_success() {
 #[actix_rt::test]
 async fn remove_menu_item_not_found() {
     let (pool, _fixtures) = common::setup_pool_with_fixtures();
-    let menu_ops = MenuOperations::new(pool.clone()).await;
+    let asset_ops = AssetOperations::new().await.expect("AssetOperations::new");
+    let menu_ops = MenuOperations::new(pool.clone(), asset_ops).await;
 
     let result = menu_ops.remove_menu_item(99999);
     assert!(result.is_err());
@@ -154,7 +161,8 @@ async fn remove_menu_item_not_found() {
 #[actix_rt::test]
 async fn get_menu_item_by_id_and_not_found() {
     let (pool, fixtures) = common::setup_pool_with_fixtures();
-    let menu_ops = MenuOperations::new(pool.clone()).await;
+    let asset_ops = AssetOperations::new().await.expect("AssetOperations::new");
+    let menu_ops = MenuOperations::new(pool.clone(), asset_ops).await;
 
     // Existing item
     let target_id = fixtures.menu_item_ids[0];

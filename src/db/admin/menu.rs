@@ -15,11 +15,11 @@ pub struct MenuOperations {
 }
 
 impl MenuOperations {
-    pub async fn new(pool: Pool<ConnectionManager<PgConnection>>) -> Self {
-        Self {
-            pool,
-            asset_ops: AssetOperations::new().await.unwrap(),
-        }
+    pub async fn new(
+        pool: Pool<ConnectionManager<PgConnection>>,
+        asset_ops: AssetOperations,
+    ) -> Self {
+        Self { pool, asset_ops }
     }
 
     pub fn add_menu_item(&self, menu_item: NewMenuItem) -> Result<MenuItem, RepositoryError> {

@@ -17,11 +17,11 @@ pub struct CanteenOperations {
 }
 
 impl CanteenOperations {
-    pub async fn new(pool: Pool<ConnectionManager<PgConnection>>) -> Self {
-        Self {
-            pool,
-            asset_ops: AssetOperations::new().await.unwrap(),
-        }
+    pub async fn new(
+        pool: Pool<ConnectionManager<PgConnection>>,
+        asset_ops: AssetOperations,
+    ) -> Self {
+        Self { pool, asset_ops }
     }
 
     pub fn create_canteen(&self, canteen: NewCanteen) -> Result<usize, RepositoryError> {

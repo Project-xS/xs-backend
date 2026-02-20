@@ -1,7 +1,7 @@
 mod common;
 
 use diesel::prelude::*;
-use proj_xs::db::{CanteenOperations, DbConnection};
+use proj_xs::db::{AssetOperations, CanteenOperations, DbConnection};
 use proj_xs::test_utils::{insert_canteen, seed_menu_item};
 
 #[test]
@@ -139,7 +139,10 @@ fn login_canteen_db_success() {
     let password_val = format!("{}@{}", username_val, padded_id);
 
     let rt = tokio::runtime::Runtime::new().unwrap();
-    let canteen_ops = rt.block_on(CanteenOperations::new(pool.clone()));
+    let asset_ops = rt
+        .block_on(AssetOperations::new())
+        .expect("AssetOperations::new");
+    let canteen_ops = rt.block_on(CanteenOperations::new(pool.clone(), asset_ops));
 
     let result = canteen_ops
         .login_canteen(&username_val, &password_val)
@@ -164,7 +167,10 @@ fn login_canteen_db_invalid_password() {
         .expect("fetch username");
 
     let rt = tokio::runtime::Runtime::new().unwrap();
-    let canteen_ops = rt.block_on(CanteenOperations::new(pool.clone()));
+    let asset_ops = rt
+        .block_on(AssetOperations::new())
+        .expect("AssetOperations::new");
+    let canteen_ops = rt.block_on(CanteenOperations::new(pool.clone(), asset_ops));
 
     let result = canteen_ops
         .login_canteen(&username_val, "wrong-password")
@@ -176,7 +182,10 @@ fn login_canteen_db_invalid_password() {
 fn login_canteen_db_unknown_user() {
     let (pool, _fixtures) = common::setup_pool_with_fixtures();
     let rt = tokio::runtime::Runtime::new().unwrap();
-    let canteen_ops = rt.block_on(CanteenOperations::new(pool.clone()));
+    let asset_ops = rt
+        .block_on(AssetOperations::new())
+        .expect("AssetOperations::new");
+    let canteen_ops = rt.block_on(CanteenOperations::new(pool.clone(), asset_ops));
 
     let result = canteen_ops
         .login_canteen("nonexistent_user", "any-password")

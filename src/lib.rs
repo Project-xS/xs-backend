@@ -35,15 +35,16 @@ impl AppState {
             .and_then(|v| v.parse::<i64>().ok())
             .unwrap_or(300); // 5 minutes default
 
-        let user_ops = UserOperations::new(db.clone()).await;
-        let menu_ops = MenuOperations::new(db.clone()).await;
-        let canteen_ops = CanteenOperations::new(db.clone()).await;
+        let asset_ops = AssetOperations::new()
+            .await
+            .expect("Unable to create asset_ops");
+
+        let user_ops = UserOperations::new(db.clone(), asset_ops.clone()).await;
+        let menu_ops = MenuOperations::new(db.clone(), asset_ops.clone()).await;
+        let canteen_ops = CanteenOperations::new(db.clone(), asset_ops.clone()).await;
         let order_ops = OrderOperations::new(db.clone()).await;
         let hold_ops = HoldOperations::new(db.clone(), hold_ttl_secs);
         let search_ops = SearchOperations::new(db.clone()).await;
-        let asset_ops = AssetOperations::new()
-            .await
-            .expect("Unable to create asset_upload operations");
         AppState {
             user_ops,
             menu_ops,

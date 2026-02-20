@@ -28,11 +28,11 @@ pub struct UserOperations {
 }
 
 impl UserOperations {
-    pub async fn new(pool: Pool<ConnectionManager<PgConnection>>) -> Self {
-        Self {
-            pool,
-            asset_ops: AssetOperations::new().await.unwrap(),
-        }
+    pub async fn new(
+        pool: Pool<ConnectionManager<PgConnection>>,
+        asset_ops: AssetOperations,
+    ) -> Self {
+        Self { pool, asset_ops }
     }
 
     #[allow(dead_code)]

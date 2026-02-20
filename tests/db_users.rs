@@ -1,12 +1,13 @@
 mod common;
 
-use proj_xs::db::{OrderOperations, RepositoryError, UserOperations};
+use proj_xs::db::{AssetOperations, OrderOperations, RepositoryError, UserOperations};
 use proj_xs::test_utils::insert_user;
 
 #[actix_rt::test]
 async fn upsert_firebase_user_insert_and_update() {
     let (pool, _fixtures) = common::setup_pool_with_fixtures();
-    let user_ops = UserOperations::new(pool.clone()).await;
+    let asset_ops = AssetOperations::new().await.expect("AssetOperations::new");
+    let user_ops = UserOperations::new(pool.clone(), asset_ops).await;
 
     // Insert a new user
     let user = user_ops
@@ -42,7 +43,8 @@ async fn upsert_firebase_user_insert_and_update() {
 #[actix_rt::test]
 async fn upsert_firebase_user_missing_email_errors() {
     let (pool, _fixtures) = common::setup_pool_with_fixtures();
-    let user_ops = UserOperations::new(pool.clone()).await;
+    let asset_ops = AssetOperations::new().await.expect("AssetOperations::new");
+    let user_ops = UserOperations::new(pool.clone(), asset_ops).await;
 
     let result = user_ops.upsert_firebase_user(
         "firebase-uid-no-email".to_string(),
@@ -62,7 +64,8 @@ async fn upsert_firebase_user_missing_email_errors() {
 #[actix_rt::test]
 async fn create_user_success() {
     let (pool, _fixtures) = common::setup_pool_with_fixtures();
-    let user_ops = UserOperations::new(pool.clone()).await;
+    let asset_ops = AssetOperations::new().await.expect("AssetOperations::new");
+    let user_ops = UserOperations::new(pool.clone(), asset_ops).await;
 
     let user = user_ops
         .upsert_firebase_user(
@@ -112,7 +115,8 @@ async fn create_user_duplicate_email_errors() {
 async fn get_user_by_email_success() {
     let (pool, _fixtures) = common::setup_pool_with_fixtures();
     let mut conn = proj_xs::db::DbConnection::new(&pool).expect("db connection");
-    let user_ops = UserOperations::new(pool.clone()).await;
+    let asset_ops = AssetOperations::new().await.expect("AssetOperations::new");
+    let user_ops = UserOperations::new(pool.clone(), asset_ops).await;
 
     insert_user(
         conn.connection(),
@@ -134,7 +138,8 @@ async fn get_user_by_email_success() {
 #[actix_rt::test]
 async fn get_user_by_email_not_found() {
     let (pool, _fixtures) = common::setup_pool_with_fixtures();
-    let user_ops = UserOperations::new(pool.clone()).await;
+    let asset_ops = AssetOperations::new().await.expect("AssetOperations::new");
+    let user_ops = UserOperations::new(pool.clone(), asset_ops).await;
 
     let result = user_ops.get_user_by_email("nobody@example.com");
 
@@ -145,7 +150,8 @@ async fn get_user_by_email_not_found() {
 async fn get_past_orders_by_userid_empty() {
     let (pool, _fixtures) = common::setup_pool_with_fixtures();
     let mut conn = proj_xs::db::DbConnection::new(&pool).expect("db connection");
-    let user_ops = UserOperations::new(pool.clone()).await;
+    let asset_ops = AssetOperations::new().await.expect("AssetOperations::new");
+    let user_ops = UserOperations::new(pool.clone(), asset_ops).await;
 
     let new_user_id = insert_user(
         conn.connection(),
@@ -168,7 +174,8 @@ async fn get_past_orders_by_userid_empty() {
 async fn get_past_orders_by_userid_populated() {
     let (pool, fixtures) = common::setup_pool_with_fixtures();
     let mut conn = proj_xs::db::DbConnection::new(&pool).expect("db connection");
-    let user_ops = UserOperations::new(pool.clone()).await;
+    let asset_ops = AssetOperations::new().await.expect("AssetOperations::new");
+    let user_ops = UserOperations::new(pool.clone(), asset_ops).await;
     let order_ops = OrderOperations::new(pool.clone()).await;
 
     // Insert a fresh user to avoid cross-test interference
