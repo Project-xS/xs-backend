@@ -98,7 +98,7 @@ pub fn setup_test_db() -> &'static TestDb {
         }
 
         let docker = Box::leak(Box::new(Cli::default()));
-        let image = GenericImage::new("postgres", "16-alpine")
+        let image = GenericImage::new("postgres", "17-alpine")
             .with_env_var("POSTGRES_USER", "postgres")
             .with_env_var("POSTGRES_PASSWORD", "postgres")
             .with_env_var("POSTGRES_DB", "proj_xs_test")
