@@ -413,12 +413,7 @@ async fn post_hold_unauthenticated() {
             "item_ids": [1]
         }))
         .to_request();
-    let result = test::try_call_service(&app, req).await;
-    let status = match result {
-        Ok(r) => r.status(),
-        Err(e) => e.as_response_error().status_code(),
-    };
-    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    common::assert_unauthenticated(&app, req).await;
 }
 
 #[actix_rt::test]
@@ -487,12 +482,7 @@ async fn confirm_hold_unauthenticated() {
     let req = test::TestRequest::post()
         .uri("/orders/hold/1/confirm")
         .to_request();
-    let result = test::try_call_service(&app, req).await;
-    let status = match result {
-        Ok(r) => r.status(),
-        Err(e) => e.as_response_error().status_code(),
-    };
-    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    common::assert_unauthenticated(&app, req).await;
 }
 
 #[actix_rt::test]
@@ -516,12 +506,7 @@ async fn delete_hold_unauthenticated() {
     let req = test::TestRequest::delete()
         .uri("/orders/hold/1")
         .to_request();
-    let result = test::try_call_service(&app, req).await;
-    let status = match result {
-        Ok(r) => r.status(),
-        Err(e) => e.as_response_error().status_code(),
-    };
-    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    common::assert_unauthenticated(&app, req).await;
 }
 
 #[actix_rt::test]

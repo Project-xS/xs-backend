@@ -142,12 +142,7 @@ async fn qr_generation_unauthenticated() {
     let (app, _fixtures, _db_url) = common::setup_api_app().await;
 
     let req = test::TestRequest::get().uri("/orders/1/qr").to_request();
-    let result = test::try_call_service(&app, req).await;
-    let status = match result {
-        Ok(r) => r.status(),
-        Err(e) => e.as_response_error().status_code(),
-    };
-    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    common::assert_unauthenticated(&app, req).await;
 }
 
 #[actix_rt::test]
@@ -159,12 +154,7 @@ async fn scan_qr_unauthenticated() {
         .insert_header((header::CONTENT_TYPE, "application/json"))
         .set_json(&serde_json::json!({ "token": "anything" }))
         .to_request();
-    let result = test::try_call_service(&app, req).await;
-    let status = match result {
-        Ok(r) => r.status(),
-        Err(e) => e.as_response_error().status_code(),
-    };
-    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    common::assert_unauthenticated(&app, req).await;
 }
 
 #[actix_rt::test]
@@ -186,7 +176,7 @@ async fn scan_qr_expired_token() {
     let (app, fixtures, _db_url) = common::setup_api_app().await;
 
     let secret = std::env::var("DELIVER_QR_HASH_SECRET").expect("DELIVER_QR_HASH_SECRET");
-    // Build a token with timestamp=1 (far in the past) so it is definitely expired
+    // Build a token with timestamp=1 (expired)
     let payload = format!("1|{}|1", fixtures.user_id);
     let mut mac = hmac::Hmac::<sha2::Sha256>::new_from_slice(secret.as_bytes()).expect("valid key");
     hmac::Mac::update(&mut mac, payload.as_bytes());
@@ -280,13 +270,12 @@ async fn user_cannot_scan_qr() {
 
 #[actix_rt::test]
 async fn qr_generation_order_with_no_items_returns_not_found() {
-    // Insert an active_order row without any active_order_items so that
-    // get_orders_by_orderid_no_pics returns Some(data) with data.items.is_empty() == true.
+    // Insert an order without items to trigger the empty-items path.
     let (app, fixtures, db_url) = common::setup_api_app().await;
     let pool = build_test_pool(&db_url);
     let mut conn = DbConnection::new(&pool).expect("db connection");
 
-    // Insert an order for the user but skip inserting items.
+    // Insert an order without items.
     use proj_xs::db::schema::active_orders::dsl as ao;
     let order_id_val: i32 = diesel::insert_into(ao::active_orders)
         .values((

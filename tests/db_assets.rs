@@ -36,7 +36,7 @@ async fn asset_ops_get_object_etag_not_found_on_404() {
 
 #[actix_rt::test]
 async fn asset_ops_get_object_etag_not_found_on_403() {
-    // The SDK treats 403 the same as 404 (garage compatibility hack in canteen.rs).
+    // The SDK treats 403 as 404 (garage S3 compatibility).
     let mock_s3 = common::start_mock_s3().await;
     let bucket = std::env::var("S3_BUCKET_NAME").unwrap_or_else(|_| "test-bucket".to_string());
     wiremock::Mock::given(wiremock::matchers::method("GET"))
@@ -138,7 +138,7 @@ async fn canteen_ops_set_canteen_pic_success() {
     let (pool, fixtures) = common::setup_pool_with_fixtures();
     let cid = fixtures.canteen_id;
 
-    // set_canteen_pic uses key "canteens/{canteen_id}" after the bug fix
+    // set_canteen_pic uses key "canteens/{canteen_id}"
     mock_s3
         .mock_object_exists(&format!("canteens/{}", cid))
         .await;

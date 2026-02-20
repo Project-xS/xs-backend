@@ -1,7 +1,7 @@
 mod common;
 
 use diesel::prelude::*;
-use proj_xs::db::{CanteenOperations, DbConnection, RepositoryError};
+use proj_xs::db::{CanteenOperations, DbConnection};
 use proj_xs::test_utils::{insert_canteen, seed_menu_item};
 
 #[test]
@@ -115,9 +115,6 @@ fn create_canteen_and_add_item() {
         result.is_ok(),
         "item should be accessible via the new canteen"
     );
-
-    // Foreign key check: deleting the pool doesn't affect just the items query
-    let _: Result<(), RepositoryError> = Ok(());
 }
 
 #[test]

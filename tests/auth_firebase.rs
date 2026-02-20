@@ -75,7 +75,7 @@ async fn firebase_rejects_wrong_algorithm() {
         .await
         .err()
         .expect("should fail");
-    // Wrong alg is caught before JWKS lookup — reported as a Claim error.
+    // Wrong alg is caught before JWKS lookup — reported as Claim error.
     assert!(
         matches!(err, FirebaseAuthError::Claim(_)),
         "expected Claim error for wrong alg, got {:?}",
@@ -85,8 +85,8 @@ async fn firebase_rejects_wrong_algorithm() {
 
 #[actix_rt::test]
 async fn firebase_rejects_unknown_kid_via_jwks_error() {
-    // Valid RS256 header with a kid, but the JwksCache has no keys and the
-    // server at localhost:1 is unreachable, so get_key returns JwksError::NotFound.
+    // Valid RS256 header with a kid, but JwksCache has no keys and
+    // localhost:1 is unreachable → get_key returns JwksError::NotFound.
     let header = base64::engine::general_purpose::URL_SAFE_NO_PAD
         .encode(r#"{"alg":"RS256","typ":"JWT","kid":"unknown-kid"}"#);
     let payload = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(r#"{"sub":"x"}"#);

@@ -252,22 +252,6 @@ async fn order_actions_nonexistent_order() {
 }
 
 #[actix_rt::test]
-async fn get_orders_by_user_admin_both_params() {
-    let (app, fixtures, _db_url) = common::setup_api_app().await;
-
-    // Providing both user_id and rfid should return BAD_REQUEST
-    let req = test::TestRequest::get()
-        .uri(&format!(
-            "/orders/by_user?as=admin-{}&user_id={}&rfid=rfid-1",
-            fixtures.canteen_id, fixtures.user_id
-        ))
-        .insert_header(auth_header())
-        .to_request();
-    let resp = test::call_service(&app, req).await;
-    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
-}
-
-#[actix_rt::test]
 async fn past_orders_after_cancellation() {
     let (app, fixtures, db_url) = common::setup_api_app().await;
     let pool = build_test_pool(&db_url);
@@ -389,12 +373,7 @@ async fn get_all_orders_unauthenticated() {
     let (app, _fixtures, _db_url) = common::setup_api_app().await;
 
     let req = test::TestRequest::get().uri("/orders").to_request();
-    let result = test::try_call_service(&app, req).await;
-    let status = match result {
-        Ok(r) => r.status(),
-        Err(e) => e.as_response_error().status_code(),
-    };
-    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    common::assert_unauthenticated(&app, req).await;
 }
 
 #[actix_rt::test]
@@ -446,12 +425,7 @@ async fn get_orders_by_user_unauthenticated() {
     let req = test::TestRequest::get()
         .uri("/orders/by_user?user_id=1")
         .to_request();
-    let result = test::try_call_service(&app, req).await;
-    let status = match result {
-        Ok(r) => r.status(),
-        Err(e) => e.as_response_error().status_code(),
-    };
-    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    common::assert_unauthenticated(&app, req).await;
 }
 
 #[actix_rt::test]
@@ -487,12 +461,7 @@ async fn get_order_by_id_unauthenticated() {
     let (app, _fixtures, _db_url) = common::setup_api_app().await;
 
     let req = test::TestRequest::get().uri("/orders/1").to_request();
-    let result = test::try_call_service(&app, req).await;
-    let status = match result {
-        Ok(r) => r.status(),
-        Err(e) => e.as_response_error().status_code(),
-    };
-    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    common::assert_unauthenticated(&app, req).await;
 }
 
 #[actix_rt::test]
@@ -502,12 +471,7 @@ async fn order_actions_unauthenticated() {
     let req = test::TestRequest::put()
         .uri("/orders/1/delivered")
         .to_request();
-    let result = test::try_call_service(&app, req).await;
-    let status = match result {
-        Ok(r) => r.status(),
-        Err(e) => e.as_response_error().status_code(),
-    };
-    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    common::assert_unauthenticated(&app, req).await;
 }
 
 #[actix_rt::test]

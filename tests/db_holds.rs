@@ -444,9 +444,7 @@ fn cleanup_expired_holds_returns_zero_when_none_expired() {
 
 #[test]
 fn concurrent_holds_on_last_stock_item_one_succeeds_one_conflicts() {
-    // Two concurrent hold_order calls on an item with stock=1.
-    // FOR UPDATE locking in hold_order serialises them: one gets the stock,
-    // the other sees stock=0 after the first commits and returns NotAvailable.
+    // FOR UPDATE in hold_order serialises concurrent holds on the same item.
     let (pool, fixtures) = common::setup_pool_with_fixtures();
 
     // Set stock to exactly 1
@@ -501,15 +499,8 @@ fn concurrent_holds_on_last_stock_item_one_succeeds_one_conflicts() {
 
 #[test]
 fn concurrent_confirm_and_cancel_same_hold_one_succeeds() {
-    // confirm_held_order and release_held_order do NOT use FOR UPDATE on the
-    // held_orders row, so both can read the hold before either commits.
-    // Under READ COMMITTED both transactions complete successfully:
-    //   - confirm creates 1 active_order and deletes the hold
-    //   - release restores stock and tries to delete the hold (0 rows, no error)
-    //
-    // This test documents the actual behaviour and asserts the invariant that
-    // the hold row is fully removed and exactly one active order exists after
-    // both operations complete, regardless of which "wins" the internal race.
+    // Under READ COMMITTED (no FOR UPDATE on held_orders), both operations can
+    // complete. The invariant: hold is removed and at most one active order exists.
     let (pool, fixtures) = common::setup_pool_with_fixtures();
 
     let hold_ops = HoldOperations::new(pool.clone(), 300);
@@ -535,8 +526,7 @@ fn concurrent_confirm_and_cancel_same_hold_one_succeeds() {
     let r1 = t1.join().expect("thread 1 panicked");
     let r2 = t2.join().expect("thread 2 panicked");
 
-    // At least one must succeed. Both can succeed (READ COMMITTED, no FOR UPDATE),
-    // or only one if the other sees the hold already deleted (NotFound).
+    // At least one must succeed; both can under READ COMMITTED.
     let successes = [r1.is_ok(), r2.is_ok()].iter().filter(|&&ok| ok).count();
     assert!(
         successes >= 1,

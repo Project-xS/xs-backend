@@ -103,8 +103,7 @@ async fn upload_asset_user_forbidden() {
 
 #[actix_rt::test]
 async fn upload_asset_nonexistent_item_id_still_presigns() {
-    // The handler does not check whether item_id exists in the DB;
-    // it only generates a presigned S3 URL using the raw id as a key.
+    // The handler does not validate item_id against the DB; it only generates a presigned URL.
     let (app, fixtures, _db_url) = common::setup_api_app().await;
 
     let req = test::TestRequest::post()
@@ -142,12 +141,7 @@ async fn upload_asset_unauthenticated() {
     let req = test::TestRequest::post()
         .uri("/assets/upload/1")
         .to_request();
-    let result = test::try_call_service(&app, req).await;
-    let status = match result {
-        Ok(r) => r.status(),
-        Err(e) => e.as_response_error().status_code(),
-    };
-    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    common::assert_unauthenticated(&app, req).await;
 }
 
 #[actix_rt::test]
@@ -157,10 +151,5 @@ async fn get_asset_unauthenticated() {
     let req = test::TestRequest::get()
         .uri("/assets/some_key")
         .to_request();
-    let result = test::try_call_service(&app, req).await;
-    let status = match result {
-        Ok(r) => r.status(),
-        Err(e) => e.as_response_error().status_code(),
-    };
-    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    common::assert_unauthenticated(&app, req).await;
 }

@@ -37,7 +37,7 @@ fn admin_jwt_wrong_secret_fails() {
 #[test]
 fn admin_jwt_expired_token_fails() {
     let cfg = test_jwt_config();
-    // Build a token with exp=1 (ancient past) using the same secret
+    // Build a token with timestamp=1 (expired) using the same secret
     let claims = serde_json::json!({
         "iss": cfg.issuer,
         "aud": cfg.audience,

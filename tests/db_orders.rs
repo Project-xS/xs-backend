@@ -401,14 +401,8 @@ async fn order_actions_handles_cancelled_and_missing() {
 
 #[actix_rt::test]
 async fn concurrent_create_orders_on_last_stock_item_one_succeeds() {
-    // Unlike hold_order (which uses FOR UPDATE), create_order does NOT lock
-    // menu_items rows before checking stock. Two concurrent calls on stock=1
-    // can therefore both read stock=1, both pass the availability check, and
-    // both create an active order — resulting in overselling.
-    //
-    // This test documents the known behaviour: both calls succeed and 2 orders
-    // are created for a single unit of stock. The correct API path (hold →
-    // confirm) uses hold_order which does apply FOR UPDATE locking.
+    // create_order lacks FOR UPDATE, so both concurrent calls can succeed (known
+    // oversell). The correct path (hold → confirm) uses hold_order with FOR UPDATE.
     let (pool, fixtures) = common::setup_pool_with_fixtures();
 
     {
@@ -443,7 +437,7 @@ async fn concurrent_create_orders_on_last_stock_item_one_succeeds() {
     let r1 = t1.join().expect("thread 1 panicked");
     let r2 = t2.join().expect("thread 2 panicked");
 
-    // Both can succeed due to missing FOR UPDATE — document this as known behaviour.
+    // Both succeed due to missing FOR UPDATE — known behaviour.
     assert!(
         r1.is_ok() && r2.is_ok(),
         "both calls succeed (no FOR UPDATE in create_order)"
@@ -458,10 +452,8 @@ async fn concurrent_create_orders_on_last_stock_item_one_succeeds() {
 
 #[actix_rt::test]
 async fn deliver_and_cancel_same_order_race() {
-    // Delivering and cancelling the same order concurrently: both try to
-    // INSERT INTO past_orders with the same order_id.  One succeeds; the other
-    // hits a UniqueViolation on the primary key (or may get NotFound if the
-    // other already deleted the active_order row first).
+    // Both try to INSERT INTO past_orders with the same PK. One succeeds; the
+    // other gets UniqueViolation or NotFound.
     let (pool, fixtures) = common::setup_pool_with_fixtures();
     let order_ops = OrderOperations::new(pool.clone()).await;
     order_ops
@@ -499,8 +491,7 @@ async fn deliver_and_cancel_same_order_race() {
     let successes = [&r1, &r2].iter().filter(|r| r.is_ok()).count();
     assert_eq!(successes, 1, "exactly one action should win");
 
-    // The losing thread gets either NotFound (active order already deleted)
-    // or a DatabaseError (UniqueViolation on past_orders PK).
+    // The losing thread gets NotFound or UniqueViolation.
     let loser = if r1.is_err() { &r1 } else { &r2 };
     assert!(
         matches!(

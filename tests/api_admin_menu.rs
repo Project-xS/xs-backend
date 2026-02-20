@@ -508,12 +508,7 @@ async fn create_menu_item_unauthenticated() {
             "has_pic": false
         }))
         .to_request();
-    let result = test::try_call_service(&app, req).await;
-    let status = match result {
-        Ok(r) => r.status(),
-        Err(e) => e.as_response_error().status_code(),
-    };
-    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    common::assert_unauthenticated(&app, req).await;
 }
 
 #[actix_rt::test]
@@ -559,7 +554,7 @@ async fn update_menu_item_all_null_update() {
         .to_request();
     let resp = test::call_service(&app, req).await;
     let status = resp.status();
-    // Diesel behavior with all-None changeset may be a no-op (200) or an error (409)
+    // Diesel may treat all-None changeset as no-op (200) or error (409)
     assert!(
         status == StatusCode::OK || status == StatusCode::CONFLICT,
         "expected 200 or 409 for all-null update, got {:?}",
@@ -638,12 +633,7 @@ async fn update_menu_item_unauthenticated() {
             "update": {"name": "Ghost"}
         }))
         .to_request();
-    let result = test::try_call_service(&app, req).await;
-    let status = match result {
-        Ok(r) => r.status(),
-        Err(e) => e.as_response_error().status_code(),
-    };
-    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    common::assert_unauthenticated(&app, req).await;
 }
 
 #[actix_rt::test]
@@ -653,12 +643,7 @@ async fn delete_menu_item_unauthenticated() {
     let req = test::TestRequest::delete()
         .uri(&format!("/menu/delete/{}", fixtures.menu_item_ids[0]))
         .to_request();
-    let result = test::try_call_service(&app, req).await;
-    let status = match result {
-        Ok(r) => r.status(),
-        Err(e) => e.as_response_error().status_code(),
-    };
-    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    common::assert_unauthenticated(&app, req).await;
 }
 
 #[actix_rt::test]
@@ -753,12 +738,7 @@ async fn get_menu_items_unauthenticated() {
     let (app, _fixtures, _db_url) = common::setup_api_app().await;
 
     let req = test::TestRequest::get().uri("/menu/items").to_request();
-    let result = test::try_call_service(&app, req).await;
-    let status = match result {
-        Ok(r) => r.status(),
-        Err(e) => e.as_response_error().status_code(),
-    };
-    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    common::assert_unauthenticated(&app, req).await;
 }
 
 #[actix_rt::test]
@@ -768,12 +748,7 @@ async fn get_menu_item_by_id_unauthenticated() {
     let req = test::TestRequest::get()
         .uri(&format!("/menu/items/{}", fixtures.menu_item_ids[0]))
         .to_request();
-    let result = test::try_call_service(&app, req).await;
-    let status = match result {
-        Ok(r) => r.status(),
-        Err(e) => e.as_response_error().status_code(),
-    };
-    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    common::assert_unauthenticated(&app, req).await;
 }
 
 #[actix_rt::test]
@@ -822,12 +797,7 @@ async fn upload_menu_item_pic_unauthenticated() {
     let req = test::TestRequest::put()
         .uri("/menu/upload_pic/1")
         .to_request();
-    let result = test::try_call_service(&app, req).await;
-    let status = match result {
-        Ok(r) => r.status(),
-        Err(e) => e.as_response_error().status_code(),
-    };
-    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    common::assert_unauthenticated(&app, req).await;
 }
 
 #[actix_rt::test]
@@ -835,12 +805,7 @@ async fn set_menu_item_pic_unauthenticated() {
     let (app, _fixtures, _db_url) = common::setup_api_app().await;
 
     let req = test::TestRequest::put().uri("/menu/set_pic/1").to_request();
-    let result = test::try_call_service(&app, req).await;
-    let status = match result {
-        Ok(r) => r.status(),
-        Err(e) => e.as_response_error().status_code(),
-    };
-    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    common::assert_unauthenticated(&app, req).await;
 }
 
 #[actix_rt::test]

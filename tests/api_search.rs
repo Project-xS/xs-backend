@@ -85,12 +85,7 @@ async fn search_unauthenticated() {
     let req = test::TestRequest::get()
         .uri("/search/Sandwich")
         .to_request();
-    let result = test::try_call_service(&app, req).await;
-    let status = match result {
-        Ok(r) => r.status(),
-        Err(e) => e.as_response_error().status_code(),
-    };
-    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    common::assert_unauthenticated(&app, req).await;
 }
 
 #[actix_rt::test]
@@ -164,10 +159,5 @@ async fn search_by_canteen_unauthenticated() {
     let req = test::TestRequest::get()
         .uri(&format!("/search/{}/Sandwich", fixtures.canteen_id))
         .to_request();
-    let result = test::try_call_service(&app, req).await;
-    let status = match result {
-        Ok(r) => r.status(),
-        Err(e) => e.as_response_error().status_code(),
-    };
-    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    common::assert_unauthenticated(&app, req).await;
 }

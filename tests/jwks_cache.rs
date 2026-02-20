@@ -89,8 +89,7 @@ async fn jwks_cache_hit_avoids_second_network_call() {
 
 #[actix_rt::test]
 async fn jwks_cache_control_max_age_header_used() {
-    // Serve a key with Cache-Control: max-age=300.  The cache should accept the
-    // response, use the 300-second TTL, and return the key successfully.
+    // Serve a key with Cache-Control: max-age=300 and verify it's accepted.
     let server = wiremock::MockServer::start().await;
     wiremock::Mock::given(wiremock::matchers::method("GET"))
         .and(wiremock::matchers::path("/jwks"))
@@ -115,11 +114,8 @@ async fn jwks_cache_control_max_age_header_used() {
 
 #[actix_rt::test]
 async fn jwks_x509_fallback_invalid_cert_silently_skipped() {
-    // When the response body is not a valid JWKS `{"keys":[...]}` structure,
-    // the code falls back to the Firebase X.509 map format
-    // `{"kid":"-----BEGIN CERTIFICATE-----..."}`.
-    // An invalid PEM value is silently skipped; get_key returns NotFound.
-    // This verifies the fallback branch runs without panicking.
+    // Not a valid JWKS; code falls back to Firebase X.509 map format.
+    // Invalid PEM is silently skipped → get_key returns NotFound.
     let server = wiremock::MockServer::start().await;
     let x509_body = serde_json::json!({
         "x509-key": "not-a-valid-pem-certificate"
@@ -148,8 +144,7 @@ async fn jwks_x509_fallback_invalid_cert_silently_skipped() {
 
 #[actix_rt::test]
 async fn jwks_unparseable_body_returns_not_found() {
-    // If the server returns a completely non-JSON body, both parse attempts fail.
-    // refresh() returns JwksError::Parse but get_key discards it and returns NotFound.
+    // Non-JSON body → both parse attempts fail → get_key returns NotFound.
     let server = wiremock::MockServer::start().await;
     wiremock::Mock::given(wiremock::matchers::method("GET"))
         .and(wiremock::matchers::path("/jwks"))
@@ -176,7 +171,7 @@ async fn jwks_unparseable_body_returns_not_found() {
 
 #[actix_rt::test]
 async fn jwks_network_error_returns_not_found() {
-    // refresh() fails with JwksError::Network; get_key swallows it and returns NotFound.
+    // refresh() fails with JwksError::Network → get_key returns NotFound.
     let cache = JwksCache::new("http://127.0.0.1:1/jwks".to_string(), 3600);
     let err = cache
         .get_key("any-kid")

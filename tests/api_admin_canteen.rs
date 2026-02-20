@@ -338,12 +338,7 @@ async fn create_canteen_unauthenticated() {
             "has_pic": false
         }))
         .to_request();
-    let result = test::try_call_service(&app, req).await;
-    let status = match result {
-        Ok(r) => r.status(),
-        Err(e) => e.as_response_error().status_code(),
-    };
-    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    common::assert_unauthenticated(&app, req).await;
 }
 
 #[actix_rt::test]
@@ -425,12 +420,7 @@ async fn get_all_canteens_unauthenticated() {
     let (app, _fixtures, _db_url) = common::setup_api_app().await;
 
     let req = test::TestRequest::get().uri("/canteen").to_request();
-    let result = test::try_call_service(&app, req).await;
-    let status = match result {
-        Ok(r) => r.status(),
-        Err(e) => e.as_response_error().status_code(),
-    };
-    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    common::assert_unauthenticated(&app, req).await;
 }
 
 #[actix_rt::test]
@@ -451,7 +441,7 @@ async fn get_all_canteens_has_pic_true_null_link() {
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), StatusCode::OK);
 
-    // List all canteens — pic_link should be null in test env (no S3 object)
+    // List all canteens — pic_link should be null (no S3 object in test env)
     let req = test::TestRequest::get()
         .uri("/canteen")
         .insert_header(auth_header())
@@ -471,7 +461,7 @@ async fn get_all_canteens_has_pic_true_null_link() {
 async fn get_canteen_items_admin_different_canteen() {
     let (app, fixtures, _db_url) = common::setup_api_app().await;
 
-    // Admin requests items for canteen_id 99999 — should still return admin's own canteen items
+    // Admin requests items for canteen_id 99999 — returns admin's own canteen items
     let req = test::TestRequest::get()
         .uri(&format!(
             "/canteen/99999/items?as=admin-{}",
@@ -494,12 +484,7 @@ async fn get_canteen_items_unauthenticated() {
     let req = test::TestRequest::get()
         .uri(&format!("/canteen/{}/items", fixtures.canteen_id))
         .to_request();
-    let result = test::try_call_service(&app, req).await;
-    let status = match result {
-        Ok(r) => r.status(),
-        Err(e) => e.as_response_error().status_code(),
-    };
-    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    common::assert_unauthenticated(&app, req).await;
 }
 
 #[actix_rt::test]
@@ -509,12 +494,7 @@ async fn upload_canteen_pic_unauthenticated() {
     let req = test::TestRequest::put()
         .uri("/canteen/upload_pic")
         .to_request();
-    let result = test::try_call_service(&app, req).await;
-    let status = match result {
-        Ok(r) => r.status(),
-        Err(e) => e.as_response_error().status_code(),
-    };
-    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    common::assert_unauthenticated(&app, req).await;
 }
 
 #[actix_rt::test]
@@ -524,12 +504,7 @@ async fn set_canteen_pic_unauthenticated() {
     let req = test::TestRequest::put()
         .uri("/canteen/set_pic")
         .to_request();
-    let result = test::try_call_service(&app, req).await;
-    let status = match result {
-        Ok(r) => r.status(),
-        Err(e) => e.as_response_error().status_code(),
-    };
-    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    common::assert_unauthenticated(&app, req).await;
 }
 
 #[actix_rt::test]

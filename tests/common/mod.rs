@@ -11,6 +11,7 @@ use actix_http::Request;
 use actix_web::body::BoxBody;
 use actix_web::dev::{Service, ServiceResponse};
 use actix_web::http::header;
+use actix_web::http::StatusCode;
 use actix_web::{test, web, App, Error};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
@@ -31,6 +32,19 @@ pub struct TestDb {
 }
 
 static TEST_DB: OnceLock<TestDb> = OnceLock::new();
+
+/// Calls `try_call_service` and asserts the response is 401 Unauthorized.
+/// Use for endpoints that should reject unauthenticated requests.
+pub async fn assert_unauthenticated<S>(app: &S, req: Request)
+where
+    S: Service<Request, Response = ServiceResponse<BoxBody>, Error = Error>,
+{
+    let status = match test::try_call_service(app, req).await {
+        Ok(r) => r.status(),
+        Err(e) => e.as_response_error().status_code(),
+    };
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
 
 pub fn auth_header() -> (header::HeaderName, String) {
     let token = std::env::var("DEV_BYPASS_TOKEN").expect("DEV_BYPASS_TOKEN");
@@ -168,18 +182,10 @@ pub async fn setup_api_app() -> (
 }
 
 // ---------------------------------------------------------------------------
-// Mock S3 helpers
+// Mock S3
 // ---------------------------------------------------------------------------
 
-/// RAII guard that runs a wiremock HTTP server posing as S3.
-///
-/// `S3_ENDPOINT` is pointed at the mock server for the duration of the guard's
-/// lifetime and restored to its previous value on drop.  Because tests must run
-/// with `--test-threads=1` this env-var manipulation is safe.
-///
-/// Call `start_mock_s3().await` to obtain a guard, then register mocks via
-/// `guard.mock_object_exists(key)` / `guard.mock_object_not_found(key)` before
-/// creating `AssetOperations` / calling `setup_api_app()`.
+/// RAII guard: runs a wiremock S3 server, overrides `S3_ENDPOINT`, restores on drop.
 pub struct MockS3Guard {
     pub server: wiremock::MockServer,
     previous_endpoint: Option<String>,
@@ -195,12 +201,11 @@ impl Drop for MockS3Guard {
 }
 
 impl MockS3Guard {
-    /// Returns the base URL of the mock server (used as `S3_ENDPOINT`).
     pub fn uri(&self) -> String {
         self.server.uri()
     }
 
-    /// Register a mock: `GET /{bucket}/{key_suffix}` → 200 with an ETag.
+    /// Mock `GET /{bucket}/{key_suffix}` → 200 with an ETag.
     pub async fn mock_object_exists(&self, key_suffix: &str) {
         let bucket = std::env::var("S3_BUCKET_NAME").unwrap_or_else(|_| "test-bucket".to_string());
         wiremock::Mock::given(wiremock::matchers::method("GET"))
@@ -217,7 +222,7 @@ impl MockS3Guard {
             .await;
     }
 
-    /// Register a mock: `GET /{bucket}/{key_suffix}` → 404 (maps to S3Error::NotFound).
+    /// Mock `GET /{bucket}/{key_suffix}` → 404.
     pub async fn mock_object_not_found(&self, key_suffix: &str) {
         let bucket = std::env::var("S3_BUCKET_NAME").unwrap_or_else(|_| "test-bucket".to_string());
         wiremock::Mock::given(wiremock::matchers::method("GET"))
@@ -235,12 +240,9 @@ impl MockS3Guard {
     }
 }
 
-/// Start a mock S3 HTTP server and point `S3_ENDPOINT` at it.
-///
-/// Must be called **before** `setup_api_app()` / `AssetOperations::new()` so
-/// that those constructors pick up the overridden endpoint.
+/// Start a mock S3 server. Must be called **before** `setup_api_app()` / `AssetOperations::new()`.
 pub async fn start_mock_s3() -> MockS3Guard {
-    // Ensure all other test env vars are initialised first (except S3_ENDPOINT).
+    // Ensure all other test env vars are initialised first.
     init_test_env();
     let previous_endpoint = std::env::var("S3_ENDPOINT").ok();
     let server = wiremock::MockServer::start().await;

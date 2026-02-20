@@ -85,9 +85,8 @@ async fn search_by_canteen_filters_correctly() {
 
 #[test]
 fn pg_trgm_similarity_threshold_matches_migration() {
-    // Migration 2025-02-17-173826_add_search/up.sql installs pg_trgm and a GIN index
-    // but sets NO custom similarity_threshold, so the PostgreSQL default (0.3) is in effect.
-    // If a future migration explicitly sets pg_trgm.similarity_threshold, update this value.
+    // Migration installs pg_trgm with no custom threshold, so PostgreSQL default (0.3) applies.
+    // Update this value if a future migration sets pg_trgm.similarity_threshold.
     let pool = common::setup_pool();
     let mut conn = proj_xs::db::DbConnection::new(&pool).expect("db connection");
 
@@ -99,7 +98,6 @@ fn pg_trgm_similarity_threshold_matches_migration() {
 
     assert_eq!(
         threshold, "0.3",
-        "pg_trgm similarity_threshold should be 0.3 (PostgreSQL default; no migration override). \
-         If a migration changes this, update the expected value here."
+        "expected PostgreSQL default (0.3); update if a migration changes this"
     );
 }

@@ -11,12 +11,7 @@ async fn rejects_missing_bearer_token() {
     let req = test::TestRequest::get()
         .uri(&format!("/orders/by_user?as=user-{}", fixtures.user_id))
         .to_request();
-    // Middleware returns Err for missing token; use try_call_service to capture it
-    let status = match test::try_call_service(&app, req).await {
-        Ok(resp) => resp.status(),
-        Err(e) => e.as_response_error().status_code(),
-    };
-    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    common::assert_unauthenticated(&app, req).await;
 }
 
 #[actix_rt::test]
@@ -27,11 +22,7 @@ async fn rejects_invalid_bearer_token() {
         .uri(&format!("/orders/by_user?as=user-{}", fixtures.user_id))
         .insert_header((header::AUTHORIZATION, "Bearer invalid-token"))
         .to_request();
-    let status = match test::try_call_service(&app, req).await {
-        Ok(resp) => resp.status(),
-        Err(e) => e.as_response_error().status_code(),
-    };
-    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    common::assert_unauthenticated(&app, req).await;
 }
 
 #[actix_rt::test]
@@ -57,12 +48,9 @@ async fn admin_on_user_endpoint_returns_forbidden() {
 
 #[actix_rt::test]
 async fn dev_bypass_invalid_as_param_defaults_to_user() {
-    let (app, fixtures, _db_url) = common::setup_api_app().await;
+    let (app, _fixtures, _db_url) = common::setup_api_app().await;
 
-    // "?as=garbage" doesn't match "user-{id}" or "admin-{id}"; middleware defaults to user_id=1
-    // The user created during fixture setup has the lowest id. We just verify the request
-    // is handled (not rejected as 401/403) by a user endpoint.
-    let _ = fixtures; // suppress unused warning
+    // "?as=garbage" doesn't match "user-{id}" or "admin-{id}"; defaults to user_id=1.
     let req = test::TestRequest::get()
         .uri("/users/get_past_orders?as=garbage")
         .insert_header(common::auth_header())
