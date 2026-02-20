@@ -21,17 +21,18 @@ use proj_xs::test_utils::{
     build_test_pool, init_test_env, reset_db, seed_basic_fixtures, TestFixtures,
 };
 use proj_xs::{api, AppState};
-use testcontainers::clients::Cli;
-use testcontainers::Container;
-use testcontainers::GenericImage;
+use testcontainers::core::IntoContainerPort;
+use testcontainers::runners::AsyncRunner;
+use testcontainers::{ContainerAsync, GenericImage, ImageExt};
 use utoipa_actix_web::AppExt;
 
 pub struct TestDb {
     pub database_url: String,
-    _container: Option<Container<'static, GenericImage>>,
+    _container: Option<ContainerAsync<GenericImage>>,
 }
 
 static TEST_DB: OnceLock<TestDb> = OnceLock::new();
+static TEST_DB_RT: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
 
 /// Calls `try_call_service` and asserts the response is 401 Unauthorized.
 /// Use for endpoints that should reject unauthenticated requests.
@@ -88,6 +89,17 @@ pub fn menu_item_state(conn: &mut PgConnection, item_id_val: i32) -> (i32, bool)
         .expect("menu item state")
 }
 
+fn test_db_runtime() -> &'static tokio::runtime::Runtime {
+    TEST_DB_RT.get_or_init(|| {
+        tokio::runtime::Builder::new_multi_thread()
+            .thread_name("test-db-runtime")
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .expect("create test db runtime")
+    })
+}
+
 pub fn setup_test_db() -> &'static TestDb {
     TEST_DB.get_or_init(|| {
         if let Ok(url) = env::var("DATABASE_URL") {
@@ -97,15 +109,37 @@ pub fn setup_test_db() -> &'static TestDb {
             };
         }
 
-        let docker = Box::leak(Box::new(Cli::default()));
-        let image = GenericImage::new("postgres", "17-alpine")
-            .with_env_var("POSTGRES_USER", "postgres")
-            .with_env_var("POSTGRES_PASSWORD", "postgres")
-            .with_env_var("POSTGRES_DB", "proj_xs_test")
-            .with_exposed_port(5432);
+        let start = || async {
+            let container =
+                GenericImage::new("public.ecr.aws/docker/library/postgres", "17-alpine")
+                    .with_exposed_port(5432.tcp())
+                    .with_env_var("POSTGRES_USER", "postgres")
+                    .with_env_var("POSTGRES_PASSWORD", "postgres")
+                    .with_env_var("POSTGRES_DB", "proj_xs_test")
+                    .start()
+                    .await
+                    .expect("start postgres container");
+            let port = container
+                .get_host_port_ipv4(5432.tcp())
+                .await
+                .expect("get postgres port");
+            (container, port)
+        };
 
-        let container = docker.run(image);
-        let port = container.get_host_port_ipv4(5432);
+        let (container, port) = match tokio::runtime::Handle::try_current() {
+            Ok(handle) => {
+                if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::CurrentThread {
+                    let (tx, rx) = std::sync::mpsc::channel();
+                    std::thread::spawn(move || {
+                        let _ = tx.send(test_db_runtime().block_on(start()));
+                    });
+                    rx.recv().expect("receive test db init")
+                } else {
+                    tokio::task::block_in_place(|| handle.block_on(start()))
+                }
+            }
+            Err(_) => test_db_runtime().block_on(start()),
+        };
         let database_url = format!("postgres://postgres:postgres@127.0.0.1:{port}/proj_xs_test");
 
         TestDb {
