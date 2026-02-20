@@ -86,7 +86,7 @@ impl CanteenOperations {
 
         let etag = self
             .asset_ops
-            .get_object_etag(&canteen_id_to_update.to_string())
+            .get_object_etag(&format!("canteens/{}", canteen_id_to_update))
             .await?;
         if etag.is_some() {
             info!("set_menu_item_pic: etag: {}", etag.clone().unwrap());

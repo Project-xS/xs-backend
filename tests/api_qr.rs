@@ -277,3 +277,36 @@ async fn user_cannot_scan_qr() {
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 }
+
+#[actix_rt::test]
+async fn qr_generation_order_with_no_items_returns_not_found() {
+    // Insert an active_order row without any active_order_items so that
+    // get_orders_by_orderid_no_pics returns Some(data) with data.items.is_empty() == true.
+    let (app, fixtures, db_url) = common::setup_api_app().await;
+    let pool = build_test_pool(&db_url);
+    let mut conn = DbConnection::new(&pool).expect("db connection");
+
+    // Insert an order for the user but skip inserting items.
+    use proj_xs::db::schema::active_orders::dsl as ao;
+    let order_id_val: i32 = diesel::insert_into(ao::active_orders)
+        .values((
+            ao::user_id.eq(fixtures.user_id),
+            ao::canteen_id.eq(fixtures.canteen_id),
+            ao::total_price.eq(0),
+        ))
+        .returning(ao::order_id)
+        .get_result(conn.connection())
+        .expect("insert order without items");
+
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/orders/{}/qr?as=user-{}",
+            order_id_val, fixtures.user_id
+        ))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    let body: Value = test::read_body_json(resp).await;
+    assert_eq!(body["status"], "error");
+}

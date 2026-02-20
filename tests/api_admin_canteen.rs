@@ -531,3 +531,27 @@ async fn set_canteen_pic_unauthenticated() {
     };
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
+
+#[actix_rt::test]
+async fn canteen_set_pic_success_when_object_exists() {
+    // Mock S3 before app creation.
+    let mock_s3 = common::start_mock_s3().await;
+    let (app, fixtures, _db_url) = common::setup_api_app().await;
+
+    // set_canteen_pic calls get_object_etag("canteens/{canteen_id}")
+    mock_s3
+        .mock_object_exists(&format!("canteens/{}", fixtures.canteen_id))
+        .await;
+
+    let req = test::TestRequest::put()
+        .uri(&format!(
+            "/canteen/set_pic?as=admin-{}",
+            fixtures.canteen_id
+        ))
+        .insert_header(common::auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    assert_eq!(body["status"], "ok");
+}

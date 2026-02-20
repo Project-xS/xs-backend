@@ -166,3 +166,87 @@ pub async fn setup_api_app() -> (
 
     (app, fixtures, db.database_url.clone())
 }
+
+// ---------------------------------------------------------------------------
+// Mock S3 helpers
+// ---------------------------------------------------------------------------
+
+/// RAII guard that runs a wiremock HTTP server posing as S3.
+///
+/// `S3_ENDPOINT` is pointed at the mock server for the duration of the guard's
+/// lifetime and restored to its previous value on drop.  Because tests must run
+/// with `--test-threads=1` this env-var manipulation is safe.
+///
+/// Call `start_mock_s3().await` to obtain a guard, then register mocks via
+/// `guard.mock_object_exists(key)` / `guard.mock_object_not_found(key)` before
+/// creating `AssetOperations` / calling `setup_api_app()`.
+pub struct MockS3Guard {
+    pub server: wiremock::MockServer,
+    previous_endpoint: Option<String>,
+}
+
+impl Drop for MockS3Guard {
+    fn drop(&mut self) {
+        match &self.previous_endpoint {
+            Some(v) => std::env::set_var("S3_ENDPOINT", v),
+            None => std::env::remove_var("S3_ENDPOINT"),
+        }
+    }
+}
+
+impl MockS3Guard {
+    /// Returns the base URL of the mock server (used as `S3_ENDPOINT`).
+    pub fn uri(&self) -> String {
+        self.server.uri()
+    }
+
+    /// Register a mock: `GET /{bucket}/{key_suffix}` → 200 with an ETag.
+    pub async fn mock_object_exists(&self, key_suffix: &str) {
+        let bucket = std::env::var("S3_BUCKET_NAME").unwrap_or_else(|_| "test-bucket".to_string());
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path(format!(
+                "/{}/{}",
+                bucket, key_suffix
+            )))
+            .respond_with(
+                wiremock::ResponseTemplate::new(200)
+                    .insert_header("etag", "\"test-etag-abc123\"")
+                    .set_body_bytes(b"fake-image-data"),
+            )
+            .mount(&self.server)
+            .await;
+    }
+
+    /// Register a mock: `GET /{bucket}/{key_suffix}` → 404 (maps to S3Error::NotFound).
+    pub async fn mock_object_not_found(&self, key_suffix: &str) {
+        let bucket = std::env::var("S3_BUCKET_NAME").unwrap_or_else(|_| "test-bucket".to_string());
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path(format!(
+                "/{}/{}",
+                bucket, key_suffix
+            )))
+            .respond_with(
+                wiremock::ResponseTemplate::new(404).set_body_string(
+                    r#"<?xml version="1.0" encoding="UTF-8"?><Error><Code>NoSuchKey</Code><Message>The specified key does not exist.</Message></Error>"#,
+                ),
+            )
+            .mount(&self.server)
+            .await;
+    }
+}
+
+/// Start a mock S3 HTTP server and point `S3_ENDPOINT` at it.
+///
+/// Must be called **before** `setup_api_app()` / `AssetOperations::new()` so
+/// that those constructors pick up the overridden endpoint.
+pub async fn start_mock_s3() -> MockS3Guard {
+    // Ensure all other test env vars are initialised first (except S3_ENDPOINT).
+    init_test_env();
+    let previous_endpoint = std::env::var("S3_ENDPOINT").ok();
+    let server = wiremock::MockServer::start().await;
+    std::env::set_var("S3_ENDPOINT", server.uri());
+    MockS3Guard {
+        server,
+        previous_endpoint,
+    }
+}
