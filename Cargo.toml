@@ -8,28 +8,28 @@ name = "proj-xs"
 path = "src/main.rs"
 
 [dependencies]
-actix-web = "4.10.2"
-futures = "0.3.31"
+actix-web = "4.13"
+futures = "0.3.32"
 utoipa-actix-web = "0.1.2"
-utoipa = { version = "5.3.1", features = ["actix_extras"] }
-utoipa-swagger-ui = { version = "9.0.0", features = ["actix-web", "vendored"] }
-serde = {version = "1.0.219", features = ["derive"]}
-diesel = {version = "2.2.8", features = ["postgres", "r2d2", "chrono"]}
-pq-sys = { version = "0.7.0", features = ["bundled"] }
-openssl-sys = { version = "0.9.106", features = ["vendored"] }
-diesel_migrations = { version = "2.2.0", features = ["postgres"] }
-chrono = {version = "0.4.40", features = ["serde"]}
-dotenvy = "0.15.7"
-log = "0.4.26"
-pretty_env_logger = "0.5.0"
-thiserror = "2.0.12"
-aws-sdk-s3 = "1.79.0"
-aws-config = { version = "1.6.0", features = ["behavior-version-latest"] }
+utoipa = { version = "5.4", features = ["actix_extras"] }
+utoipa-swagger-ui = { version = "9.0", features = ["actix-web", "vendored"] }
+serde = {version = "1.0.228", features = ["derive"]}
+diesel = {version = "2.3", features = ["postgres", "r2d2", "chrono"]}
+pq-sys = { version = "0.7.5", features = ["bundled"] }
+openssl-sys = { version = "0.9.111", features = ["vendored"] }
+diesel_migrations = { version = "2.3", features = ["postgres"] }
+chrono = {version = "0.4", features = ["serde"]}
+dotenvy = "0.15"
+log = "0.4"
+pretty_env_logger = "0.5"
+thiserror = "2.0"
+aws-sdk-s3 = "1.124"
+aws-config = { version = "1.8", features = ["behavior-version-latest"] }
 with_pic_macro = { path = "with_pic_macro" }
-jsonwebtoken = "9.3.0"
-reqwest = { version = "0.12.8", default-features = false, features = ["rustls-tls"] }
-tokio = { version = "1.41.1", features = ["rt-multi-thread", "macros", "sync", "time"] }
-serde_json = "1.0.132"
+jsonwebtoken = "10.3"
+reqwest = { version = "0.13", default-features = false, features = ["rustls"] }
+tokio = { version = "1.49", features = ["rt-multi-thread", "macros", "sync", "time"] }
+serde_json = "1.0"
 base64 = "0.22.1"
 hmac = "0.12"
 sha2 = "0.10"
@@ -38,9 +38,9 @@ qrcode = "0.14"
 image = { version = "0.25", default-features = false, features = ["png"] }
 
 [dev-dependencies]
-testcontainers = "0.15.0"
-actix-rt = "2.10.0"
-actix-http = "3.10.0"
+testcontainers = "0.27.0"
+actix-rt = "2.11.0"
+actix-http = "3.12.0"
 wiremock = "0.6"
 
 [workspace]
