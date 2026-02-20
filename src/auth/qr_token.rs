@@ -92,3 +92,30 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     }
     result == 0
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn verify_expired_token() {
+        let secret = "test-secret";
+        // Construct a token with timestamp = 1 (Unix epoch start) which is definitely expired
+        let payload = "1|1|1";
+        let signature = sign_payload(payload, secret);
+        let token_raw = format!("{}|{}", payload, signature);
+        let token = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(token_raw.as_bytes());
+        let result = verify_qr_token(&token, secret, 60);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Token has expired");
+    }
+
+    #[test]
+    fn constant_time_eq_basic() {
+        assert!(constant_time_eq(b"hello", b"hello"));
+        assert!(!constant_time_eq(b"hello", b"hellx"));
+        assert!(!constant_time_eq(b"hello", b"hello!"));
+        assert!(!constant_time_eq(b"", b"x"));
+        assert!(constant_time_eq(b"", b""));
+    }
+}
