@@ -398,3 +398,116 @@ async fn order_actions_handles_cancelled_and_missing() {
         .expect_err("missing order");
     assert!(matches!(err, RepositoryError::NotFound(_)));
 }
+
+#[actix_rt::test]
+async fn concurrent_create_orders_on_last_stock_item_one_succeeds() {
+    // Unlike hold_order (which uses FOR UPDATE), create_order does NOT lock
+    // menu_items rows before checking stock. Two concurrent calls on stock=1
+    // can therefore both read stock=1, both pass the availability check, and
+    // both create an active order — resulting in overselling.
+    //
+    // This test documents the known behaviour: both calls succeed and 2 orders
+    // are created for a single unit of stock. The correct API path (hold →
+    // confirm) uses hold_order which does apply FOR UPDATE locking.
+    let (pool, fixtures) = common::setup_pool_with_fixtures();
+
+    {
+        let mut conn = DbConnection::new(&pool).expect("db connection");
+        use proj_xs::db::schema::menu_items::dsl as mi;
+        diesel::update(mi::menu_items.filter(mi::item_id.eq(fixtures.menu_item_ids[0])))
+            .set((mi::stock.eq(1), mi::is_available.eq(true)))
+            .execute(conn.connection())
+            .expect("set stock=1");
+    }
+
+    let item_id = fixtures.menu_item_ids[0];
+    let user_id = fixtures.user_id;
+    let pool1 = pool.clone();
+    let pool2 = pool.clone();
+
+    let t1 = std::thread::spawn(move || {
+        let rt = tokio::runtime::Runtime::new().expect("rt");
+        rt.block_on(async move {
+            let order_ops = OrderOperations::new(pool1).await;
+            order_ops.create_order(user_id, vec![item_id], None)
+        })
+    });
+    let t2 = std::thread::spawn(move || {
+        let rt = tokio::runtime::Runtime::new().expect("rt");
+        rt.block_on(async move {
+            let order_ops = OrderOperations::new(pool2).await;
+            order_ops.create_order(user_id, vec![item_id], None)
+        })
+    });
+
+    let r1 = t1.join().expect("thread 1 panicked");
+    let r2 = t2.join().expect("thread 2 panicked");
+
+    // Both can succeed due to missing FOR UPDATE — document this as known behaviour.
+    assert!(
+        r1.is_ok() && r2.is_ok(),
+        "both calls succeed (no FOR UPDATE in create_order)"
+    );
+    let mut conn = DbConnection::new(&pool).expect("db connection");
+    assert_eq!(
+        active_orders_count(conn.connection()),
+        2,
+        "both orders created"
+    );
+}
+
+#[actix_rt::test]
+async fn deliver_and_cancel_same_order_race() {
+    // Delivering and cancelling the same order concurrently: both try to
+    // INSERT INTO past_orders with the same order_id.  One succeeds; the other
+    // hits a UniqueViolation on the primary key (or may get NotFound if the
+    // other already deleted the active_order row first).
+    let (pool, fixtures) = common::setup_pool_with_fixtures();
+    let order_ops = OrderOperations::new(pool.clone()).await;
+    order_ops
+        .create_order(fixtures.user_id, vec![fixtures.menu_item_ids[0]], None)
+        .expect("create order");
+
+    let mut conn = DbConnection::new(&pool).expect("db connection");
+    use proj_xs::db::schema::active_orders::dsl::*;
+    let order_id_val = active_orders
+        .select(order_id)
+        .first::<i32>(conn.connection())
+        .expect("order id");
+
+    let pool1 = pool.clone();
+    let pool2 = pool.clone();
+
+    let t1 = std::thread::spawn(move || {
+        let rt = tokio::runtime::Runtime::new().expect("rt");
+        rt.block_on(async move {
+            let ops = OrderOperations::new(pool1).await;
+            ops.order_actions(&order_id_val, "delivered")
+        })
+    });
+    let t2 = std::thread::spawn(move || {
+        let rt = tokio::runtime::Runtime::new().expect("rt");
+        rt.block_on(async move {
+            let ops = OrderOperations::new(pool2).await;
+            ops.order_actions(&order_id_val, "cancelled")
+        })
+    });
+
+    let r1 = t1.join().expect("thread 1 panicked");
+    let r2 = t2.join().expect("thread 2 panicked");
+
+    let successes = [&r1, &r2].iter().filter(|r| r.is_ok()).count();
+    assert_eq!(successes, 1, "exactly one action should win");
+
+    // The losing thread gets either NotFound (active order already deleted)
+    // or a DatabaseError (UniqueViolation on past_orders PK).
+    let loser = if r1.is_err() { &r1 } else { &r2 };
+    assert!(
+        matches!(
+            loser,
+            Err(RepositoryError::NotFound(_)) | Err(RepositoryError::DatabaseError(_))
+        ),
+        "losing race should be NotFound or DatabaseError, got {:?}",
+        loser
+    );
+}

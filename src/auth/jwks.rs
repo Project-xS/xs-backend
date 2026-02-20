@@ -137,3 +137,36 @@ fn parse_max_age(header: &str) -> Option<u64> {
     }
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::parse_max_age;
+
+    #[test]
+    fn parse_max_age_simple() {
+        assert_eq!(parse_max_age("max-age=3600"), Some(3600));
+    }
+
+    #[test]
+    fn parse_max_age_with_directives() {
+        assert_eq!(
+            parse_max_age("public, max-age=7200, must-revalidate"),
+            Some(7200)
+        );
+    }
+
+    #[test]
+    fn parse_max_age_no_cache() {
+        assert_eq!(parse_max_age("no-cache, no-store"), None);
+    }
+
+    #[test]
+    fn parse_max_age_zero() {
+        assert_eq!(parse_max_age("max-age=0"), Some(0));
+    }
+
+    #[test]
+    fn parse_max_age_empty() {
+        assert_eq!(parse_max_age(""), None);
+    }
+}

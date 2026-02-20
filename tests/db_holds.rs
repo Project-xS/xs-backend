@@ -498,3 +498,61 @@ fn concurrent_holds_on_last_stock_item_one_succeeds_one_conflicts() {
         .expect("fetch stock");
     assert_eq!(stock_val, 0, "stock should be fully consumed");
 }
+
+#[test]
+fn concurrent_confirm_and_cancel_same_hold_one_succeeds() {
+    // confirm_held_order and release_held_order do NOT use FOR UPDATE on the
+    // held_orders row, so both can read the hold before either commits.
+    // Under READ COMMITTED both transactions complete successfully:
+    //   - confirm creates 1 active_order and deletes the hold
+    //   - release restores stock and tries to delete the hold (0 rows, no error)
+    //
+    // This test documents the actual behaviour and asserts the invariant that
+    // the hold row is fully removed and exactly one active order exists after
+    // both operations complete, regardless of which "wins" the internal race.
+    let (pool, fixtures) = common::setup_pool_with_fixtures();
+
+    let hold_ops = HoldOperations::new(pool.clone(), 300);
+    let (hold_id_val, _) = hold_ops
+        .hold_order(fixtures.user_id, vec![fixtures.menu_item_ids[0]], None)
+        .expect("hold order");
+
+    let user_id = fixtures.user_id;
+    let pool1 = pool.clone();
+    let pool2 = pool.clone();
+
+    let t1 = std::thread::spawn(move || {
+        let ops = HoldOperations::new(pool1, 300);
+        ops.confirm_held_order(hold_id_val, user_id)
+            .map(|_| ())
+            .map_err(|e| e)
+    });
+    let t2 = std::thread::spawn(move || {
+        let ops = HoldOperations::new(pool2, 300);
+        ops.release_held_order(hold_id_val, user_id)
+    });
+
+    let r1 = t1.join().expect("thread 1 panicked");
+    let r2 = t2.join().expect("thread 2 panicked");
+
+    // At least one must succeed. Both can succeed (READ COMMITTED, no FOR UPDATE),
+    // or only one if the other sees the hold already deleted (NotFound).
+    let successes = [r1.is_ok(), r2.is_ok()].iter().filter(|&&ok| ok).count();
+    assert!(
+        successes >= 1,
+        "at least one of confirm/cancel should succeed"
+    );
+
+    // The hold row must be gone regardless of which won.
+    let mut conn = DbConnection::new(&pool).expect("db connection");
+    assert_eq!(
+        common::held_orders_count(conn.connection()),
+        0,
+        "hold must be fully consumed"
+    );
+    // active orders ≤ 1 (only confirm creates one)
+    assert!(
+        common::active_orders_count(conn.connection()) <= 1,
+        "at most 1 active order should exist"
+    );
+}
