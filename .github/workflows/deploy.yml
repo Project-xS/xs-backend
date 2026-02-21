@@ -9,7 +9,7 @@ on:
 jobs:
   test:
     name: Tests
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     env:
       S3_ENDPOINT: http://localhost:9000
       S3_REGION: us-east-1
@@ -36,7 +36,7 @@ jobs:
 
   deploy:
     name: Deploy app
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     concurrency: deploy-group
     needs: test
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
