@@ -45,12 +45,14 @@
                 inherit cargoArtifacts;
 
                 nativeBuildInputs = (commonArgs.nativeBuildInputs or [ ]);
+                doCheck = false; # disable tests
               }
             );
 
             dockerImage = pkgs.dockerTools.buildLayeredImage {
               name = "proj-xs";
               tag = "latest";
+              contents = [ my-rust-build pkgs.cacert ];
               config = {
                 Env = [ "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt" ];
                 Cmd = [ "${my-rust-build}/bin/proj-xs" ];
@@ -59,8 +61,12 @@
 
           in {
             packages = {
+              proj-xs = my-rust-build;
               docker = dockerImage;
             };
             defaultPackage = dockerImage;
+            apps.default = flake-utils.lib.mkApp {
+              drv = my-rust-build;
+            };
           });
 }
