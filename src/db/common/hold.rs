@@ -115,6 +115,26 @@ impl HoldOperations {
 
                 canteen_id_in_order = items_in_order.first().unwrap().canteen_id;
 
+                // Block new holds if canteen is closed.
+                {
+                    use crate::db::schema::canteens::dsl::*;
+                    let open_flag = canteens
+                        .filter(canteen_id.eq(canteen_id_in_order))
+                        .select(is_open)
+                        .first::<bool>(conn)
+                        .map_err(|e| match e {
+                            Error::NotFound => RepositoryError::NotFound(format!(
+                                "canteens: {canteen_id_in_order}"
+                            )),
+                            other => RepositoryError::DatabaseError(other),
+                        })?;
+                    if !open_flag {
+                        return Err(RepositoryError::ValidationError(
+                            "Canteen is closed".to_string(),
+                        ));
+                    }
+                }
+
                 for item in &items_in_order {
                     item_prices.insert(item.item_id, item.price);
                     if canteen_id_in_order != item.canteen_id {

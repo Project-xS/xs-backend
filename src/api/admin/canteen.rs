@@ -4,11 +4,14 @@ use crate::auth::principal::Principal;
 use crate::auth::AdminJwtConfig;
 use crate::db::CanteenOperations;
 use crate::enums::admin::{
-    AllCanteenResponse, AllItemsResponse, GeneralMenuResponse, LoginRequest, LoginResponse,
-    NewCanteenResponse, UploadCanteenPicPresignedResponse,
+    AllCanteenResponse, AllItemsResponse, CanteenStatusResponse, GeneralMenuResponse, LoginRequest,
+    LoginResponse, NewCanteenResponse, UploadCanteenPicPresignedResponse,
 };
-use crate::models::admin::NewCanteen;
+use crate::models::admin::{NewCanteen, NewCanteenInsert};
+use crate::services::canteen_hours::{compute_close_at, parse_tz_offset_from_env};
+use crate::services::canteen_scheduler::CanteenSchedulerNotifier;
 use actix_web::{get, post, put, web, HttpResponse, Responder};
+use chrono::Utc;
 use log::{debug, error};
 
 #[utoipa::path(
@@ -33,8 +36,32 @@ pub(super) async fn create_canteen(
             error: Some("canteen_name must not be empty".to_string()),
         }));
     }
+    if req_data.opening_time.is_some() ^ req_data.closing_time.is_some() {
+        return Ok(HttpResponse::BadRequest().json(NewCanteenResponse {
+            status: "error".to_string(),
+            error: Some("opening_time and closing_time must be both set or both null".to_string()),
+        }));
+    }
+    if req_data.opening_time.is_some() && req_data.opening_time == req_data.closing_time {
+        return Ok(HttpResponse::BadRequest().json(NewCanteenResponse {
+            status: "error".to_string(),
+            error: Some("opening_time and closing_time cannot be the same".to_string()),
+        }));
+    }
+
     let item_name = req_data.canteen_name.clone();
-    let result = web::block(move || canteen_ops.create_canteen(req_data)).await?;
+    let should_open = req_data.opening_time.is_none();
+    let new_canteen = NewCanteenInsert {
+        canteen_name: req_data.canteen_name,
+        location: req_data.location,
+        has_pic: req_data.has_pic,
+        opening_time: req_data.opening_time,
+        closing_time: req_data.closing_time,
+        is_open: should_open,
+        last_opened_at: None,
+    };
+
+    let result = web::block(move || canteen_ops.create_canteen(new_canteen)).await?;
     match result {
         Ok(_) => {
             debug!(
@@ -289,5 +316,83 @@ pub(super) async fn login_canteen(
                 }),
             )
         }
+    }
+}
+
+#[utoipa::path(
+    tag = "Canteen",
+    responses(
+        (status = 200, description = "Canteen opened successfully", body = CanteenStatusResponse),
+        (status = 409, description = "Failed to open canteen", body = CanteenStatusResponse)
+    ),
+    summary = "Manually open the canteen for accepting new orders"
+)]
+#[post("/open")]
+pub(super) async fn open_canteen(
+    canteen_ops: web::Data<CanteenOperations>,
+    scheduler: web::Data<CanteenSchedulerNotifier>,
+    admin: crate::auth::AdminPrincipal,
+) -> actix_web::Result<impl Responder> {
+    let canteen_id = admin.canteen_id;
+    let tz = parse_tz_offset_from_env();
+    let now = Utc::now();
+
+    let result = web::block(move || {
+        let state = canteen_ops.get_canteen_hours_state(canteen_id)?;
+        if let (Some(opening), Some(closing)) = (state.opening_time, state.closing_time) {
+            let close_at = compute_close_at(now, opening, closing, tz);
+            if now >= close_at.with_timezone(&Utc) {
+                return Err(crate::db::RepositoryError::ValidationError(
+                    "closing time already passed for this window".to_string(),
+                ));
+            }
+        }
+        canteen_ops.set_canteen_open(canteen_id, now)
+    })
+    .await?;
+
+    match result {
+        Ok(_) => {
+            scheduler.notify();
+            Ok(HttpResponse::Ok().json(CanteenStatusResponse {
+                status: "ok".to_string(),
+                error: None,
+            }))
+        }
+        Err(e) => Ok(HttpResponse::Conflict().json(CanteenStatusResponse {
+            status: "error".to_string(),
+            error: Some(e.to_string()),
+        })),
+    }
+}
+
+#[utoipa::path(
+    tag = "Canteen",
+    responses(
+        (status = 200, description = "Canteen closed successfully", body = CanteenStatusResponse),
+        (status = 409, description = "Failed to close canteen", body = CanteenStatusResponse)
+    ),
+    summary = "Manually close the canteen for new orders"
+)]
+#[post("/close")]
+pub(super) async fn close_canteen(
+    canteen_ops: web::Data<CanteenOperations>,
+    scheduler: web::Data<CanteenSchedulerNotifier>,
+    admin: crate::auth::AdminPrincipal,
+) -> actix_web::Result<impl Responder> {
+    let canteen_id = admin.canteen_id;
+    let result = web::block(move || canteen_ops.set_canteen_closed(canteen_id)).await?;
+    match result {
+        Ok(_) => {
+            scheduler.notify();
+            Ok(HttpResponse::Ok().json(CanteenStatusResponse {
+                status: "ok".to_string(),
+                error: None,
+            }))
+        }
+        Err(e) => Ok(HttpResponse::Conflict().json(CanteenStatusResponse {
+            status: "error".to_string(),
+            error: Some(e.to_string()),
+        })),
     }
 }

@@ -30,6 +30,7 @@ diesel::table! {
 }
 
 diesel::table! {
+    use diesel::sql_types::*;
     canteens (canteen_id) {
         canteen_id -> Int4,
         canteen_name -> Varchar,
@@ -38,6 +39,10 @@ diesel::table! {
         password -> Varchar,
         has_pic -> Bool,
         pic_etag -> Nullable<Varchar>,
+        opening_time -> Nullable<Time>,
+        closing_time -> Nullable<Time>,
+        is_open -> Bool,
+        last_opened_at -> Nullable<Timestamptz>,
     }
 }
 

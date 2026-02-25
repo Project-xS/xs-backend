@@ -88,28 +88,18 @@ async fn main() -> std::io::Result<()> {
     {
         let hold_ops = state.hold_ops.clone();
         tokio::spawn(async move {
-            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(60));
-            loop {
-                interval.tick().await;
-                match web::block({
-                    let hold_ops = hold_ops.clone();
-                    move || hold_ops.cleanup_expired_holds()
-                })
-                .await
-                {
-                    Ok(Ok(count)) => {
-                        if count > 0 {
-                            info!("Background cleanup: released {} expired order holds", count);
-                        }
-                    }
-                    Ok(Err(e)) => {
-                        error!("Background cleanup error: {}", e);
-                    }
-                    Err(e) => {
-                        error!("Background cleanup blocking error: {}", e);
-                    }
-                }
-            }
+            proj_xs::services::hold_cleanup::run_hold_cleanup(hold_ops).await;
+        });
+    }
+
+    // Spawn background task to auto-close canteens based on hours
+    {
+        let canteen_ops = state.canteen_ops.clone();
+        let scheduler = state.canteen_scheduler.clone();
+        let tz = proj_xs::services::canteen_hours::parse_tz_offset_from_env();
+        tokio::spawn(async move {
+            proj_xs::services::canteen_scheduler::run_canteen_scheduler(canteen_ops, tz, scheduler)
+                .await;
         });
     }
 

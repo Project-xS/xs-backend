@@ -1,5 +1,6 @@
 use crate::api::ContentTypeHeader;
 use crate::db::{AssetOperations, CanteenOperations, MenuOperations};
+use crate::services::canteen_scheduler::CanteenSchedulerNotifier;
 use actix_web::middleware::NormalizePath;
 use actix_web::web;
 use asset_management::*;
@@ -16,6 +17,7 @@ pub fn config(
     menu_ops: &MenuOperations,
     canteen_ops: &CanteenOperations,
     asset_ops: &AssetOperations,
+    scheduler: &CanteenSchedulerNotifier,
 ) {
     cfg.service(
         scope::scope("/menu")
@@ -40,6 +42,7 @@ pub fn config(
         scope::scope("/canteen")
             .wrap(NormalizePath::trim())
             .app_data(web::Data::new(canteen_ops.clone()))
+            .app_data(web::Data::new(scheduler.clone()))
             .service(
                 scope::scope("")
                     .guard(ContentTypeHeader)
@@ -50,6 +53,8 @@ pub fn config(
                 scope::scope("")
                     .service(upload_canteen_pic)
                     .service(set_canteen_pic_link)
+                    .service(open_canteen)
+                    .service(close_canteen)
                     .service(get_all_canteens)
                     .service(get_canteen_menu),
             ),

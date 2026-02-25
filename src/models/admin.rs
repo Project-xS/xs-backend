@@ -1,8 +1,9 @@
+use chrono::{DateTime, NaiveTime, Utc};
 use diesel::{AsChangeset, Identifiable, Insertable, Queryable, Selectable};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-#[derive(Queryable, Debug, Identifiable, Serialize, Deserialize, ToSchema)]
+#[derive(Queryable, Debug, Identifiable, Serialize, Deserialize)]
 #[diesel(table_name = crate::db::schema::canteens)]
 #[diesel(primary_key(canteen_id))]
 pub struct Canteen {
@@ -13,9 +14,13 @@ pub struct Canteen {
     pub password: String,
     pub has_pic: bool,
     pub pic_etag: Option<String>,
+    pub opening_time: Option<NaiveTime>,
+    pub closing_time: Option<NaiveTime>,
+    pub is_open: bool,
+    pub last_opened_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Queryable, Debug, Identifiable, Selectable, Serialize, Deserialize, ToSchema)]
+#[derive(Queryable, Debug, Identifiable, Selectable, Serialize, Deserialize)]
 #[diesel(table_name = crate::db::schema::canteens)]
 #[diesel(primary_key(canteen_id))]
 pub struct CanteenDetails {
@@ -24,6 +29,9 @@ pub struct CanteenDetails {
     pub location: String,
     pub has_pic: bool,
     pub pic_etag: Option<String>,
+    pub opening_time: Option<NaiveTime>,
+    pub closing_time: Option<NaiveTime>,
+    pub is_open: bool,
 }
 
 #[derive(Insertable, Debug, Serialize, Deserialize, ToSchema)]
@@ -32,6 +40,22 @@ pub struct NewCanteen {
     pub canteen_name: String,
     pub location: String,
     pub has_pic: bool,
+    #[schema(value_type = String, format = "time")]
+    pub opening_time: Option<NaiveTime>,
+    #[schema(value_type = String, format = "time")]
+    pub closing_time: Option<NaiveTime>,
+}
+
+#[derive(Insertable, Debug)]
+#[diesel(table_name = crate::db::schema::canteens)]
+pub struct NewCanteenInsert {
+    pub canteen_name: String,
+    pub location: String,
+    pub has_pic: bool,
+    pub opening_time: Option<NaiveTime>,
+    pub closing_time: Option<NaiveTime>,
+    pub is_open: bool,
+    pub last_opened_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Queryable, Debug, Identifiable, Serialize, Deserialize, ToSchema, Selectable)]

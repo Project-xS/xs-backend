@@ -58,7 +58,15 @@ impl Guard for ContentTypeHeader {
 pub fn configure(cfg: &mut ServiceConfig, state: &AppState, qr_cfg: QrConfig) {
     cfg.service(root_endpoint)
         .service(health_endpoint)
-        .configure(|cfg| admin::config(cfg, &state.menu_ops, &state.canteen_ops, &state.asset_ops))
+        .configure(|cfg| {
+            admin::config(
+                cfg,
+                &state.menu_ops,
+                &state.canteen_ops,
+                &state.asset_ops,
+                &state.canteen_scheduler,
+            )
+        })
         .configure(|cfg| users::config(cfg, &state.user_ops))
         .configure(|cfg| {
             common::config(

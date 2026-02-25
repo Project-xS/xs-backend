@@ -1,4 +1,5 @@
 use crate::models::admin::{CanteenLoginSuccess, UpdateMenuItem};
+use chrono::NaiveTime;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use with_pic_macro::{with_pic, WithPic};
@@ -61,6 +62,11 @@ pub struct CanteenDetailsWithPic {
     pub canteen_id: i32,
     pub canteen_name: String,
     pub location: String,
+    #[schema(value_type = String, format = "time")]
+    pub opening_time: Option<NaiveTime>,
+    #[schema(value_type = String, format = "time")]
+    pub closing_time: Option<NaiveTime>,
+    pub is_open: bool,
     pub pic_link: Option<String>,
     pub pic_etag: Option<String>,
 }
@@ -100,6 +106,12 @@ pub struct CreateMenuItemRequest {
 
 #[derive(Serialize, ToSchema)]
 pub struct NewCanteenResponse {
+    pub status: String,
+    pub error: Option<String>,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct CanteenStatusResponse {
     pub status: String,
     pub error: Option<String>,
 }

@@ -160,6 +160,8 @@ pub fn insert_canteen(
         canteen_name: canteen_name_val.to_string(),
         location: location_val.to_string(),
         has_pic: false,
+        opening_time: None,
+        closing_time: None,
     };
 
     diesel::insert_into(canteens)

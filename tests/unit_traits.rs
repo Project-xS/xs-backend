@@ -28,6 +28,9 @@ fn pic_key_canteen_details_format() {
         location: "Block A".to_string(),
         has_pic: true,
         pic_etag: None,
+        opening_time: None,
+        closing_time: None,
+        is_open: true,
     };
     assert_eq!(canteen.pic_key(), "canteens/3");
 }

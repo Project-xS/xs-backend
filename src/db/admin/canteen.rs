@@ -2,7 +2,10 @@ use crate::db::errors::RepositoryError;
 use crate::db::schema::canteens::dsl::*;
 use crate::db::{AssetOperations, DbConnection};
 use crate::enums::admin::{CanteenDetailsWithPic, MenuItemWithPic};
-use crate::models::admin::{Canteen, CanteenDetails, CanteenLoginSuccess, MenuItem, NewCanteen};
+use crate::models::admin::{
+    Canteen, CanteenDetails, CanteenLoginSuccess, MenuItem, NewCanteenInsert,
+};
+use chrono::{DateTime, NaiveTime, Utc};
 use diesel::dsl::{case_when, sql};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
@@ -16,6 +19,15 @@ pub struct CanteenOperations {
     asset_ops: AssetOperations,
 }
 
+#[derive(Debug, Queryable)]
+pub struct CanteenHoursState {
+    pub canteen_id: i32,
+    pub opening_time: Option<NaiveTime>,
+    pub closing_time: Option<NaiveTime>,
+    pub is_open: bool,
+    pub last_opened_at: Option<DateTime<Utc>>,
+}
+
 impl CanteenOperations {
     pub async fn new(
         pool: Pool<ConnectionManager<PgConnection>>,
@@ -24,7 +36,7 @@ impl CanteenOperations {
         Self { pool, asset_ops }
     }
 
-    pub fn create_canteen(&self, canteen: NewCanteen) -> Result<usize, RepositoryError> {
+    pub fn create_canteen(&self, canteen: NewCanteenInsert) -> Result<usize, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!("create_canteen: failed to acquire DB connection: {}", e);
             e
@@ -38,6 +50,140 @@ impl CanteenOperations {
                     "create_canteen: error inserting canteen '{}': {}",
                     canteen.canteen_name, e
                 );
+                RepositoryError::DatabaseError(e)
+            })
+    }
+
+    pub fn get_canteen_hours_state(
+        &self,
+        canteen_id_val: i32,
+    ) -> Result<CanteenHoursState, RepositoryError> {
+        let mut conn = DbConnection::new(&self.pool).map_err(|e| {
+            error!(
+                "get_canteen_hours_state: failed to acquire DB connection: {}",
+                e
+            );
+            e
+        })?;
+
+        canteens
+            .filter(canteen_id.eq(canteen_id_val))
+            .select((
+                canteen_id,
+                opening_time,
+                closing_time,
+                is_open,
+                last_opened_at,
+            ))
+            .first::<CanteenHoursState>(conn.connection())
+            .map_err(|e| {
+                error!(
+                    "get_canteen_hours_state: error fetching canteen {}: {}",
+                    canteen_id_val, e
+                );
+                match e {
+                    Error::NotFound => {
+                        RepositoryError::NotFound(format!("canteens: {canteen_id_val}"))
+                    }
+                    other => RepositoryError::DatabaseError(other),
+                }
+            })
+    }
+
+    pub fn list_open_canteens_with_hours(&self) -> Result<Vec<CanteenHoursState>, RepositoryError> {
+        let mut conn = DbConnection::new(&self.pool).map_err(|e| {
+            error!(
+                "list_open_canteens_with_hours: failed to acquire DB connection: {}",
+                e
+            );
+            e
+        })?;
+
+        canteens
+            .filter(is_open.eq(true))
+            .filter(opening_time.is_not_null())
+            .filter(closing_time.is_not_null())
+            .select((
+                canteen_id,
+                opening_time,
+                closing_time,
+                is_open,
+                last_opened_at,
+            ))
+            .load::<CanteenHoursState>(conn.connection())
+            .map_err(|e| {
+                error!(
+                    "list_open_canteens_with_hours: error fetching canteens: {}",
+                    e
+                );
+                RepositoryError::DatabaseError(e)
+            })
+    }
+
+    pub fn set_canteen_open(
+        &self,
+        canteen_id_val: i32,
+        opened_at: DateTime<Utc>,
+    ) -> Result<usize, RepositoryError> {
+        let mut conn = DbConnection::new(&self.pool).map_err(|e| {
+            error!("set_canteen_open: failed to acquire DB connection: {}", e);
+            e
+        })?;
+
+        diesel::update(canteens.filter(canteen_id.eq(canteen_id_val)))
+            .set((is_open.eq(true), last_opened_at.eq(opened_at)))
+            .execute(conn.connection())
+            .map_err(|e| {
+                error!(
+                    "set_canteen_open: error opening canteen {}: {}",
+                    canteen_id_val, e
+                );
+                match e {
+                    Error::NotFound => {
+                        RepositoryError::NotFound(format!("canteens: {canteen_id_val}"))
+                    }
+                    other => RepositoryError::DatabaseError(other),
+                }
+            })
+    }
+
+    pub fn set_canteen_closed(&self, canteen_id_val: i32) -> Result<usize, RepositoryError> {
+        let mut conn = DbConnection::new(&self.pool).map_err(|e| {
+            error!("set_canteen_closed: failed to acquire DB connection: {}", e);
+            e
+        })?;
+
+        diesel::update(canteens.filter(canteen_id.eq(canteen_id_val)))
+            .set(is_open.eq(false))
+            .execute(conn.connection())
+            .map_err(|e| {
+                error!(
+                    "set_canteen_closed: error closing canteen {}: {}",
+                    canteen_id_val, e
+                );
+                match e {
+                    Error::NotFound => {
+                        RepositoryError::NotFound(format!("canteens: {canteen_id_val}"))
+                    }
+                    other => RepositoryError::DatabaseError(other),
+                }
+            })
+    }
+
+    pub fn close_canteens(&self, ids: &[i32]) -> Result<usize, RepositoryError> {
+        if ids.is_empty() {
+            return Ok(0);
+        }
+        let mut conn = DbConnection::new(&self.pool).map_err(|e| {
+            error!("close_canteens: failed to acquire DB connection: {}", e);
+            e
+        })?;
+
+        diesel::update(canteens.filter(canteen_id.eq_any(ids)))
+            .set(is_open.eq(false))
+            .execute(conn.connection())
+            .map_err(|e| {
+                error!("close_canteens: error closing canteens {:?}: {}", ids, e);
                 RepositoryError::DatabaseError(e)
             })
     }

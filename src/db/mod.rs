@@ -8,6 +8,7 @@ pub mod schema;
 mod users;
 
 pub use admin::asset_management::AssetOperations;
+pub use admin::canteen::CanteenHoursState;
 pub use admin::canteen::CanteenOperations;
 pub use admin::menu::MenuOperations;
 pub use common::hold::HoldOperations;
