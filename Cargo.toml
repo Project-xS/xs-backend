@@ -8,34 +8,49 @@ name = "proj-xs"
 path = "src/main.rs"
 
 [dependencies]
+
+# Web stuff
 actix-web = "4.13"
-futures = "0.3.32"
-utoipa-actix-web = "0.1.2"
-utoipa = { version = "5.4", features = ["actix_extras"] }
-utoipa-swagger-ui = { version = "9.0", features = ["actix-web", "vendored"] }
+actix-web-lab = "0.26.0"
+
 serde = {version = "1.0.228", features = ["derive"]}
+serde_json = "1.0"
+chrono = {version = "0.4", features = ["serde"]}
+
+jsonwebtoken = { version = "10.3", features = ["rust_crypto"] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls"] }
+tokio = { version = "1.49", features = ["rt-multi-thread", "macros", "sync", "time"] }
+
+utoipa = { version = "5.4", features = ["actix_extras"] }
+utoipa-actix-web = "0.1.2"
+utoipa-swagger-ui = { version = "9.0", features = ["actix-web", "vendored"] }
+
+# SQL
 diesel = {version = "2.3", features = ["postgres", "r2d2", "chrono"]}
 pq-sys = { version = "0.7.5", features = ["bundled"] }
 openssl-sys = { version = "0.9.111", features = ["vendored"] }
 diesel_migrations = { version = "2.3", features = ["postgres"] }
-chrono = {version = "0.4", features = ["serde"]}
-dotenvy = "0.15"
-log = "0.4"
-pretty_env_logger = "0.5"
-thiserror = "2.0"
-aws-sdk-s3 = "1.124"
+
+# Image stuff
+aws-sdk-s3 = "1.126"
 aws-config = { version = "1.8", features = ["behavior-version-latest"] }
 with_pic_macro = { path = "with_pic_macro" }
-jsonwebtoken = { version = "10.3", features = ["rust_crypto"] }
-reqwest = { version = "0.13", default-features = false, features = ["rustls"] }
-tokio = { version = "1.49", features = ["rt-multi-thread", "macros", "sync", "time"] }
-serde_json = "1.0"
+
+# QR stuff
 base64 = "0.22.1"
 hmac = "0.12"
 sha2 = "0.10"
 hex = "0.4"
 qrcode = "0.14"
 image = { version = "0.25", default-features = false, features = ["png"] }
+
+# Misc
+dashmap = "6.1.0"
+dotenvy = "0.15"
+futures = "0.3.32"
+log = "0.4"
+pretty_env_logger = "0.5"
+thiserror = "2.0"
 
 [dev-dependencies]
 testcontainers = { version = "0.27.0", features = ["blocking"] }
