@@ -54,7 +54,6 @@ pub(super) async fn create_canteen(
     let new_canteen = NewCanteenInsert {
         canteen_name: req_data.canteen_name,
         location: req_data.location,
-        has_pic: req_data.has_pic,
         opening_time: req_data.opening_time,
         closing_time: req_data.closing_time,
         is_open: should_open,

@@ -4,6 +4,9 @@ use actix_web::http::header;
 use actix_web::http::StatusCode;
 use actix_web::test;
 use common::auth_header;
+use diesel::prelude::*;
+use proj_xs::db::DbConnection;
+use proj_xs::test_utils::build_test_pool;
 use serde_json::Value;
 
 #[actix_rt::test]
@@ -20,8 +23,8 @@ async fn create_menu_item_success() {
             "price": 80,
             "stock": 20,
             "is_available": true,
-            "description": "Crispy dosa with potato filling",
-            "has_pic": false
+            "description": "Crispy dosa with potato filling"
+
         }))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -45,8 +48,8 @@ async fn create_menu_item_validation_rejects_bad_price() {
             "price": 0,
             "stock": 10,
             "is_available": true,
-            "description": null,
-            "has_pic": false
+            "description": null
+
         }))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -65,7 +68,7 @@ async fn create_menu_item_requires_content_type() {
             fixtures.canteen_id
         ))
         .insert_header(auth_header())
-        .set_payload(r#"{"name":"X","is_veg":true,"price":10,"stock":5,"is_available":true,"description":null,"has_pic":false}"#)
+        .set_payload(r#"{"name":"X","is_veg":true,"price":10,"stock":5,"is_available":true,"description":null}"#)
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
@@ -205,8 +208,8 @@ async fn user_cannot_create_menu_item() {
             "price": 50,
             "stock": 10,
             "is_available": true,
-            "description": null,
-            "has_pic": false
+            "description": null
+
         }))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -318,8 +321,8 @@ async fn create_menu_item_rejects_long_description() {
             "price": 100,
             "stock": 10,
             "is_available": true,
-            "description": long_desc,
-            "has_pic": false
+            "description": long_desc
+
         }))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -383,8 +386,8 @@ async fn create_menu_item_whitespace_name() {
             "price": 50,
             "stock": 10,
             "is_available": true,
-            "description": null,
-            "has_pic": false
+            "description": null
+
         }))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -408,8 +411,8 @@ async fn create_menu_item_overlong_name() {
             "price": 50,
             "stock": 10,
             "is_available": true,
-            "description": null,
-            "has_pic": false
+            "description": null
+
         }))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -432,8 +435,8 @@ async fn create_menu_item_negative_price() {
             "price": -5,
             "stock": 10,
             "is_available": true,
-            "description": null,
-            "has_pic": false
+            "description": null
+
         }))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -456,39 +459,14 @@ async fn create_menu_item_negative_stock() {
             "price": 100,
             "stock": -2,
             "is_available": true,
-            "description": null,
-            "has_pic": false
+            "description": null
+
         }))
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     let body: Value = test::read_body_json(resp).await;
     assert_eq!(body["status"], "error");
-}
-
-#[actix_rt::test]
-async fn create_menu_item_has_pic_true() {
-    let (app, fixtures, _db_url) = common::setup_api_app().await;
-
-    let req = test::TestRequest::post()
-        .uri(&format!("/menu/create?as=admin-{}", fixtures.canteen_id))
-        .insert_header(auth_header())
-        .insert_header((header::CONTENT_TYPE, "application/json"))
-        .set_json(&serde_json::json!({
-            "name": "Pic Item",
-            "is_veg": true,
-            "price": 120,
-            "stock": 5,
-            "is_available": true,
-            "description": "Has a pic",
-            "has_pic": true
-        }))
-        .to_request();
-    let resp = test::call_service(&app, req).await;
-    assert_eq!(resp.status(), StatusCode::OK);
-    let body: Value = test::read_body_json(resp).await;
-    assert_eq!(body["status"], "ok");
-    assert!(body["item_id"].is_number());
 }
 
 #[actix_rt::test]
@@ -504,8 +482,8 @@ async fn create_menu_item_unauthenticated() {
             "price": 50,
             "stock": 10,
             "is_available": true,
-            "description": null,
-            "has_pic": false
+            "description": null
+
         }))
         .to_request();
     common::assert_unauthenticated(&app, req).await;
@@ -752,10 +730,10 @@ async fn get_menu_item_by_id_unauthenticated() {
 }
 
 #[actix_rt::test]
-async fn get_menu_item_has_pic_true() {
+async fn get_menu_item_without_uploaded_pic_has_null_pic_link() {
     let (app, fixtures, _db_url) = common::setup_api_app().await;
 
-    // Create a menu item with has_pic = true
+    // Create a menu item without uploading a picture.
     let create_req = test::TestRequest::post()
         .uri(&format!("/menu/create?as=admin-{}", fixtures.canteen_id))
         .insert_header(auth_header())
@@ -766,14 +744,16 @@ async fn get_menu_item_has_pic_true() {
             "price": 100,
             "stock": 10,
             "is_available": true,
-            "description": null,
-            "has_pic": true
+            "description": null
         }))
         .to_request();
     let create_resp = test::call_service(&app, create_req).await;
     assert_eq!(create_resp.status(), StatusCode::OK);
     let create_body: Value = test::read_body_json(create_resp).await;
-    let item_id = create_body["item_id"].as_i64().expect("item_id");
+    assert_eq!(create_body["status"], "ok");
+    let item_id = create_body["item_id"]
+        .as_i64()
+        .expect("item_id should be present") as i32;
 
     // Fetch the item — pic_link is null since no S3 object exists in the test env
     let get_req = test::TestRequest::get()
@@ -812,13 +792,30 @@ async fn set_menu_item_pic_unauthenticated() {
 async fn menu_set_pic_success_when_object_exists() {
     // Mock S3 before app creation so the embedded AssetOperations uses the mock endpoint.
     let mock_s3 = common::start_mock_s3().await;
-    let (app, fixtures, _db_url) = common::setup_api_app().await;
+    let (app, fixtures, db_url) = common::setup_api_app().await;
     let item_id = fixtures.menu_item_ids[0];
 
-    // set_menu_item_pic calls get_object_etag("items/{item_id}")
-    mock_s3
-        .mock_object_exists(&format!("items/{}", item_id))
-        .await;
+    let upload_req = test::TestRequest::put()
+        .uri(&format!(
+            "/menu/upload_pic/{}?as=admin-{}",
+            item_id, fixtures.canteen_id
+        ))
+        .insert_header(common::auth_header())
+        .to_request();
+    let upload_resp = test::call_service(&app, upload_req).await;
+    assert_eq!(upload_resp.status(), StatusCode::OK);
+
+    let pool = build_test_pool(&db_url);
+    let mut conn = DbConnection::new(&pool).expect("db connection");
+    use proj_xs::db::schema::menu_items::dsl as mi;
+    let key = mi::menu_items
+        .filter(mi::item_id.eq(item_id))
+        .select(mi::pic_key)
+        .first::<Option<String>>(conn.connection())
+        .expect("pic_key")
+        .expect("pic_key must be set");
+
+    mock_s3.mock_object_exists(&format!("items/{key}")).await;
 
     let req = test::TestRequest::put()
         .uri(&format!(

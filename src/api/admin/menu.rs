@@ -33,7 +33,6 @@ pub(super) async fn create_menu_item(
         stock: req_data.stock,
         is_available: req_data.is_available,
         description: req_data.description,
-        has_pic: req_data.has_pic,
     };
     let req_data = match new_item.sanitize_and_validate() {
         Ok(data) => data,

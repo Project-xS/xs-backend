@@ -13,6 +13,7 @@ use diesel::result::Error;
 use diesel::sql_types::{Bool, Text};
 use futures::future::join_all;
 use log::error;
+use uuid::Uuid;
 
 pub struct CanteenOperations {
     pool: Pool<ConnectionManager<PgConnection>>,
@@ -197,7 +198,7 @@ impl CanteenOperations {
             e
         })?;
 
-        canteens
+        let canteen = canteens
             .filter(canteen_id.eq(canteen_id_to_set))
             .first::<Canteen>(conn.connection())
             .map_err(|e| {
@@ -213,9 +214,23 @@ impl CanteenOperations {
                 }
             })?;
 
+        let key = if let Some(existing) = canteen.pic_key {
+            existing
+        } else {
+            let generated = Uuid::now_v7().to_string();
+            diesel::update(canteens.filter(canteen_id.eq(canteen_id_to_set)))
+                .set((
+                    pic_key.eq(Some(generated.clone())),
+                    pic_etag.eq::<Option<String>>(None),
+                ))
+                .execute(conn.connection())
+                .map_err(RepositoryError::DatabaseError)?;
+            generated
+        };
+
         let res = self
             .asset_ops
-            .get_upload_presign_url(&format!("canteens/{}", canteen_id_to_set))
+            .get_upload_presign_url(&format!("canteens/{key}"))
             .await?;
 
         Ok(res)
@@ -230,9 +245,25 @@ impl CanteenOperations {
             e
         })?;
 
+        let canteen = canteens
+            .filter(canteen_id.eq(canteen_id_to_update))
+            .first::<Canteen>(conn.connection())
+            .map_err(|e| match e {
+                Error::NotFound => {
+                    RepositoryError::NotFound(format!("canteens: {canteen_id_to_update}"))
+                }
+                other => RepositoryError::DatabaseError(other),
+            })?;
+
+        let key = canteen.pic_key.ok_or_else(|| {
+            RepositoryError::ValidationError(
+                "pic_key is missing; call upload_canteen_pic first".to_string(),
+            )
+        })?;
+
         let etag = self
             .asset_ops
-            .get_object_etag(&format!("canteens/{}", canteen_id_to_update))
+            .get_object_etag(&format!("canteens/{key}"))
             .await?;
         if etag.is_some() {
             info!("set_menu_item_pic: etag: {}", etag.clone().unwrap());
@@ -241,7 +272,7 @@ impl CanteenOperations {
         }
 
         diesel::update(canteens.filter(canteen_id.eq(canteen_id_to_update)))
-            .set(has_pic.eq(true))
+            .set(pic_etag.eq(etag))
             .execute(conn.connection())
             .map_err(|e| {
                 error!(

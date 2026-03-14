@@ -378,8 +378,8 @@ impl OrderOperations {
                 active_order_items::quantity,
                 active_order_items::price,
                 menu_items::is_veg,
-                menu_items::has_pic,
                 menu_items::pic_etag,
+                menu_items::pic_key,
                 menu_items::description,
             ))
             .order_by(active_orders::ordered_at.desc())
@@ -442,8 +442,8 @@ impl OrderOperations {
                 active_order_items::quantity,
                 active_order_items::price,
                 menu_items::is_veg,
-                menu_items::has_pic,
                 menu_items::pic_etag,
+                menu_items::pic_key,
                 menu_items::description,
             ))
             .order_by(active_orders::ordered_at.desc())
@@ -531,8 +531,8 @@ impl OrderOperations {
                 active_order_items::quantity,
                 active_order_items::price,
                 menu_items::is_veg,
-                menu_items::has_pic,
                 menu_items::pic_etag,
+                menu_items::pic_key,
                 menu_items::description,
             ))
             .order(menu_items::item_id.asc())

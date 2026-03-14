@@ -2,7 +2,7 @@
 //! Test conventions:
 //! - Use testcontainers for Postgres when `DATABASE_URL` is not set.
 //! - Use dummy S3/AWS env vars via `proj_xs::test_utils::init_test_env`.
-//! - Seed fixtures through `proj_xs::test_utils` and keep `has_pic = false`.
+//! - Seed fixtures through `proj_xs::test_utils` and keep `pic_key = null`.
 
 use std::env;
 use std::sync::OnceLock;
@@ -87,6 +87,24 @@ pub fn menu_item_state(conn: &mut PgConnection, item_id_val: i32) -> (i32, bool)
         .select((stock, is_available))
         .first::<(i32, bool)>(conn)
         .expect("menu item state")
+}
+
+pub fn menu_item_pic_key(conn: &mut PgConnection, item_id_val: i32) -> Option<String> {
+    use proj_xs::db::schema::menu_items::dsl::*;
+    menu_items
+        .filter(item_id.eq(item_id_val))
+        .select(pic_key)
+        .first::<Option<String>>(conn)
+        .expect("menu item pic_key")
+}
+
+pub fn canteen_pic_key(conn: &mut PgConnection, canteen_id_val: i32) -> Option<String> {
+    use proj_xs::db::schema::canteens::dsl::*;
+    canteens
+        .filter(canteen_id.eq(canteen_id_val))
+        .select(pic_key)
+        .first::<Option<String>>(conn)
+        .expect("canteen pic_key")
 }
 
 fn test_db_runtime() -> &'static tokio::runtime::Runtime {

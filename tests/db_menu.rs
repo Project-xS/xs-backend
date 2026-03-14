@@ -17,7 +17,6 @@ async fn add_menu_item_success() {
         stock: 20,
         is_available: true,
         description: Some("Grilled paneer".to_string()),
-        has_pic: false,
     };
 
     let result = menu_ops.add_menu_item(new_item);
@@ -43,7 +42,6 @@ async fn add_menu_item_rejects_zero_price() {
         stock: 10,
         is_available: true,
         description: None,
-        has_pic: false,
     };
 
     let result = menu_ops.add_menu_item(new_item);
@@ -68,7 +66,6 @@ async fn add_menu_item_rejects_empty_name() {
         stock: 10,
         is_available: true,
         description: None,
-        has_pic: false,
     };
 
     let result = menu_ops.add_menu_item(new_item);

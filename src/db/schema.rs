@@ -30,19 +30,18 @@ diesel::table! {
 }
 
 diesel::table! {
-    use diesel::sql_types::*;
     canteens (canteen_id) {
         canteen_id -> Int4,
         canteen_name -> Varchar,
         location -> Varchar,
         username -> Varchar,
         password -> Varchar,
-        has_pic -> Bool,
         pic_etag -> Nullable<Varchar>,
         opening_time -> Nullable<Time>,
         closing_time -> Nullable<Time>,
         is_open -> Bool,
         last_opened_at -> Nullable<Timestamptz>,
+        pic_key -> Nullable<Varchar>,
     }
 }
 
@@ -80,8 +79,8 @@ diesel::table! {
         stock -> Int4,
         is_available -> Bool,
         description -> Nullable<Varchar>,
-        has_pic -> Bool,
         pic_etag -> Nullable<Varchar>,
+        pic_key -> Nullable<Varchar>,
     }
 }
 

@@ -107,8 +107,8 @@ pub struct OrderItems {
     pub quantity: i16,
     pub price: i32,
     pub is_veg: bool,
-    pub has_pic: bool,
     pub pic_etag: Option<String>,
+    pub pic_key: Option<String>,
     pub description: Option<String>,
 }
 

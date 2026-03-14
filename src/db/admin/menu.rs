@@ -8,6 +8,7 @@ use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::result::Error;
 use futures::future::join_all;
 use log::error;
+use uuid::Uuid;
 
 pub struct MenuOperations {
     pool: Pool<ConnectionManager<PgConnection>>,
@@ -52,7 +53,7 @@ impl MenuOperations {
             e
         })?;
 
-        menu_items
+        let menu_item = menu_items
             .filter(item_id.eq(menu_item_to_set))
             .first::<MenuItem>(conn.connection())
             .map_err(|e| {
@@ -68,9 +69,23 @@ impl MenuOperations {
                 }
             })?;
 
+        let key = if let Some(existing) = menu_item.pic_key {
+            existing
+        } else {
+            let generated = Uuid::now_v7().to_string();
+            diesel::update(menu_items.filter(item_id.eq(menu_item_to_set)))
+                .set((
+                    pic_key.eq(Some(generated.clone())),
+                    pic_etag.eq::<Option<String>>(None),
+                ))
+                .execute(conn.connection())
+                .map_err(RepositoryError::DatabaseError)?;
+            generated
+        };
+
         let res = self
             .asset_ops
-            .get_upload_presign_url(&format!("items/{}", menu_item_to_set))
+            .get_upload_presign_url(&format!("items/{key}"))
             .await?;
 
         Ok(res)
@@ -89,9 +104,25 @@ impl MenuOperations {
             item_id_to_update
         );
 
+        let menu_item = menu_items
+            .filter(item_id.eq(item_id_to_update))
+            .first::<MenuItem>(conn.connection())
+            .map_err(|e| match e {
+                Error::NotFound => {
+                    RepositoryError::NotFound(format!("menu_items: {item_id_to_update}"))
+                }
+                other => RepositoryError::DatabaseError(other),
+            })?;
+
+        let key = menu_item.pic_key.ok_or_else(|| {
+            RepositoryError::ValidationError(
+                "pic_key is missing; call upload_menu_item_pic first".to_string(),
+            )
+        })?;
+
         let etag = self
             .asset_ops
-            .get_object_etag(&format!("items/{}", item_id_to_update))
+            .get_object_etag(&format!("items/{key}"))
             .await?;
         if etag.is_some() {
             info!("set_menu_item_pic: etag: {}", etag.clone().unwrap());
@@ -100,7 +131,7 @@ impl MenuOperations {
         }
 
         diesel::update(menu_items.filter(item_id.eq(item_id_to_update)))
-            .set((has_pic.eq(true), pic_etag.eq(etag)))
+            .set(pic_etag.eq(etag))
             .execute(conn.connection())
             .map_err(|e| {
                 error!(

@@ -12,12 +12,12 @@ pub struct Canteen {
     pub location: String,
     pub username: String,
     pub password: String,
-    pub has_pic: bool,
     pub pic_etag: Option<String>,
     pub opening_time: Option<NaiveTime>,
     pub closing_time: Option<NaiveTime>,
     pub is_open: bool,
     pub last_opened_at: Option<DateTime<Utc>>,
+    pub pic_key: Option<String>,
 }
 
 #[derive(Queryable, Debug, Identifiable, Selectable, Serialize, Deserialize)]
@@ -27,19 +27,19 @@ pub struct CanteenDetails {
     pub canteen_id: i32,
     pub canteen_name: String,
     pub location: String,
-    pub has_pic: bool,
     pub pic_etag: Option<String>,
+    pub pic_key: Option<String>,
     pub opening_time: Option<NaiveTime>,
     pub closing_time: Option<NaiveTime>,
     pub is_open: bool,
 }
 
 #[derive(Insertable, Debug, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
 #[diesel(table_name = crate::db::schema::canteens)]
 pub struct NewCanteen {
     pub canteen_name: String,
     pub location: String,
-    pub has_pic: bool,
     #[schema(value_type = String, format = "time")]
     pub opening_time: Option<NaiveTime>,
     #[schema(value_type = String, format = "time")]
@@ -51,7 +51,6 @@ pub struct NewCanteen {
 pub struct NewCanteenInsert {
     pub canteen_name: String,
     pub location: String,
-    pub has_pic: bool,
     pub opening_time: Option<NaiveTime>,
     pub closing_time: Option<NaiveTime>,
     pub is_open: bool,
@@ -70,8 +69,8 @@ pub struct MenuItem {
     pub stock: i32,
     pub is_available: bool,
     pub description: Option<String>,
-    pub has_pic: bool,
     pub pic_etag: Option<String>,
+    pub pic_key: Option<String>,
 }
 
 #[derive(Insertable, Debug, Serialize, Deserialize, Selectable)]
@@ -84,7 +83,6 @@ pub struct NewMenuItem {
     pub stock: i32,
     pub is_available: bool,
     pub description: Option<String>,
-    pub has_pic: bool,
 }
 
 #[derive(Debug, Selectable, Queryable)]
@@ -295,7 +293,6 @@ mod tests {
             stock: 10,
             is_available: true,
             description: None,
-            has_pic: false,
         };
         assert!(item.sanitize_and_validate().is_err());
     }
@@ -310,7 +307,6 @@ mod tests {
             stock: 10,
             is_available: true,
             description: Some("a".repeat(MENU_ITEM_DESC_MAX_LEN + 1)),
-            has_pic: false,
         };
         assert!(item.sanitize_and_validate().is_err());
     }
