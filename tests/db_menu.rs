@@ -92,7 +92,7 @@ async fn update_menu_item_partial_name_only() {
         description: None,
     };
 
-    let result = menu_ops.update_menu_item(item_id, update);
+    let result = menu_ops.update_menu_item(item_id, fixtures.canteen_id, update);
     assert!(result.is_ok(), "update should succeed: {:?}", result);
     let updated = result.unwrap();
     assert_eq!(updated.name, "Updated Name");
@@ -103,7 +103,7 @@ async fn update_menu_item_partial_name_only() {
 
 #[actix_rt::test]
 async fn update_menu_item_not_found() {
-    let (pool, _fixtures) = common::setup_pool_with_fixtures();
+    let (pool, fixtures) = common::setup_pool_with_fixtures();
     let asset_ops = AssetOperations::new().await.expect("AssetOperations::new");
     let menu_ops = MenuOperations::new(pool.clone(), asset_ops).await;
 
@@ -116,7 +116,7 @@ async fn update_menu_item_not_found() {
         description: None,
     };
 
-    let result = menu_ops.update_menu_item(99999, update);
+    let result = menu_ops.update_menu_item(99999, fixtures.canteen_id, update);
     assert!(result.is_err());
     assert!(matches!(result.unwrap_err(), RepositoryError::NotFound(_)));
 }
@@ -128,7 +128,7 @@ async fn remove_menu_item_success() {
     let menu_ops = MenuOperations::new(pool.clone(), asset_ops).await;
 
     let target_id = fixtures.menu_item_ids[0];
-    let result = menu_ops.remove_menu_item(target_id);
+    let result = menu_ops.remove_menu_item(target_id, fixtures.canteen_id);
     assert!(result.is_ok(), "remove should succeed: {:?}", result);
     assert_eq!(result.unwrap().item_id, target_id);
 
@@ -146,11 +146,11 @@ async fn remove_menu_item_success() {
 
 #[actix_rt::test]
 async fn remove_menu_item_not_found() {
-    let (pool, _fixtures) = common::setup_pool_with_fixtures();
+    let (pool, fixtures) = common::setup_pool_with_fixtures();
     let asset_ops = AssetOperations::new().await.expect("AssetOperations::new");
     let menu_ops = MenuOperations::new(pool.clone(), asset_ops).await;
 
-    let result = menu_ops.remove_menu_item(99999);
+    let result = menu_ops.remove_menu_item(99999, fixtures.canteen_id);
     assert!(result.is_err());
     assert!(matches!(result.unwrap_err(), RepositoryError::NotFound(_)));
 }

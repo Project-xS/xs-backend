@@ -88,7 +88,7 @@ async fn menu_ops_set_menu_item_pic_success() {
     let asset_ops = AssetOperations::new().await.expect("AssetOperations::new");
     let menu_ops = MenuOperations::new(pool.clone(), asset_ops).await;
     menu_ops
-        .upload_menu_item_pic(&item_id)
+        .upload_menu_item_pic(&item_id, fixtures.canteen_id)
         .await
         .expect("upload_menu_item_pic");
 
@@ -97,7 +97,7 @@ async fn menu_ops_set_menu_item_pic_success() {
     mock_s3.mock_object_exists(&format!("items/{key}")).await;
 
     let rows = menu_ops
-        .set_menu_item_pic(&item_id)
+        .set_menu_item_pic(&item_id, fixtures.canteen_id)
         .await
         .expect("set_menu_item_pic");
     assert_eq!(rows, 1, "should update exactly one row");
@@ -124,7 +124,7 @@ async fn menu_ops_set_menu_item_pic_not_found_key() {
     let asset_ops = AssetOperations::new().await.expect("AssetOperations::new");
     let menu_ops = MenuOperations::new(pool.clone(), asset_ops).await;
     menu_ops
-        .upload_menu_item_pic(&item_id)
+        .upload_menu_item_pic(&item_id, fixtures.canteen_id)
         .await
         .expect("upload_menu_item_pic");
 
@@ -133,7 +133,7 @@ async fn menu_ops_set_menu_item_pic_not_found_key() {
     mock_s3.mock_object_not_found(&format!("items/{key}")).await;
 
     let err = menu_ops
-        .set_menu_item_pic(&item_id)
+        .set_menu_item_pic(&item_id, fixtures.canteen_id)
         .await
         .expect_err("should fail when object not found");
     assert!(

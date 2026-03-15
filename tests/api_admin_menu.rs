@@ -6,8 +6,27 @@ use actix_web::test;
 use common::auth_header;
 use diesel::prelude::*;
 use proj_xs::db::DbConnection;
-use proj_xs::test_utils::build_test_pool;
+use proj_xs::test_utils::{build_test_pool, insert_canteen, seed_menu_item};
 use serde_json::Value;
+
+fn seed_other_canteen_item(db_url: &str) -> (i32, i32) {
+    let pool = build_test_pool(db_url);
+    let mut conn = DbConnection::new(&pool).expect("db connection");
+    let other_canteen_id =
+        insert_canteen(conn.connection(), "Other Canteen", "Block Z").expect("insert canteen");
+    let other_item_id = seed_menu_item(
+        conn.connection(),
+        other_canteen_id,
+        "Other Canteen Item",
+        199,
+        8,
+        true,
+        true,
+        Some("owned by another canteen"),
+    )
+    .expect("insert menu item");
+    (other_canteen_id, other_item_id)
+}
 
 #[actix_rt::test]
 async fn create_menu_item_success() {
@@ -112,9 +131,33 @@ async fn update_menu_item_not_found() {
         }))
         .to_request();
     let resp = test::call_service(&app, req).await;
-    assert_eq!(resp.status(), StatusCode::CONFLICT);
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
     let body: Value = test::read_body_json(resp).await;
     assert_eq!(body["status"], "error");
+    assert_eq!(body["error"], "item not found");
+}
+
+#[actix_rt::test]
+async fn update_menu_item_forbidden_for_item_owned_by_another_canteen() {
+    let (app, fixtures, db_url) = common::setup_api_app().await;
+    let (_other_canteen_id, other_item_id) = seed_other_canteen_item(&db_url);
+
+    let req = test::TestRequest::put()
+        .uri(&format!("/menu/update?as=admin-{}", fixtures.canteen_id))
+        .insert_header(auth_header())
+        .insert_header((header::CONTENT_TYPE, "application/json"))
+        .set_json(&serde_json::json!({
+            "item_id": other_item_id,
+            "update": {
+                "name": "Should Not Update"
+            }
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    let body: Value = test::read_body_json(resp).await;
+    assert_eq!(body["status"], "error");
+    assert_eq!(body["error"], "item not found");
 }
 
 #[actix_rt::test]
@@ -143,7 +186,29 @@ async fn delete_menu_item_success_and_not_found() {
         .insert_header(auth_header())
         .to_request();
     let resp = test::call_service(&app, req).await;
-    assert_eq!(resp.status(), StatusCode::CONFLICT);
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    let body: Value = test::read_body_json(resp).await;
+    assert_eq!(body["status"], "error");
+    assert_eq!(body["error"], "item not found");
+}
+
+#[actix_rt::test]
+async fn delete_menu_item_forbidden_for_item_owned_by_another_canteen() {
+    let (app, fixtures, db_url) = common::setup_api_app().await;
+    let (_other_canteen_id, other_item_id) = seed_other_canteen_item(&db_url);
+
+    let req = test::TestRequest::delete()
+        .uri(&format!(
+            "/menu/delete/{}?as=admin-{}",
+            other_item_id, fixtures.canteen_id
+        ))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    let body: Value = test::read_body_json(resp).await;
+    assert_eq!(body["status"], "error");
+    assert_eq!(body["error"], "item not found");
 }
 
 #[actix_rt::test]
@@ -600,6 +665,27 @@ async fn update_menu_item_negative_price() {
 }
 
 #[actix_rt::test]
+async fn update_menu_item_user_forbidden() {
+    let (app, fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::put()
+        .uri(&format!("/menu/update?as=user-{}", fixtures.user_id))
+        .insert_header(auth_header())
+        .insert_header((header::CONTENT_TYPE, "application/json"))
+        .set_json(&serde_json::json!({
+            "item_id": fixtures.menu_item_ids[0],
+            "update": {
+                "name": "Should Not Update"
+            }
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    let body = test::read_body(resp).await;
+    assert_eq!(body, "user not allowed");
+}
+
+#[actix_rt::test]
 async fn update_menu_item_unauthenticated() {
     let (app, fixtures, _db_url) = common::setup_api_app().await;
 
@@ -637,6 +723,8 @@ async fn delete_menu_item_user_forbidden() {
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    let body = test::read_body(resp).await;
+    assert_eq!(body, "user not allowed");
 }
 
 #[actix_rt::test]
@@ -651,7 +739,31 @@ async fn upload_menu_item_pic_nonexistent_item() {
         .insert_header(auth_header())
         .to_request();
     let resp = test::call_service(&app, req).await;
-    assert_eq!(resp.status(), StatusCode::CONFLICT);
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    let body: Value = test::read_body_json(resp).await;
+    assert_eq!(body["status"], "error");
+    assert!(body["presigned_url"].is_null());
+    assert_eq!(body["error"], "item not found");
+}
+
+#[actix_rt::test]
+async fn upload_menu_item_pic_forbidden_for_item_owned_by_another_canteen() {
+    let (app, fixtures, db_url) = common::setup_api_app().await;
+    let (_other_canteen_id, other_item_id) = seed_other_canteen_item(&db_url);
+
+    let req = test::TestRequest::put()
+        .uri(&format!(
+            "/menu/upload_pic/{}?as=admin-{}",
+            other_item_id, fixtures.canteen_id
+        ))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    let body: Value = test::read_body_json(resp).await;
+    assert_eq!(body["status"], "error");
+    assert!(body["presigned_url"].is_null());
+    assert_eq!(body["error"], "item not found");
 }
 
 #[actix_rt::test]
@@ -667,6 +779,8 @@ async fn upload_menu_item_pic_user_forbidden() {
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    let body = test::read_body(resp).await;
+    assert_eq!(body, "user not allowed");
 }
 
 #[actix_rt::test]
@@ -681,7 +795,29 @@ async fn set_menu_item_pic_nonexistent_item() {
         .insert_header(auth_header())
         .to_request();
     let resp = test::call_service(&app, req).await;
-    assert_eq!(resp.status(), StatusCode::CONFLICT);
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    let body: Value = test::read_body_json(resp).await;
+    assert_eq!(body["status"], "error");
+    assert_eq!(body["error"], "item not found");
+}
+
+#[actix_rt::test]
+async fn set_menu_item_pic_forbidden_for_item_owned_by_another_canteen() {
+    let (app, fixtures, db_url) = common::setup_api_app().await;
+    let (_other_canteen_id, other_item_id) = seed_other_canteen_item(&db_url);
+
+    let req = test::TestRequest::put()
+        .uri(&format!(
+            "/menu/set_pic/{}?as=admin-{}",
+            other_item_id, fixtures.canteen_id
+        ))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    let body: Value = test::read_body_json(resp).await;
+    assert_eq!(body["status"], "error");
+    assert_eq!(body["error"], "item not found");
 }
 
 #[actix_rt::test]
@@ -697,10 +833,12 @@ async fn set_menu_item_pic_user_forbidden() {
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    let body = test::read_body(resp).await;
+    assert_eq!(body, "user not allowed");
 }
 
 #[actix_rt::test]
-async fn get_menu_items_user_forbidden() {
+async fn get_menu_items_user_allowed() {
     let (app, fixtures, _db_url) = common::setup_api_app().await;
 
     let req = test::TestRequest::get()
@@ -708,7 +846,22 @@ async fn get_menu_items_user_forbidden() {
         .insert_header(auth_header())
         .to_request();
     let resp = test::call_service(&app, req).await;
-    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+#[actix_rt::test]
+async fn get_menu_item_by_id_user_allowed() {
+    let (app, fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/menu/items/{}?as=user-{}",
+            fixtures.menu_item_ids[0], fixtures.user_id
+        ))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
 }
 
 #[actix_rt::test]

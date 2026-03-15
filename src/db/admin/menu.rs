@@ -47,6 +47,7 @@ impl MenuOperations {
     pub async fn upload_menu_item_pic(
         &self,
         menu_item_to_set: &i32,
+        owner_canteen_id: i32,
     ) -> Result<String, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!("set_menu_item_pic: failed to acquire DB connection: {}", e);
@@ -55,11 +56,12 @@ impl MenuOperations {
 
         let menu_item = menu_items
             .filter(item_id.eq(menu_item_to_set))
+            .filter(canteen_id.eq(owner_canteen_id))
             .first::<MenuItem>(conn.connection())
             .map_err(|e| {
                 error!(
-                    "upload_menu_item_pic: error approving pic for menu item with id {}: {}",
-                    menu_item_to_set, e
+                    "upload_menu_item_pic: error approving pic for menu item with id {} (canteen {}): {}",
+                    menu_item_to_set, owner_canteen_id, e
                 );
                 match e {
                     Error::NotFound => {
@@ -73,13 +75,17 @@ impl MenuOperations {
             existing
         } else {
             let generated = Uuid::now_v7().to_string();
-            diesel::update(menu_items.filter(item_id.eq(menu_item_to_set)))
-                .set((
-                    pic_key.eq(Some(generated.clone())),
-                    pic_etag.eq::<Option<String>>(None),
-                ))
-                .execute(conn.connection())
-                .map_err(RepositoryError::DatabaseError)?;
+            diesel::update(
+                menu_items
+                    .filter(item_id.eq(menu_item_to_set))
+                    .filter(canteen_id.eq(owner_canteen_id)),
+            )
+            .set((
+                pic_key.eq(Some(generated.clone())),
+                pic_etag.eq::<Option<String>>(None),
+            ))
+            .execute(conn.connection())
+            .map_err(RepositoryError::DatabaseError)?;
             generated
         };
 
@@ -94,6 +100,7 @@ impl MenuOperations {
     pub async fn set_menu_item_pic(
         &self,
         item_id_to_update: &i32,
+        owner_canteen_id: i32,
     ) -> Result<usize, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!("set_menu_item_pic: failed to acquire DB connection: {}", e);
@@ -106,6 +113,7 @@ impl MenuOperations {
 
         let menu_item = menu_items
             .filter(item_id.eq(item_id_to_update))
+            .filter(canteen_id.eq(owner_canteen_id))
             .first::<MenuItem>(conn.connection())
             .map_err(|e| match e {
                 Error::NotFound => {
@@ -116,7 +124,7 @@ impl MenuOperations {
 
         let key = menu_item.pic_key.ok_or_else(|| {
             RepositoryError::ValidationError(
-                "pic_key is missing; call upload_menu_item_pic first".to_string(),
+                "pic_key is missing; call /menu/upload_pic/{item_id} first".to_string(),
             )
         })?;
 
@@ -130,24 +138,32 @@ impl MenuOperations {
             info!("set_menu_item_pic: no etag found");
         }
 
-        diesel::update(menu_items.filter(item_id.eq(item_id_to_update)))
-            .set(pic_etag.eq(etag))
-            .execute(conn.connection())
-            .map_err(|e| {
-                error!(
-                    "set_menu_item_pic: error approving pic for menu item with id {}: {}",
-                    item_id_to_update, e
-                );
-                match e {
-                    Error::NotFound => {
-                        RepositoryError::NotFound(format!("menu_items: {item_id_to_update}"))
-                    }
-                    other => RepositoryError::DatabaseError(other),
+        diesel::update(
+            menu_items
+                .filter(item_id.eq(item_id_to_update))
+                .filter(canteen_id.eq(owner_canteen_id)),
+        )
+        .set(pic_etag.eq(etag))
+        .execute(conn.connection())
+        .map_err(|e| {
+            error!(
+                "set_menu_item_pic: error approving pic for menu item with id {}: {}",
+                item_id_to_update, e
+            );
+            match e {
+                Error::NotFound => {
+                    RepositoryError::NotFound(format!("menu_items: {item_id_to_update}"))
                 }
-            })
+                other => RepositoryError::DatabaseError(other),
+            }
+        })
     }
 
-    pub fn remove_menu_item(&self, id: i32) -> Result<MenuItem, RepositoryError> {
+    pub fn remove_menu_item(
+        &self,
+        id: i32,
+        owner_canteen_id: i32,
+    ) -> Result<MenuItem, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!(
                 "remove_menu_item: failed to acquire DB connection for id {}: {}",
@@ -156,23 +172,28 @@ impl MenuOperations {
             e
         })?;
 
-        diesel::delete(menu_items.filter(item_id.eq(id)))
-            .get_result(conn.connection())
-            .map_err(|e| {
-                error!(
-                    "remove_menu_item: error deleting menu item with id {}: {}",
-                    id, e
-                );
-                match e {
-                    Error::NotFound => RepositoryError::NotFound(format!("menu_items: {id}")),
-                    other => RepositoryError::DatabaseError(other),
-                }
-            })
+        diesel::delete(
+            menu_items
+                .filter(item_id.eq(id))
+                .filter(canteen_id.eq(owner_canteen_id)),
+        )
+        .get_result(conn.connection())
+        .map_err(|e| {
+            error!(
+                "remove_menu_item: error deleting menu item with id {} (canteen {}): {}",
+                id, owner_canteen_id, e
+            );
+            match e {
+                Error::NotFound => RepositoryError::NotFound(format!("menu_items: {id}")),
+                other => RepositoryError::DatabaseError(other),
+            }
+        })
     }
 
     pub fn update_menu_item(
         &self,
         itemid: i32,
+        owner_canteen_id: i32,
         changed_menu_item: UpdateMenuItem,
     ) -> Result<MenuItem, RepositoryError> {
         let changed_menu_item = changed_menu_item
@@ -186,19 +207,23 @@ impl MenuOperations {
             e
         })?;
 
-        diesel::update(menu_items.filter(item_id.eq(itemid)))
-            .set(&changed_menu_item)
-            .get_result(conn.connection())
-            .map_err(|e| {
-                error!(
-                    "update_menu_item: error updating menu item with id {}: {}",
-                    itemid, e
-                );
-                match e {
-                    Error::NotFound => RepositoryError::NotFound(format!("menu_items: {itemid}")),
-                    other => RepositoryError::DatabaseError(other),
-                }
-            })
+        diesel::update(
+            menu_items
+                .filter(item_id.eq(itemid))
+                .filter(canteen_id.eq(owner_canteen_id)),
+        )
+        .set(&changed_menu_item)
+        .get_result(conn.connection())
+        .map_err(|e| {
+            error!(
+                "update_menu_item: error updating menu item with id {} (canteen {}): {}",
+                itemid, owner_canteen_id, e
+            );
+            match e {
+                Error::NotFound => RepositoryError::NotFound(format!("menu_items: {itemid}")),
+                other => RepositoryError::DatabaseError(other),
+            }
+        })
     }
 
     pub async fn get_all_menu_items(&self) -> Result<Vec<MenuItemWithPic>, RepositoryError> {
