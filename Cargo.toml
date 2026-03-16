@@ -51,6 +51,7 @@ futures = "0.3.32"
 log = "0.4"
 pretty_env_logger = "0.5"
 thiserror = "2.0"
+uuid = { version = "1.16.0", features = ["v4"] }
 
 [dev-dependencies]
 testcontainers = { version = "0.27.0", features = ["blocking"] }
@@ -61,22 +62,26 @@ wiremock = "0.6"
 [workspace]
 members = [".", "with_pic_macro"]
 
+[lints]
+workspace = true
+
 [workspace.lints.clippy]
 correctness = { level = "deny", priority = -1 }  # Treat correctness lints as errors
+style = { level = "warn", priority = -1 }
+complexity = { level = "warn", priority = -1 }
+perf = { level = "warn", priority = -1 }
 
 # --- Style: Learn and enforce good Rust style ---
-style = "warn"
 redundant_closure = "warn" # Helps you learn when closures can be simplified
 match_bool = "warn"       # Encourages using if/else for booleans (more common in other languages)
 needless_return = "warn"    # Encourages omitting the `return` keyword when it's not needed
+enum_variant_names = "allow"
 
 # --- Complexity: Keep your code simple ---
-complexity = "warn"
 too_many_arguments = "warn"   # Avoid functions with excessive parameters
 redundant_clone = "warn"      # Learn to use references and borrowing instead of unnecessary cloning
 
 # --- Performance: Start with the basics ---
-perf = "warn"
 iter_next_loop = "warn"    # Avoid common mistakes with iterators
 inefficient_to_string = "warn" # Learn about the performance implications of `to_string`
 

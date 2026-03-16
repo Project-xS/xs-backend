@@ -7,6 +7,7 @@ pub mod db;
 pub mod enums;
 pub mod models;
 pub mod services;
+mod sse;
 pub mod test_utils;
 pub mod traits;
 
@@ -15,6 +16,7 @@ use crate::db::{
     HoldOperations, MenuOperations, OrderOperations, SearchOperations, UserOperations,
 };
 use crate::services::canteen_scheduler::CanteenSchedulerNotifier;
+use crate::sse::SseBroker;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -26,6 +28,7 @@ pub struct AppState {
     pub search_ops: SearchOperations,
     pub asset_ops: AssetOperations,
     pub canteen_scheduler: CanteenSchedulerNotifier,
+    pub sse_broker: SseBroker,
 }
 
 impl AppState {
@@ -49,6 +52,7 @@ impl AppState {
         let hold_ops = HoldOperations::new(db.clone(), hold_ttl_secs);
         let search_ops = SearchOperations::new(db.clone()).await;
         let canteen_scheduler = CanteenSchedulerNotifier::new();
+        let sse_broker = SseBroker::new();
         AppState {
             user_ops,
             menu_ops,
@@ -58,6 +62,7 @@ impl AppState {
             search_ops,
             asset_ops,
             canteen_scheduler,
+            sse_broker,
         }
     }
 }
