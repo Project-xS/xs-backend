@@ -3,6 +3,7 @@ use crate::models::admin::MenuItemCheck;
 use crate::models::common::{NewHeldOrder, TimeBandEnum};
 use crate::sse::InventoryUpdateItems;
 use chrono::{Duration, Utc};
+use diesel::dsl::sum;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::result::Error;
@@ -15,6 +16,15 @@ use std::collections::HashMap;
 #[diesel(table_name = crate::db::schema::held_order_items)]
 struct HeldOrderItemInsert {
     hold_id: i32,
+    item_id: i32,
+    quantity: i16,
+    price: i32,
+}
+
+#[derive(Insertable, Debug)]
+#[diesel(table_name = crate::db::schema::active_order_items)]
+struct ActiveOrderItemInsert {
+    order_id: i32,
     item_id: i32,
     quantity: i16,
     price: i32,
@@ -35,6 +45,7 @@ struct HeldOrderWithItems {
     canteen_id: i32,
     total_price: i32,
     deliver_at: Option<TimeBandEnum>,
+    expires_at: chrono::DateTime<chrono::Utc>,
     item_id: i32,
     quantity: i16,
     price: i32,
@@ -268,19 +279,19 @@ impl HoldOperations {
     }
 
     /// Confirm a held order: move to active_orders, delete from held tables.
-    /// Returns the new order_id.
+    /// Returns (order_id, canteen_id, (time_band, [(item_id, num_ordered)])).
     pub fn confirm_held_order(
         &self,
         search_hold_id: i32,
         requesting_user_id: i32,
-    ) -> Result<i32, RepositoryError> {
+    ) -> Result<(i32, i32, (String, Vec<(i32, i32)>)), RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!("confirm_held_order: failed to acquire DB connection: {}", e);
             e
         })?;
 
         enum ConfirmOutcome {
-            Confirmed(i32),
+            Confirmed(i32, i32, (String, Vec<(i32, i32)>)),
             Expired,
         }
 
@@ -301,6 +312,7 @@ impl HoldOperations {
                         held_orders::canteen_id,
                         held_orders::total_price,
                         held_orders::deliver_at,
+                        held_orders::expires_at,
                         held_order_items::item_id,
                         held_order_items::quantity,
                         held_order_items::price,
@@ -331,23 +343,15 @@ impl HoldOperations {
                 ));
             }
 
-            // Expiry check — fetch expires_at
-            {
+            // Expiry check
+            if Utc::now() > first.expires_at {
                 use crate::db::schema::held_orders::dsl::*;
-                let hold_expires: chrono::DateTime<chrono::Utc> = held_orders
-                    .filter(hold_id.eq(search_hold_id))
-                    .select(expires_at)
-                    .first::<chrono::DateTime<chrono::Utc>>(conn)
+                // Hold has expired — clean it up but allow commit.
+                let _ = Self::restore_stock_for_hold(conn, search_hold_id)?;
+                diesel::delete(held_orders.filter(hold_id.eq(search_hold_id)))
+                    .execute(conn)
                     .map_err(RepositoryError::DatabaseError)?;
-
-                if Utc::now() > hold_expires {
-                    // Hold has expired — clean it up but allow commit.
-                    let _ = Self::restore_stock_for_hold(conn, search_hold_id)?;
-                    diesel::delete(held_orders.filter(hold_id.eq(search_hold_id)))
-                        .execute(conn)
-                        .map_err(RepositoryError::DatabaseError)?;
-                    return Ok(ConfirmOutcome::Expired);
-                }
+                return Ok(ConfirmOutcome::Expired);
             }
 
             // Create active order
@@ -369,18 +373,70 @@ impl HoldOperations {
             // Create active order items
             {
                 use crate::db::schema::active_order_items::dsl::*;
-                for row in &held_data {
-                    diesel::insert_into(active_order_items)
-                        .values((
-                            order_id.eq(new_order_id),
-                            item_id.eq(row.item_id),
-                            quantity.eq(row.quantity),
-                            price.eq(row.price),
-                        ))
-                        .execute(conn)
-                        .map_err(RepositoryError::DatabaseError)?;
-                }
+                let active_items = held_data
+                    .iter()
+                    .map(|row| ActiveOrderItemInsert {
+                        order_id: new_order_id,
+                        item_id: row.item_id,
+                        quantity: row.quantity,
+                        price: row.price,
+                    })
+                    .collect::<Vec<ActiveOrderItemInsert>>();
+                diesel::insert_into(active_order_items)
+                    .values(&active_items)
+                    .execute(conn)
+                    .map_err(RepositoryError::DatabaseError)?;
             }
+
+            let deliver_time_string = first
+                .deliver_at
+                .as_ref()
+                .map(|deliver_at| deliver_at.human_readable().to_string())
+                .unwrap_or_else(|| "Instant".to_string());
+
+            // Snapshot aggregated active order counts for this canteen/time-band
+            // inside the same transaction so publish data is transactionally consistent.
+            let aggregated_updates = {
+                use crate::db::schema::{active_order_items, active_orders};
+                let snapshot_rows = if let Some(deliver_time) = first.deliver_at.clone() {
+                    active_order_items::table
+                        .inner_join(
+                            active_orders::table
+                                .on(active_order_items::order_id.eq(active_orders::order_id)),
+                        )
+                        .filter(active_orders::canteen_id.eq(first.canteen_id))
+                        .filter(active_orders::deliver_at.eq(Some(deliver_time)))
+                        .group_by(active_order_items::item_id)
+                        .select((
+                            active_order_items::item_id,
+                            sum(active_order_items::quantity),
+                        ))
+                        .order(active_order_items::item_id.asc())
+                        .load::<(i32, Option<i64>)>(conn)
+                        .map_err(RepositoryError::DatabaseError)?
+                } else {
+                    active_order_items::table
+                        .inner_join(
+                            active_orders::table
+                                .on(active_order_items::order_id.eq(active_orders::order_id)),
+                        )
+                        .filter(active_orders::canteen_id.eq(first.canteen_id))
+                        .filter(active_orders::deliver_at.is_null())
+                        .group_by(active_order_items::item_id)
+                        .select((
+                            active_order_items::item_id,
+                            sum(active_order_items::quantity),
+                        ))
+                        .order(active_order_items::item_id.asc())
+                        .load::<(i32, Option<i64>)>(conn)
+                        .map_err(RepositoryError::DatabaseError)?
+                };
+
+                snapshot_rows
+                    .into_iter()
+                    .map(|(item_id, num_ordered)| (item_id, num_ordered.unwrap_or(0) as i32))
+                    .collect::<Vec<(i32, i32)>>()
+            };
 
             // Delete held order (cascade deletes items)
             {
@@ -395,11 +451,17 @@ impl HoldOperations {
                 search_hold_id, new_order_id, requesting_user_id
             );
 
-            Ok(ConfirmOutcome::Confirmed(new_order_id))
+            Ok(ConfirmOutcome::Confirmed(
+                new_order_id,
+                first.canteen_id,
+                (deliver_time_string, aggregated_updates),
+            ))
         });
 
         match outcome? {
-            ConfirmOutcome::Confirmed(order_id) => Ok(order_id),
+            ConfirmOutcome::Confirmed(order_id, canteen_id, aggregated_update) => {
+                Ok((order_id, canteen_id, aggregated_update))
+            }
             ConfirmOutcome::Expired => Err(RepositoryError::ValidationError(
                 "Hold has expired. Items have been released.".to_string(),
             )),

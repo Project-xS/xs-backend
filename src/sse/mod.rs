@@ -14,6 +14,12 @@ pub struct InventoryUpdateItems {
 }
 
 #[derive(Clone, Debug, Serialize)]
+pub struct CanteenAggregatedOrderUpdateItem {
+    pub item_id: i32,
+    pub num_ordered: i32,
+}
+
+#[derive(Clone, Debug, Serialize)]
 #[serde(untagged)]
 pub enum SseEvent {
     InventoryUpdate {
@@ -28,8 +34,7 @@ pub enum SseEvent {
     CanteenAggregatedOrderUpdate {
         // only to canteen
         time_band: String,
-        item_id: i32,
-        num_ordered: i32,
+        items: Vec<CanteenAggregatedOrderUpdateItem>,
     },
 }
 

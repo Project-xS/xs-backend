@@ -1,7 +1,7 @@
 use crate::auth::UserPrincipal;
 use crate::db::HoldOperations;
 use crate::enums::common::{ConfirmHoldResponse, HoldOrderResponse, OrderRequest, OrderResponse};
-use crate::sse::SseEvent;
+use crate::sse::{CanteenAggregatedOrderUpdateItem, SseEvent};
 use actix_web::{delete, post, web, HttpResponse, Responder};
 use log::{debug, error};
 
@@ -94,6 +94,7 @@ pub(super) async fn hold_order(
 #[post("/{id}/confirm")]
 pub(super) async fn confirm_hold(
     hold_ops: web::Data<HoldOperations>,
+    broker: web::Data<crate::sse::SseBroker>,
     user: UserPrincipal,
     path: web::Path<(i32,)>,
 ) -> actix_web::Result<impl Responder> {
@@ -102,10 +103,24 @@ pub(super) async fn confirm_hold(
     let result = web::block(move || hold_ops.confirm_held_order(hold_id, uid)).await?;
 
     match result {
-        Ok(order_id) => {
+        Ok((order_id, canteen_id, (time_band, aggregated_updates))) => {
             debug!(
                 "confirm_hold: hold {} confirmed as order {} for user {}",
                 hold_id, order_id, uid
+            );
+            let aggregated_items = aggregated_updates
+                .into_iter()
+                .map(|(item_id, num_ordered)| CanteenAggregatedOrderUpdateItem {
+                    item_id,
+                    num_ordered,
+                })
+                .collect::<Vec<CanteenAggregatedOrderUpdateItem>>();
+            broker.publish_canteen_event(
+                canteen_id,
+                &SseEvent::CanteenAggregatedOrderUpdate {
+                    time_band,
+                    items: aggregated_items,
+                },
             );
             Ok(HttpResponse::Ok().json(ConfirmHoldResponse {
                 status: "ok".to_string(),
