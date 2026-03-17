@@ -15,7 +15,7 @@ use uuid::Uuid;
     ),
     summary = "Connect to SSE stream for user order updates",
 )]
-#[get("/order")]
+#[get("/orders")]
 pub async fn user_order_events(
     user: UserPrincipal,
     broker: web::Data<SseBroker>,
@@ -37,6 +37,6 @@ pub async fn user_order_events(
     });
 
     Sse::from_infallible_receiver(rx)
-        .with_retry_duration(Duration::from_secs(10))
+        .with_retry_duration(Duration::from_secs(3))
         .with_keep_alive(Duration::from_secs(10))
 }

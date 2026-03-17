@@ -3,6 +3,7 @@ mod broker;
 use actix_web_lab::sse;
 pub use broker::SseBroker;
 use serde::Serialize;
+use std::time::SystemTime;
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(untagged)]
@@ -41,6 +42,11 @@ impl SseEvent {
                 serde_json::to_string(self).unwrap(),
             ),
         };
-        sse::Data::new(json_str).event(event_name).into()
+        let now = SystemTime::now();
+        let epoch = now.duration_since(SystemTime::UNIX_EPOCH).unwrap();
+        sse::Data::new(json_str)
+            .event(event_name)
+            .id(epoch.as_millis().to_string())
+            .into()
     }
 }
