@@ -87,8 +87,9 @@ async fn main() -> std::io::Result<()> {
     // Spawn background task to clean up expired holds
     {
         let hold_ops = state.hold_ops.clone();
+        let sse_broker = state.sse_broker.clone();
         tokio::spawn(async move {
-            proj_xs::services::hold_cleanup::run_hold_cleanup(hold_ops).await;
+            proj_xs::services::hold_cleanup::run_hold_cleanup(hold_ops, sse_broker).await;
         });
     }
 

@@ -1,6 +1,7 @@
 use crate::auth::UserPrincipal;
 use crate::db::HoldOperations;
 use crate::enums::common::{ConfirmHoldResponse, HoldOrderResponse, OrderRequest, OrderResponse};
+use crate::sse::SseEvent;
 use actix_web::{delete, post, web, HttpResponse, Responder};
 use log::{debug, error};
 
@@ -16,6 +17,7 @@ use log::{debug, error};
 #[post("")]
 pub(super) async fn hold_order(
     hold_ops: web::Data<HoldOperations>,
+    broker: web::Data<crate::sse::SseBroker>,
     user: UserPrincipal,
     req_data: web::Json<OrderRequest>,
 ) -> actix_web::Result<impl Responder> {
@@ -45,10 +47,16 @@ pub(super) async fn hold_order(
     let result = web::block(move || hold_ops.hold_order(uid, item_ids_cl, deliver_at_cl)).await?;
 
     match result {
-        Ok((hold_id, expires_at)) => {
+        Ok((hold_id, expires_at, (canteen_id, inventory_updates))) => {
             debug!(
                 "hold_order: created hold {} for user {} with items {:?}",
                 hold_id, uid, item_ids
+            );
+            broker.publish_canteen_subscription_event(
+                canteen_id,
+                &SseEvent::InventoryUpdate {
+                    items: inventory_updates,
+                },
             );
             Ok(HttpResponse::Ok().json(HoldOrderResponse {
                 status: "ok".to_string(),
@@ -133,6 +141,7 @@ pub(super) async fn confirm_hold(
 #[delete("/{id}")]
 pub(super) async fn cancel_hold(
     hold_ops: web::Data<HoldOperations>,
+    broker: web::Data<crate::sse::SseBroker>,
     user: UserPrincipal,
     path: web::Path<(i32,)>,
 ) -> actix_web::Result<impl Responder> {
@@ -141,8 +150,16 @@ pub(super) async fn cancel_hold(
     let result = web::block(move || hold_ops.release_held_order(hold_id, uid)).await?;
 
     match result {
-        Ok(()) => {
+        Ok((canteen_id, inventory_updates)) => {
             debug!("cancel_hold: hold {} cancelled for user {}", hold_id, uid);
+            if !inventory_updates.is_empty() {
+                broker.publish_canteen_subscription_event(
+                    canteen_id,
+                    &SseEvent::InventoryUpdate {
+                        items: inventory_updates,
+                    },
+                );
+            }
             Ok(HttpResponse::Ok().json(OrderResponse {
                 status: "ok".to_string(),
                 error: None,

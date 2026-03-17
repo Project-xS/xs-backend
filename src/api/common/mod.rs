@@ -1,6 +1,7 @@
 use crate::api::common::qr::QrConfig;
 use crate::api::ContentTypeHeader;
 use crate::db::{HoldOperations, OrderOperations, SearchOperations};
+use crate::sse::SseBroker;
 use actix_web::middleware::NormalizePath;
 use actix_web::web;
 use hold::*;
@@ -20,6 +21,7 @@ pub(super) fn config(
     order_ops: &OrderOperations,
     hold_ops: &HoldOperations,
     search_ops: &SearchOperations,
+    sse_broker: &SseBroker,
     qr_cfg: QrConfig,
 ) {
     cfg.service(
@@ -27,6 +29,7 @@ pub(super) fn config(
             .wrap(NormalizePath::trim())
             .app_data(web::Data::new(order_ops.clone()))
             .app_data(web::Data::new(hold_ops.clone()))
+            .app_data(web::Data::new(sse_broker.clone()))
             .app_data(web::Data::new(qr_cfg))
             .service(
                 scope::scope("/hold")

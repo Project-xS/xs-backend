@@ -2,21 +2,22 @@ use crate::sse::SseEvent;
 use actix_web_lab::sse;
 use dashmap::DashMap;
 use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct SseBroker {
-    user_conns: DashMap<i32, HashMap<Uuid, mpsc::Sender<sse::Event>>>, // send user order updates
-    canteen_conns: DashMap<i32, HashMap<Uuid, mpsc::Sender<sse::Event>>>, // sends canteen aggregated order updates
-    canteen_subs: DashMap<i32, HashMap<Uuid, mpsc::Sender<sse::Event>>>, // canteen id -> tx - sends both inventory updates
+    user_conns: Arc<DashMap<i32, HashMap<Uuid, mpsc::Sender<sse::Event>>>>, // send user order updates
+    canteen_conns: Arc<DashMap<i32, HashMap<Uuid, mpsc::Sender<sse::Event>>>>, // sends canteen aggregated order updates
+    canteen_subs: Arc<DashMap<i32, HashMap<Uuid, mpsc::Sender<sse::Event>>>>, // canteen id -> tx - sends both inventory updates
 }
 impl SseBroker {
     pub fn new() -> Self {
         Self {
-            user_conns: DashMap::new(),
-            canteen_conns: DashMap::new(),
-            canteen_subs: DashMap::new(),
+            user_conns: Arc::new(DashMap::new()),
+            canteen_conns: Arc::new(DashMap::new()),
+            canteen_subs: Arc::new(DashMap::new()),
         }
     }
 
@@ -115,10 +116,13 @@ impl SseBroker {
         debug!("user_order_events: publishing event to user {}", user_id);
         let sse_event = event.to_sse_event();
         let mut dead_devices: Vec<Uuid> = Vec::new();
+        let mut successful_count: i32 = 0;
         if let Some(conn_map) = self.user_conns.get(&user_id) {
             for (conn_id, tx) in conn_map.iter() {
                 if tx.try_send(sse_event.clone()).is_err() {
                     dead_devices.push(*conn_id);
+                } else {
+                    successful_count += 1;
                 }
             }
             for dead_device in dead_devices {
@@ -126,8 +130,8 @@ impl SseBroker {
             }
         }
         debug!(
-            "user_order_events: finished publishing event to user {}",
-            user_id
+            "user_order_events: finished publishing event to user {}: {} devices",
+            user_id, successful_count
         );
     }
 
@@ -138,10 +142,17 @@ impl SseBroker {
         );
         let sse_event = event.to_sse_event();
         let mut dead_devices: Vec<Uuid> = Vec::new();
+        let mut successful_count: i32 = 0;
         if let Some(conn_map) = self.canteen_conns.get(&canteen_id) {
+            debug!(
+                "canteen_order_events: initial: found {} devices",
+                conn_map.len()
+            );
             for (conn_id, tx) in conn_map.iter() {
                 if tx.try_send(sse_event.clone()).is_err() {
                     dead_devices.push(*conn_id);
+                } else {
+                    successful_count += 1;
                 }
             }
             for dead_device in dead_devices {
@@ -149,22 +160,29 @@ impl SseBroker {
             }
         }
         debug!(
-            "canteen_order_events: finished publishing event to canteen {}",
-            canteen_id
+            "canteen_order_events: finished publishing event to canteen {}: {} devices",
+            canteen_id, successful_count
         );
     }
 
     pub fn publish_canteen_subscription_event(&self, canteen_id: i32, event: &SseEvent) {
         debug!(
-            "canteen_subscription_events: publishing event to canteen {}",
+            "canteen_subscription_events: publishing event for canteen {}",
             canteen_id
         );
         let sse_event = event.to_sse_event();
         let mut dead_devices: Vec<Uuid> = Vec::new();
+        let mut successful_count: i32 = 0;
         if let Some(conn_map) = self.canteen_subs.get(&canteen_id) {
+            debug!(
+                "canteen_subscription_events: initial: found {} devices",
+                conn_map.len()
+            );
             for (conn_id, tx) in conn_map.iter() {
                 if tx.try_send(sse_event.clone()).is_err() {
                     dead_devices.push(*conn_id);
+                } else {
+                    successful_count += 1;
                 }
             }
             for dead_device in dead_devices {
@@ -172,8 +190,8 @@ impl SseBroker {
             }
         }
         debug!(
-            "canteen_subscription_events: finished publishing event to canteen {}",
-            canteen_id
+            "canteen_subscription_events: finished publishing event for canteen {}: {} devices",
+            canteen_id, successful_count
         );
     }
 }

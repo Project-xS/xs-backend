@@ -5,6 +5,7 @@ use crate::enums::common::{
     OrderItemsResponse, OrderResponse, OrdersItemsResponse, TimedActiveItemCount,
     TimedActiveItemCountResponse,
 };
+use crate::sse::{SseBroker, SseEvent};
 use actix_web::{get, put, web, HttpResponse, Responder};
 use log::{debug, error};
 use serde::Deserialize;
@@ -241,6 +242,7 @@ pub(super) async fn get_orders_by_user(
 #[put("/{id}/{action}")]
 pub(super) async fn order_actions(
     order_ops: web::Data<OrderOperations>,
+    broker: web::Data<SseBroker>,
     _admin: AdminPrincipal,
     path: web::Path<(i32, String)>,
 ) -> actix_web::Result<impl Responder> {
@@ -261,12 +263,21 @@ pub(super) async fn order_actions(
         }));
     }
     let status_cl = status.clone();
-    let result = web::block(move || order_ops.order_actions(&order_id, &status_cl)).await?;
+    let status_for_db = status_cl.clone();
+    let result = web::block(move || order_ops.order_actions(&order_id, &status_for_db)).await?;
     match result {
-        Ok(_) => {
+        Ok(user_id) => {
             debug!(
                 "order_actions: successfully changed order with order_id {:?} to status {:?}",
                 order_id, status
+            );
+            broker.publish_user_event(
+                user_id,
+                &SseEvent::UserOrderUpdate {
+                    //-> send the user a sse event as update for order
+                    order_id: order_id.clone(),
+                    status: status_cl,
+                },
             );
             Ok(HttpResponse::Ok().json(OrderResponse {
                 status: "ok".to_string(),

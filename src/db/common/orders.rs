@@ -92,7 +92,7 @@ impl OrderOperations {
             *qty += 1;
         }
 
-        // Check item availability
+        // Check validity of item
         {
             use crate::db::schema::*;
             items_in_order = menu_items::table
@@ -122,6 +122,7 @@ impl OrderOperations {
 
             canteen_id_in_order = items_in_order.first().unwrap().canteen_id;
 
+            // Check if each item is available and not from different canteens
             for item in &items_in_order {
                 item_prices.insert(item.item_id, item.price);
                 if canteen_id_in_order != item.canteen_id {
@@ -580,7 +581,7 @@ impl OrderOperations {
         &self,
         search_order_id: &i32,
         deliver_status: &str,
-    ) -> Result<(), RepositoryError> {
+    ) -> Result<i32, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!("order_actions: get_orders_by_orderid: failed to acquire DB connection for order_id {}: {}", search_order_id, e);
             e
@@ -649,7 +650,7 @@ impl OrderOperations {
                         }
                     })?;
             }
-            Ok(())
+            Ok(first_item.user_id)
         })
     }
 }

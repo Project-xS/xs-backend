@@ -6,14 +6,19 @@ use serde::Serialize;
 use std::time::SystemTime;
 
 #[derive(Clone, Debug, Serialize)]
+pub struct InventoryUpdateItems {
+    pub item_id: i32,
+    pub stock: i32,
+    pub is_available: bool,
+    pub price: i32,
+}
+
+#[derive(Clone, Debug, Serialize)]
 #[serde(untagged)]
 pub enum SseEvent {
     InventoryUpdate {
         // to both user and canteen
-        item_id: i32,
-        stock: i32,
-        is_available: bool,
-        price: i32,
+        items: Vec<InventoryUpdateItems>,
     },
     UserOrderUpdate {
         // only to user
