@@ -103,11 +103,12 @@ pub(super) async fn confirm_hold(
     let result = web::block(move || hold_ops.confirm_held_order(hold_id, uid)).await?;
 
     match result {
-        Ok((order_id, canteen_id, (time_band, aggregated_updates))) => {
+        Ok((order_id, user_id, canteen_id, (time_band, aggregated_updates))) => {
             debug!(
                 "confirm_hold: hold {} confirmed as order {} for user {}",
                 hold_id, order_id, uid
             );
+            // Publish canteen aggregated sse
             let aggregated_items = aggregated_updates
                 .into_iter()
                 .map(|(item_id, num_ordered)| CanteenAggregatedOrderUpdateItem {
@@ -122,6 +123,16 @@ pub(super) async fn confirm_hold(
                     items: aggregated_items,
                 },
             );
+
+            // Publish user order placed sse
+            broker.publish_user_event(
+                user_id,
+                &SseEvent::UserOrderUpdate {
+                    order_id,
+                    status: "placed".to_string(),
+                },
+            );
+
             Ok(HttpResponse::Ok().json(ConfirmHoldResponse {
                 status: "ok".to_string(),
                 order_id: Some(order_id),

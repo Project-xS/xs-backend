@@ -279,19 +279,19 @@ impl HoldOperations {
     }
 
     /// Confirm a held order: move to active_orders, delete from held tables.
-    /// Returns (order_id, canteen_id, (time_band, [(item_id, num_ordered)])).
+    /// Returns (order_id, user_id, canteen_id, (time_band, [(item_id, num_ordered)])).
     pub fn confirm_held_order(
         &self,
         search_hold_id: i32,
         requesting_user_id: i32,
-    ) -> Result<(i32, i32, (String, Vec<(i32, i32)>)), RepositoryError> {
+    ) -> Result<(i32, i32, i32, (String, Vec<(i32, i32)>)), RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!("confirm_held_order: failed to acquire DB connection: {}", e);
             e
         })?;
 
         enum ConfirmOutcome {
-            Confirmed(i32, i32, (String, Vec<(i32, i32)>)),
+            Confirmed(i32, i32, i32, (String, Vec<(i32, i32)>)),
             Expired,
         }
 
@@ -453,14 +453,15 @@ impl HoldOperations {
 
             Ok(ConfirmOutcome::Confirmed(
                 new_order_id,
+                first.user_id,
                 first.canteen_id,
                 (deliver_time_string, aggregated_updates),
             ))
         });
 
         match outcome? {
-            ConfirmOutcome::Confirmed(order_id, canteen_id, aggregated_update) => {
-                Ok((order_id, canteen_id, aggregated_update))
+            ConfirmOutcome::Confirmed(order_id, user_id, canteen_id, aggregated_update) => {
+                Ok((order_id, user_id, canteen_id, aggregated_update))
             }
             ConfirmOutcome::Expired => Err(RepositoryError::ValidationError(
                 "Hold has expired. Items have been released.".to_string(),
