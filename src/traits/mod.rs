@@ -3,42 +3,29 @@ use crate::models::common::OrderItems;
 use crate::models::user::PastOrderItem;
 
 pub trait PicKey {
-    fn has_pic(&self) -> bool;
-    fn pic_key(&self) -> String;
+    fn pic_key(&self) -> Option<String>;
 }
 
 impl PicKey for MenuItem {
-    fn has_pic(&self) -> bool {
-        self.has_pic
-    }
-    fn pic_key(&self) -> String {
-        format!("items/{}", self.item_id)
+    fn pic_key(&self) -> Option<String> {
+        self.pic_key.as_ref().map(|key| format!("items/{key}"))
     }
 }
 
 impl PicKey for CanteenDetails {
-    fn has_pic(&self) -> bool {
-        self.has_pic
-    }
-    fn pic_key(&self) -> String {
-        format!("canteens/{}", self.canteen_id)
+    fn pic_key(&self) -> Option<String> {
+        self.pic_key.as_ref().map(|key| format!("canteens/{key}"))
     }
 }
 
 impl PicKey for OrderItems {
-    fn has_pic(&self) -> bool {
-        self.has_pic
-    }
-    fn pic_key(&self) -> String {
-        format!("items/{}", self.item_id)
+    fn pic_key(&self) -> Option<String> {
+        self.pic_key.as_ref().map(|key| format!("items/{key}"))
     }
 }
 
 impl PicKey for PastOrderItem {
-    fn has_pic(&self) -> bool {
-        self.has_pic
-    }
-    fn pic_key(&self) -> String {
-        format!("items/{}", self.item_id)
+    fn pic_key(&self) -> Option<String> {
+        self.pic_key.as_ref().map(|key| format!("items/{key}"))
     }
 }

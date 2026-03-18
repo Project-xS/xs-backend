@@ -7,7 +7,7 @@ use std::sync::Once;
 
 // Fixture strategy:
 // - Build users/canteens/menu items via helpers below.
-// - Keep has_pic = false to avoid S3 presign calls in tests.
+// - Keep pic_key = null by default to avoid S3 presign calls in tests.
 const TEST_S3_ENDPOINT: &str = "http://localhost:9000";
 const TEST_S3_REGION: &str = "us-east-1";
 const TEST_S3_ACCESS_KEY: &str = "test-access-key";
@@ -159,7 +159,6 @@ pub fn insert_canteen(
     let new_canteen = NewCanteen {
         canteen_name: canteen_name_val.to_string(),
         location: location_val.to_string(),
-        has_pic: false,
         opening_time: None,
         closing_time: None,
     };
@@ -192,7 +191,6 @@ pub fn seed_menu_item(
         stock: stock_val,
         is_available: is_available_val,
         description: description_val.map(|val| val.to_string()),
-        has_pic: false,
     };
 
     diesel::insert_into(menu_items)

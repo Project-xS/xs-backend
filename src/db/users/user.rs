@@ -11,7 +11,14 @@ use futures::future::join_all;
 use log::error;
 use std::collections::{HashMap, HashSet};
 
-type MenuItemInfo = (String, String, bool, bool, Option<String>, Option<String>);
+type MenuItemInfo = (
+    String,
+    String,
+    bool,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+);
 
 #[derive(Debug)]
 struct GroupedPastOrder {
@@ -200,7 +207,7 @@ impl UserOperations {
                     crate::db::schema::canteens::canteen_name,
                     name,
                     is_veg,
-                    has_pic,
+                    pic_key,
                     pic_etag,
                     description,
                 ))
@@ -210,7 +217,7 @@ impl UserOperations {
                     String,
                     String,
                     bool,
-                    bool,
+                    Option<String>,
                     Option<String>,
                     Option<String>,
                 )>(conn.connection())
@@ -233,7 +240,7 @@ impl UserOperations {
                         item.1.clone(),
                         item.2.clone(),
                         item.3,
-                        item.4,
+                        item.4.clone(),
                         item.5.clone(),
                         item.6.clone(),
                     )
@@ -262,7 +269,7 @@ impl UserOperations {
                     name: menu_items_in_orders.get(&item_unwrap).unwrap().1.clone(),
                     quantity: *items_qty.get(&item_unwrap).unwrap(),
                     is_veg: menu_items_in_orders.get(&item_unwrap).unwrap().2,
-                    has_pic: menu_items_in_orders.get(&item_unwrap).unwrap().3,
+                    pic_key: menu_items_in_orders.get(&item_unwrap).unwrap().3.clone(),
                     pic_etag: menu_items_in_orders.get(&item_unwrap).unwrap().4.clone(),
                     description: menu_items_in_orders.get(&item_unwrap).unwrap().5.clone(),
                 });

@@ -14,10 +14,10 @@ fn pic_key_menu_item_format() {
         stock: 10,
         is_available: true,
         description: None,
-        has_pic: true,
         pic_etag: None,
+        pic_key: Some("abc-uuid".to_string()),
     };
-    assert_eq!(item.pic_key(), "items/7");
+    assert_eq!(item.pic_key(), Some("items/abc-uuid".to_string()));
 }
 
 #[test]
@@ -26,11 +26,11 @@ fn pic_key_canteen_details_format() {
         canteen_id: 3,
         canteen_name: "Test Canteen".to_string(),
         location: "Block A".to_string(),
-        has_pic: true,
         pic_etag: None,
+        pic_key: Some("canteen-uuid".to_string()),
         opening_time: None,
         closing_time: None,
         is_open: true,
     };
-    assert_eq!(canteen.pic_key(), "canteens/3");
+    assert_eq!(canteen.pic_key(), Some("canteens/canteen-uuid".to_string()));
 }

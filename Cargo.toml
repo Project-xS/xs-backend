@@ -51,7 +51,7 @@ futures = "0.3.32"
 log = "0.4"
 pretty_env_logger = "0.5"
 thiserror = "2.0"
-uuid = { version = "1.16.0", features = ["v4"] }
+uuid = { version = "1.18", features = ["v4", "v7"] }
 
 [dev-dependencies]
 testcontainers = { version = "0.27.0", features = ["blocking"] }

@@ -10,8 +10,8 @@ pub fn derive_with_pic(input: TokenStream) -> TokenStream {
     let gen = quote! {
         impl #name {
             pub async fn populate_pic_link_from<K: crate::traits::PicKey>(&mut self, asset_ops: &crate::db::AssetOperations, key_src: &K) {
-                if key_src.has_pic() {
-                    let url = asset_ops.get_object_presign(&key_src.pic_key()).await.ok();
+                if let Some(pic_key) = key_src.pic_key() {
+                    let url = asset_ops.get_object_presign(&pic_key).await.ok();
                     self.pic_link = url;
                 }
             }

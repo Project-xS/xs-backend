@@ -92,6 +92,7 @@ pub struct UpdateItemRequest {
 }
 
 #[derive(Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct CreateMenuItemRequest {
     pub name: String,
     pub is_veg: bool,
@@ -99,7 +100,6 @@ pub struct CreateMenuItemRequest {
     pub stock: i32,
     pub is_available: bool,
     pub description: Option<String>,
-    pub has_pic: bool,
 }
 
 // ---------- CANTEEN ---------- //

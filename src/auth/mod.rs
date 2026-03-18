@@ -8,7 +8,7 @@ pub mod principal;
 pub mod qr_token;
 
 pub use config::{AdminJwtConfig, FirebaseAuthConfig};
-pub use extractors::{AdminPrincipal, UserPrincipal};
+pub use extractors::{AdminPrincipal, PrincipalExtractor, UserPrincipal};
 pub use jwks::JwksCache;
 pub use middleware::AuthLayer;
 pub use principal::Principal;

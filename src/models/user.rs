@@ -27,8 +27,8 @@ pub struct PastOrderItem {
     pub name: String,
     pub quantity: i16,
     pub is_veg: bool,
-    pub has_pic: bool,
     pub pic_etag: Option<String>,
+    pub pic_key: Option<String>,
     pub description: Option<String>,
 }
 

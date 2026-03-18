@@ -1,4 +1,4 @@
-use crate::auth::AdminPrincipal;
+use crate::auth::{AdminPrincipal, PrincipalExtractor};
 use crate::db::{MenuOperations, RepositoryError};
 use crate::enums::admin::{
     AllItemsResponse, CreateMenuItemRequest, CreateMenuItemResponse, GeneralMenuResponse,
@@ -34,7 +34,6 @@ pub(super) async fn create_menu_item(
         stock: req_data.stock,
         is_available: req_data.is_available,
         description: req_data.description,
-        has_pic: req_data.has_pic,
     };
     let req_data = match new_item.sanitize_and_validate() {
         Ok(data) => data,
@@ -83,6 +82,7 @@ pub(super) async fn create_menu_item(
     ),
     responses(
         (status = 200, description = "Menu item successfully deleted", body = GeneralMenuResponse),
+        (status = 403, description = "Item not found", body = GeneralMenuResponse),
         (status = 409, description = "Failed to delete menu item due to conflict", body = GeneralMenuResponse)
     ),
     summary = "Remove a menu item from the menu"
@@ -90,11 +90,11 @@ pub(super) async fn create_menu_item(
 #[delete("/delete/{id}")]
 pub(super) async fn remove_menu_item(
     menu_ops: web::Data<MenuOperations>,
-    _admin: AdminPrincipal,
+    admin: AdminPrincipal,
     path: web::Path<(i32,)>,
 ) -> actix_web::Result<impl Responder> {
     let req_data = path.into_inner().0;
-    let result = web::block(move || menu_ops.remove_menu_item(req_data)).await?;
+    let result = web::block(move || menu_ops.remove_menu_item(req_data, admin.canteen_id)).await?;
     match result {
         Ok(x) => {
             debug!(
@@ -111,9 +111,15 @@ pub(super) async fn remove_menu_item(
                 "remove_menu_item: failed to remove menu item with id {}: {}",
                 req_data, e
             );
-            Ok(HttpResponse::Conflict().json(GeneralMenuResponse {
+            let (status, message) = match e {
+                RepositoryError::NotFound(_) => {
+                    (StatusCode::FORBIDDEN, "item not found".to_string())
+                }
+                other => (StatusCode::CONFLICT, other.to_string()),
+            };
+            Ok(HttpResponse::build(status).json(GeneralMenuResponse {
                 status: "error".to_string(),
-                error: Some(e.to_string()),
+                error: Some(message),
             }))
         }
     }
@@ -126,6 +132,7 @@ pub(super) async fn remove_menu_item(
     ),
     responses(
         (status = 200, description = "Presigned URL generated successfully", body = GeneralMenuResponse),
+        (status = 403, description = "Item not found", body = GeneralMenuResponse),
         (status = 409, description = "Failed to generate presigned url", body = GeneralMenuResponse)
     ),
     summary = "Get presigned URL for uploading the menu item picture. Call the resulting URL with PUT to upload the image."
@@ -133,11 +140,13 @@ pub(super) async fn remove_menu_item(
 #[put("/upload_pic/{item_id}")]
 pub(super) async fn upload_menu_item_pic(
     menu_ops: web::Data<MenuOperations>,
-    _admin: AdminPrincipal,
+    admin: AdminPrincipal,
     path: web::Path<(i32,)>,
 ) -> actix_web::Result<impl Responder> {
     let item_id_to_set = path.into_inner().0;
-    let result = menu_ops.upload_menu_item_pic(&item_id_to_set).await;
+    let result = menu_ops
+        .upload_menu_item_pic(&item_id_to_set, admin.canteen_id)
+        .await;
     match result {
         Ok(res) => {
             debug!(
@@ -155,11 +164,17 @@ pub(super) async fn upload_menu_item_pic(
                 "upload_menu_item_pic: failed to generate presign upload for menu item with id {}: {}",
                 item_id_to_set, e
             );
+            let (status, message) = match e {
+                RepositoryError::NotFound(_) => {
+                    (StatusCode::FORBIDDEN, "item not found".to_string())
+                }
+                other => (StatusCode::CONFLICT, other.to_string()),
+            };
             Ok(
-                HttpResponse::Conflict().json(UploadMenuItemPicPresignedResponse {
+                HttpResponse::build(status).json(UploadMenuItemPicPresignedResponse {
                     status: "error".to_string(),
                     presigned_url: None,
-                    error: Some(e.to_string()),
+                    error: Some(message),
                 }),
             )
         }
@@ -173,6 +188,7 @@ pub(super) async fn upload_menu_item_pic(
     ),
     responses(
         (status = 200, description = "Menu item updated successfully", body = GeneralMenuResponse),
+        (status = 403, description = "Item not found", body = GeneralMenuResponse),
         (status = 409, description = "Failed to update menu item due to conflict", body = GeneralMenuResponse)
     ),
     summary = "Set picture link for a menu item after uploading the asset."
@@ -180,11 +196,13 @@ pub(super) async fn upload_menu_item_pic(
 #[put("/set_pic/{item_id}")]
 pub(super) async fn set_menu_pic_link(
     menu_ops: web::Data<MenuOperations>,
-    _admin: AdminPrincipal,
+    admin: AdminPrincipal,
     path: web::Path<(i32,)>,
 ) -> actix_web::Result<impl Responder> {
     let item_id_to_set = path.into_inner().0;
-    let result = menu_ops.set_menu_item_pic(&item_id_to_set).await;
+    let result = menu_ops
+        .set_menu_item_pic(&item_id_to_set, admin.canteen_id)
+        .await;
     match result {
         Ok(_x) => {
             debug!(
@@ -201,9 +219,15 @@ pub(super) async fn set_menu_pic_link(
                 "set_menu_pic_link: failed to approve pic for menu item with id {}: {}",
                 item_id_to_set, e
             );
-            Ok(HttpResponse::Conflict().json(GeneralMenuResponse {
+            let (status, message) = match e {
+                RepositoryError::NotFound(_) => {
+                    (StatusCode::FORBIDDEN, "item not found".to_string())
+                }
+                other => (StatusCode::CONFLICT, other.to_string()),
+            };
+            Ok(HttpResponse::build(status).json(GeneralMenuResponse {
                 status: "error".to_string(),
-                error: Some(e.to_string()),
+                error: Some(message),
             }))
         }
     }
@@ -221,8 +245,8 @@ pub(super) async fn set_menu_pic_link(
 #[put("/update")]
 pub(super) async fn update_menu_item(
     menu_ops: web::Data<MenuOperations>,
+    admin: AdminPrincipal,
     broker: web::Data<SseBroker>,
-    _admin: AdminPrincipal,
     req_data: web::Json<UpdateItemRequest>,
 ) -> actix_web::Result<impl Responder> {
     let req_data = req_data.into_inner();
@@ -236,8 +260,10 @@ pub(super) async fn update_menu_item(
         }
     };
     let update_data_cl = update_data.clone();
-    let result =
-        web::block(move || menu_ops.update_menu_item(req_data.item_id, update_data_cl)).await?;
+    let result = web::block(move || {
+        menu_ops.update_menu_item(req_data.item_id, admin.canteen_id, update_data_cl)
+    })
+    .await?;
     match result {
         Ok(x) => {
             debug!(
@@ -267,6 +293,9 @@ pub(super) async fn update_menu_item(
             );
             let (status, message) = match e {
                 RepositoryError::ValidationError(message) => (StatusCode::BAD_REQUEST, message),
+                RepositoryError::NotFound(_) => {
+                    (StatusCode::FORBIDDEN, "item not found".to_string())
+                }
                 other => (StatusCode::CONFLICT, other.to_string()),
             };
             Ok(HttpResponse::build(status).json(GeneralMenuResponse {
@@ -288,7 +317,7 @@ pub(super) async fn update_menu_item(
 #[get("/items")]
 pub(super) async fn get_all_menu_items(
     menu_ops: web::Data<MenuOperations>,
-    _admin: AdminPrincipal,
+    _principal: PrincipalExtractor,
 ) -> actix_web::Result<impl Responder> {
     let result = menu_ops.get_all_menu_items().await;
     match result {
@@ -328,6 +357,7 @@ pub(super) async fn get_all_menu_items(
 #[get("/items/{id}")]
 pub(super) async fn get_menu_item(
     menu_ops: web::Data<MenuOperations>,
+    _principal: PrincipalExtractor,
     path: web::Path<(i32,)>,
 ) -> actix_web::Result<impl Responder> {
     let req_data = path.into_inner().0;

@@ -1,7 +1,7 @@
 use crate::auth::extractors::AdminPrincipal;
 use crate::auth::qr_token;
 use crate::auth::UserPrincipal;
-use crate::db::OrderOperations;
+use crate::db::{OrderOperations, QrGenerationLookup, QrScanLookup};
 use crate::enums::common::{OrderItemsResponse, ScanQrRequest, ScanQrResponse};
 use actix_web::{get, post, web, HttpResponse, Responder};
 use image::ImageEncoder;
@@ -36,27 +36,28 @@ pub(super) async fn generate_order_qr(
     let order_id = path.into_inner().0;
     let uid = user.user_id();
 
-    // Verify the order exists and belongs to this user
-    let order_data = order_ops.get_orders_by_orderid_no_pics(&order_id).await;
-    match order_data {
-        Ok(Some(ref data)) if data.items.is_empty() => {
+    let access = order_ops
+        .lookup_order_for_qr_generation(order_id, uid)
+        .await;
+    match access {
+        Ok(QrGenerationLookup::NotFound) => {
             return Ok(HttpResponse::NotFound().json(OrderItemsResponse {
                 status: "error".to_string(),
                 data: None,
                 error: Some("Order not found".to_string()),
             }));
         }
-        Ok(None) => {
-            return Ok(HttpResponse::NotFound().json(OrderItemsResponse {
-                status: "error".to_string(),
-                data: None,
-                error: Some("Order not found".to_string()),
-            }));
+        Ok(QrGenerationLookup::NotOwned) => {
+            return Ok(HttpResponse::Forbidden().json(serde_json::json!({
+                "status": "error",
+                "error": "You do not own this order"
+            })));
         }
+        Ok(QrGenerationLookup::Owned) => {}
         Err(e) => {
             error!(
-                "generate_order_qr: error fetching order {}: {}",
-                order_id, e
+                "generate_order_qr: error validating order {} for user {}: {}",
+                order_id, uid, e
             );
             return Ok(
                 HttpResponse::InternalServerError().json(OrderItemsResponse {
@@ -66,24 +67,6 @@ pub(super) async fn generate_order_qr(
                 }),
             );
         }
-        Ok(Some(_)) => {}
-    }
-
-    // Verify ownership by checking if user has this order
-    let user_orders = order_ops.get_orders_by_userid(&uid).await.map_err(|e| {
-        error!(
-            "generate_order_qr: error verifying ownership for user {} order {}: {}",
-            uid, order_id, e
-        );
-        actix_web::error::ErrorInternalServerError("Failed to verify order ownership")
-    })?;
-
-    let owns_order = user_orders.iter().any(|o| o.order_id == order_id);
-    if !owns_order {
-        return Ok(HttpResponse::Forbidden().json(serde_json::json!({
-            "status": "error",
-            "error": "You do not own this order"
-        })));
     }
 
     // Generate token
@@ -152,29 +135,10 @@ pub(super) async fn scan_order_qr(
         };
 
     let order_data = order_ops
-        .get_orders_by_orderid_no_pics_with_canteen_id(&order_id)
+        .lookup_order_for_qr_scan(order_id, admin.canteen_id)
         .await;
     match order_data {
-        Ok(Some((order_canteen_id, data))) => {
-            if order_canteen_id != admin.canteen_id {
-                debug!(
-                    "scan_order_qr: order {} belongs to canteen {}, not admin canteen {}",
-                    order_id, order_canteen_id, admin.canteen_id
-                );
-                return Ok(HttpResponse::Forbidden().json(ScanQrResponse {
-                    status: "error".to_string(),
-                    data: None,
-                    error: Some("QR is valid but does not belong to this shop's order".to_string()),
-                }));
-            }
-            if data.items.is_empty() {
-                debug!("scan_order_qr: order {} not found or empty", order_id);
-                return Ok(HttpResponse::BadRequest().json(ScanQrResponse {
-                    status: "error".to_string(),
-                    data: None,
-                    error: Some("Order not found or already completed".to_string()),
-                }));
-            }
+        Ok(QrScanLookup::Found(data)) => {
             debug!(
                 "scan_order_qr: retrieved order {} with {} items",
                 order_id,
@@ -186,7 +150,18 @@ pub(super) async fn scan_order_qr(
                 error: None,
             }))
         }
-        Ok(None) => {
+        Ok(QrScanLookup::WrongCanteen) => {
+            debug!(
+                "scan_order_qr: order {} does not belong to admin canteen {}",
+                order_id, admin.canteen_id
+            );
+            Ok(HttpResponse::Forbidden().json(ScanQrResponse {
+                status: "error".to_string(),
+                data: None,
+                error: Some("QR is valid but does not belong to this shop's order".to_string()),
+            }))
+        }
+        Ok(QrScanLookup::NotFoundOrCompleted) => {
             debug!("scan_order_qr: order {} not found", order_id);
             Ok(HttpResponse::BadRequest().json(ScanQrResponse {
                 status: "error".to_string(),

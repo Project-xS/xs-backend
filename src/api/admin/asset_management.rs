@@ -2,6 +2,7 @@ use crate::auth::AdminPrincipal;
 use crate::db::{AssetOperations, S3Error};
 use crate::enums::admin::ItemUploadResponse;
 use actix_web::{get, post, web, HttpResponse, Responder};
+use uuid::Uuid;
 
 #[utoipa::path(
     tag = "Assets",
@@ -18,8 +19,9 @@ pub async fn upload_image_handler(
     _admin: AdminPrincipal,
     path: web::Path<(i32,)>,
 ) -> impl Responder {
-    let s3_key = path.into_inner().0;
-    match asset_ops.get_upload_presign_url(&s3_key.to_string()).await {
+    let item_id_val = path.into_inner().0;
+    let s3_key = Uuid::now_v7().to_string();
+    match asset_ops.get_upload_presign_url(&s3_key).await {
         Ok(url) => {
             debug!(
                 "upload_image: successfully generated presigned url '{:?}'",
@@ -28,7 +30,7 @@ pub async fn upload_image_handler(
             HttpResponse::Ok().json(ItemUploadResponse {
                 status: "ok".to_string(),
                 url: url.to_string(),
-                item_id: s3_key,
+                item_id: item_id_val,
                 error: None,
             })
         }
@@ -64,10 +66,10 @@ pub async fn upload_image_handler(
 pub async fn get_image_handler(
     asset_ops: web::Data<AssetOperations>,
     _admin: AdminPrincipal,
-    path: web::Path<(i32,)>,
+    path: web::Path<(String,)>,
 ) -> impl Responder {
     let s3_key = path.into_inner().0;
-    match asset_ops.get_object_presign(&s3_key.to_string()).await {
+    match asset_ops.get_object_presign(&s3_key).await {
         Ok(url) => {
             debug!(
                 "get_image: successfully generated presigned url '{:?}'",
@@ -76,7 +78,7 @@ pub async fn get_image_handler(
             HttpResponse::Ok().json(ItemUploadResponse {
                 status: "ok".to_string(),
                 url: url.to_string(),
-                item_id: s3_key,
+                item_id: -1,
                 error: None,
             })
         }

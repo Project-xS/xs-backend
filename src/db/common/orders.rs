@@ -56,6 +56,18 @@ pub struct OrderOperations {
     asset_ops: AssetOperations,
 }
 
+pub enum QrGenerationLookup {
+    NotFound,
+    NotOwned,
+    Owned,
+}
+
+pub enum QrScanLookup {
+    NotFoundOrCompleted,
+    WrongCanteen,
+    Found(OrderItemContainer),
+}
+
 impl OrderOperations {
     pub async fn new(pool: Pool<ConnectionManager<PgConnection>>) -> Self {
         Self {
@@ -379,8 +391,8 @@ impl OrderOperations {
                 active_order_items::quantity,
                 active_order_items::price,
                 menu_items::is_veg,
-                menu_items::has_pic,
                 menu_items::pic_etag,
+                menu_items::pic_key,
                 menu_items::description,
             ))
             .order_by(active_orders::ordered_at.desc())
@@ -443,8 +455,8 @@ impl OrderOperations {
                 active_order_items::quantity,
                 active_order_items::price,
                 menu_items::is_veg,
-                menu_items::has_pic,
                 menu_items::pic_etag,
+                menu_items::pic_key,
                 menu_items::description,
             ))
             .order_by(active_orders::ordered_at.desc())
@@ -500,6 +512,85 @@ impl OrderOperations {
             .await
     }
 
+    pub async fn lookup_order_for_qr_generation(
+        &self,
+        search_order_id: i32,
+        search_user_id: i32,
+    ) -> Result<QrGenerationLookup, RepositoryError> {
+        let mut conn = DbConnection::new(&self.pool).map_err(|e| {
+            error!(
+                "lookup_order_for_qr_generation: failed to acquire DB connection for order_id {}: {}",
+                search_order_id, e
+            );
+            e
+        })?;
+        use crate::db::schema::*;
+
+        let order_owner_id = active_orders::table
+            .filter(active_orders::order_id.eq(search_order_id))
+            .select(active_orders::user_id)
+            .first::<i32>(conn.connection())
+            .optional()
+            .map_err(|e| {
+                error!(
+                    "lookup_order_for_qr_generation: failed to fetch owner for order_id {}: {}",
+                    search_order_id, e
+                );
+                RepositoryError::DatabaseError(e)
+            })?;
+
+        let Some(order_owner_id) = order_owner_id else {
+            return Ok(QrGenerationLookup::NotFound);
+        };
+
+        let has_order_items = active_order_items::table
+            .filter(active_order_items::order_id.eq(search_order_id))
+            .select(active_order_items::item_id)
+            .first::<i32>(conn.connection())
+            .optional()
+            .map_err(|e| {
+                error!(
+                    "lookup_order_for_qr_generation: failed to fetch items for order_id {}: {}",
+                    search_order_id, e
+                );
+                RepositoryError::DatabaseError(e)
+            })?
+            .is_some();
+
+        if !has_order_items {
+            return Ok(QrGenerationLookup::NotFound);
+        }
+
+        if order_owner_id != search_user_id {
+            return Ok(QrGenerationLookup::NotOwned);
+        }
+
+        Ok(QrGenerationLookup::Owned)
+    }
+
+    pub async fn lookup_order_for_qr_scan(
+        &self,
+        search_order_id: i32,
+        admin_canteen_id: i32,
+    ) -> Result<QrScanLookup, RepositoryError> {
+        let order_data = self
+            .get_orders_by_orderid_no_pics_with_canteen_id(&search_order_id)
+            .await?;
+
+        match order_data {
+            Some((order_canteen_id, data)) => {
+                if order_canteen_id != admin_canteen_id {
+                    return Ok(QrScanLookup::WrongCanteen);
+                }
+                if data.items.is_empty() {
+                    return Ok(QrScanLookup::NotFoundOrCompleted);
+                }
+                Ok(QrScanLookup::Found(data))
+            }
+            None => Ok(QrScanLookup::NotFoundOrCompleted),
+        }
+    }
+
     async fn get_orders_by_orderid_internal_with_canteen_id(
         &self,
         search_order_id: &i32,
@@ -532,8 +623,8 @@ impl OrderOperations {
                 active_order_items::quantity,
                 active_order_items::price,
                 menu_items::is_veg,
-                menu_items::has_pic,
                 menu_items::pic_etag,
+                menu_items::pic_key,
                 menu_items::description,
             ))
             .order(menu_items::item_id.asc())

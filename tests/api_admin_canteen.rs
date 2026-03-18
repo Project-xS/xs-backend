@@ -145,8 +145,8 @@ async fn user_cannot_create_canteen() {
         .insert_header((header::CONTENT_TYPE, "application/json"))
         .set_json(&serde_json::json!({
             "canteen_name": "Unauthorized Canteen",
-            "location": "Block Z",
-            "has_pic": false
+            "location": "Block Z"
+
         }))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -163,8 +163,8 @@ async fn create_canteen_as_admin_success() {
         .insert_header((header::CONTENT_TYPE, "application/json"))
         .set_json(&serde_json::json!({
             "canteen_name": "New Canteen",
-            "location": "Block Z",
-            "has_pic": false
+            "location": "Block Z"
+
         }))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -243,7 +243,7 @@ async fn create_canteen_requires_content_type() {
     let req = test::TestRequest::post()
         .uri(&format!("/canteen/create?as=admin-{}", fixtures.canteen_id))
         .insert_header(auth_header())
-        .set_payload(r#"{"canteen_name":"X","location":"Y","has_pic":false}"#)
+        .set_payload(r#"{"canteen_name":"X","location":"Y"}"#)
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
@@ -287,8 +287,8 @@ async fn create_canteen_whitespace_name() {
         .insert_header((header::CONTENT_TYPE, "application/json"))
         .set_json(&serde_json::json!({
             "canteen_name": "   ",
-            "location": "Block A",
-            "has_pic": false
+            "location": "Block A"
+
         }))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -303,8 +303,8 @@ async fn create_canteen_duplicate() {
 
     let payload = serde_json::json!({
         "canteen_name": "Duplicate Canteen",
-        "location": "Block D",
-        "has_pic": false
+        "location": "Block D"
+
     });
     let req = test::TestRequest::post()
         .uri(&format!("/canteen/create?as=admin-{}", fixtures.canteen_id))
@@ -334,8 +334,8 @@ async fn create_canteen_unauthenticated() {
         .insert_header((header::CONTENT_TYPE, "application/json"))
         .set_json(&serde_json::json!({
             "canteen_name": "Ghost Canteen",
-            "location": "Block G",
-            "has_pic": false
+            "location": "Block G"
+
         }))
         .to_request();
     common::assert_unauthenticated(&app, req).await;
@@ -424,18 +424,17 @@ async fn get_all_canteens_unauthenticated() {
 }
 
 #[actix_rt::test]
-async fn get_all_canteens_has_pic_true_null_link() {
+async fn get_all_canteens_without_uploaded_pic_has_null_link() {
     let (app, fixtures, _db_url) = common::setup_api_app().await;
 
-    // Create a canteen with has_pic = true
+    // Create a canteen without uploading a picture.
     let req = test::TestRequest::post()
         .uri(&format!("/canteen/create?as=admin-{}", fixtures.canteen_id))
         .insert_header(auth_header())
         .insert_header((header::CONTENT_TYPE, "application/json"))
         .set_json(&serde_json::json!({
             "canteen_name": "Pic Canteen",
-            "location": "Block P",
-            "has_pic": true
+            "location": "Block P"
         }))
         .to_request();
     let resp = test::call_service(&app, req).await;
@@ -511,12 +510,29 @@ async fn set_canteen_pic_unauthenticated() {
 async fn canteen_set_pic_success_when_object_exists() {
     // Mock S3 before app creation.
     let mock_s3 = common::start_mock_s3().await;
-    let (app, fixtures, _db_url) = common::setup_api_app().await;
+    let (app, fixtures, db_url) = common::setup_api_app().await;
 
-    // set_canteen_pic calls get_object_etag("canteens/{canteen_id}")
-    mock_s3
-        .mock_object_exists(&format!("canteens/{}", fixtures.canteen_id))
-        .await;
+    let upload_req = test::TestRequest::put()
+        .uri(&format!(
+            "/canteen/upload_pic?as=admin-{}",
+            fixtures.canteen_id
+        ))
+        .insert_header(common::auth_header())
+        .to_request();
+    let upload_resp = test::call_service(&app, upload_req).await;
+    assert_eq!(upload_resp.status(), StatusCode::OK);
+
+    let pool = build_test_pool(&db_url);
+    let mut conn = DbConnection::new(&pool).expect("db connection");
+    use proj_xs::db::schema::canteens::dsl as c;
+    let key = c::canteens
+        .filter(c::canteen_id.eq(fixtures.canteen_id))
+        .select(c::pic_key)
+        .first::<Option<String>>(conn.connection())
+        .expect("pic_key")
+        .expect("pic_key must be set");
+
+    mock_s3.mock_object_exists(&format!("canteens/{key}")).await;
 
     let req = test::TestRequest::put()
         .uri(&format!(
