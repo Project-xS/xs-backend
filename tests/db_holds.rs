@@ -34,7 +34,7 @@ fn hold_order_success_decrements_stock_and_creates_rows() {
         .expect("set non-veg stock");
 
     let hold_ops = HoldOperations::new(pool.clone(), 300);
-    let (hold_id_val, _) = hold_ops
+    let (hold_id_val, _, _) = hold_ops
         .hold_order(
             fixtures.user_id,
             vec![veg_item, veg_item, non_veg_item],
@@ -207,7 +207,7 @@ fn hold_order_fails_on_empty_or_missing_items() {
 fn hold_order_invalid_deliver_at_maps_to_none() {
     let (pool, fixtures) = common::setup_pool_with_fixtures();
     let hold_ops = HoldOperations::new(pool.clone(), 300);
-    let (hold_id_val, _) = hold_ops
+    let (hold_id_val, _, _) = hold_ops
         .hold_order(
             fixtures.user_id,
             vec![fixtures.menu_item_ids[0]],
@@ -229,11 +229,11 @@ fn hold_order_invalid_deliver_at_maps_to_none() {
 fn confirm_held_order_moves_to_active_orders() {
     let (pool, fixtures) = common::setup_pool_with_fixtures();
     let hold_ops = HoldOperations::new(pool.clone(), 300);
-    let (hold_id_val, _) = hold_ops
+    let (hold_id_val, _, _) = hold_ops
         .hold_order(fixtures.user_id, vec![fixtures.menu_item_ids[0]], None)
         .expect("hold order");
 
-    let order_id_val = hold_ops
+    let (order_id_val, _, _, _) = hold_ops
         .confirm_held_order(hold_id_val, fixtures.user_id)
         .expect("confirm hold");
 
@@ -264,7 +264,7 @@ fn confirm_held_order_expired_restores_stock_and_deletes() {
         .expect("set stock");
 
     let hold_ops = HoldOperations::new(pool.clone(), -1);
-    let (hold_id_val, _) = hold_ops
+    let (hold_id_val, _, _) = hold_ops
         .hold_order(fixtures.user_id, vec![item_id_val], None)
         .expect("hold order");
 
@@ -294,7 +294,7 @@ fn confirm_held_order_owner_mismatch_keeps_hold() {
     .expect("insert user");
 
     let hold_ops = HoldOperations::new(pool.clone(), 300);
-    let (hold_id_val, _) = hold_ops
+    let (hold_id_val, _, _) = hold_ops
         .hold_order(fixtures.user_id, vec![fixtures.menu_item_ids[0]], None)
         .expect("hold order");
 
@@ -319,7 +319,7 @@ fn release_held_order_restores_stock() {
         .expect("set stock");
 
     let hold_ops = HoldOperations::new(pool.clone(), 300);
-    let (hold_id_val, _) = hold_ops
+    let (hold_id_val, _, _) = hold_ops
         .hold_order(fixtures.user_id, vec![item_id_val], None)
         .expect("hold order");
 
@@ -360,8 +360,14 @@ fn cleanup_expired_holds_restores_stock_and_deletes() {
         .hold_order(fixtures.user_id, vec![item_b], None)
         .expect("active hold");
 
-    let cleaned = hold_ops_active.cleanup_expired_holds().expect("cleanup");
+    let (cleaned, updates) = hold_ops_active.cleanup_expired_holds().expect("cleanup");
     assert_eq!(cleaned, 1);
+    assert_eq!(updates.len(), 1);
+    assert_eq!(updates[0].0, fixtures.canteen_id);
+    assert_eq!(updates[0].1.len(), 1);
+    assert_eq!(updates[0].1[0].item_id, item_a);
+    assert_eq!(updates[0].1[0].stock, 2);
+    assert!(updates[0].1[0].is_available);
 
     assert_eq!(held_orders_count(conn.connection()), 1);
     let (stock_a, _) = menu_item_state(conn.connection(), item_a);
@@ -386,7 +392,7 @@ fn release_held_order_keeps_unlimited_stock() {
         .expect("set stock");
 
     let hold_ops = HoldOperations::new(pool.clone(), 300);
-    let (hold_id_val, _) = hold_ops
+    let (hold_id_val, _, _) = hold_ops
         .hold_order(fixtures.user_id, vec![item_id_val], None)
         .expect("hold order");
 
@@ -415,7 +421,7 @@ fn confirm_expired_hold_keeps_unlimited_stock() {
         .expect("set stock");
 
     let hold_ops = HoldOperations::new(pool.clone(), -1);
-    let (hold_id_val, _) = hold_ops
+    let (hold_id_val, _, _) = hold_ops
         .hold_order(fixtures.user_id, vec![item_id_val], None)
         .expect("hold order");
 
@@ -438,8 +444,9 @@ fn cleanup_expired_holds_returns_zero_when_none_expired() {
         .hold_order(fixtures.user_id, vec![fixtures.menu_item_ids[0]], None)
         .expect("hold order");
 
-    let cleaned = hold_ops.cleanup_expired_holds().expect("cleanup");
+    let (cleaned, updates) = hold_ops.cleanup_expired_holds().expect("cleanup");
     assert_eq!(cleaned, 0);
+    assert!(updates.is_empty());
 }
 
 #[test]
@@ -504,7 +511,7 @@ fn concurrent_confirm_and_cancel_same_hold_one_succeeds() {
     let (pool, fixtures) = common::setup_pool_with_fixtures();
 
     let hold_ops = HoldOperations::new(pool.clone(), 300);
-    let (hold_id_val, _) = hold_ops
+    let (hold_id_val, _, _) = hold_ops
         .hold_order(fixtures.user_id, vec![fixtures.menu_item_ids[0]], None)
         .expect("hold order");
 

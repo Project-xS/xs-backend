@@ -104,7 +104,7 @@ async fn confirm_hold_success_and_expired() {
 
     let pool = build_test_pool(&db_url);
     let hold_ops = HoldOperations::new(pool.clone(), -1);
-    let (expired_id, _) = hold_ops
+    let (expired_id, _, _) = hold_ops
         .hold_order(fixtures.user_id, vec![fixtures.menu_item_ids[0]], None)
         .expect("expired hold");
 
@@ -175,7 +175,7 @@ async fn delete_hold_success_and_wrong_owner() {
 
     let pool = build_test_pool(&db_url);
     let hold_ops = HoldOperations::new(pool.clone(), 300);
-    let (hold_id, _) = hold_ops
+    let (hold_id, _, _) = hold_ops
         .hold_order(fixtures.user_id, vec![fixtures.menu_item_ids[0]], None)
         .expect("hold order");
 

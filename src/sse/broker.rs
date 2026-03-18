@@ -125,9 +125,9 @@ impl SseBroker {
                     successful_count += 1;
                 }
             }
-            for dead_device in dead_devices {
-                self.unregister_user_connection(user_id, dead_device);
-            }
+        }
+        for dead_device in dead_devices {
+            self.unregister_user_connection(user_id, dead_device);
         }
         debug!(
             "user_order_events: finished publishing event to user {}: {} devices",
@@ -155,9 +155,9 @@ impl SseBroker {
                     successful_count += 1;
                 }
             }
-            for dead_device in dead_devices {
-                self.unregister_canteen_connection(canteen_id, dead_device);
-            }
+        }
+        for dead_device in dead_devices {
+            self.unregister_canteen_connection(canteen_id, dead_device);
         }
         debug!(
             "canteen_order_events: finished publishing event to canteen {}: {} devices",
@@ -185,9 +185,9 @@ impl SseBroker {
                     successful_count += 1;
                 }
             }
-            for dead_device in dead_devices {
-                self.unregister_canteen_subscription(canteen_id, dead_device);
-            }
+        }
+        for dead_device in dead_devices {
+            self.unregister_canteen_subscription(canteen_id, dead_device);
         }
         debug!(
             "canteen_subscription_events: finished publishing event for canteen {}: {} devices",
