@@ -206,7 +206,7 @@ async fn get_past_orders_by_userid_populated() {
     };
 
     order_ops
-        .order_actions(&order_id_val, "delivered")
+        .order_actions(&order_id_val, "delivered", fixtures.canteen_id)
         .expect("deliver order");
 
     let orders = user_ops

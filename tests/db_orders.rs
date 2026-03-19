@@ -356,7 +356,7 @@ async fn order_actions_moves_to_past_orders() {
         .expect("order id");
 
     order_ops
-        .order_actions(&order_id_val, "delivered")
+        .order_actions(&order_id_val, "delivered", fixtures.canteen_id)
         .expect("deliver order");
 
     assert_eq!(active_orders_count(conn.connection()), 0);
@@ -388,13 +388,13 @@ async fn order_actions_handles_cancelled_and_missing() {
         .expect("order id");
 
     order_ops
-        .order_actions(&order_id_val, "cancelled")
+        .order_actions(&order_id_val, "cancelled", fixtures.canteen_id)
         .expect("cancel order");
     assert_eq!(active_orders_count(conn.connection()), 0);
     assert_eq!(past_orders_count(conn.connection()), 1);
 
     let err = order_ops
-        .order_actions(&9999, "delivered")
+        .order_actions(&9999, "delivered", fixtures.canteen_id)
         .expect_err("missing order");
     assert!(matches!(err, RepositoryError::NotFound(_)));
 }
@@ -474,14 +474,14 @@ async fn deliver_and_cancel_same_order_race() {
         let rt = tokio::runtime::Runtime::new().expect("rt");
         rt.block_on(async move {
             let ops = OrderOperations::new(pool1).await;
-            ops.order_actions(&order_id_val, "delivered")
+            ops.order_actions(&order_id_val, "delivered", fixtures.canteen_id)
         })
     });
     let t2 = std::thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new().expect("rt");
         rt.block_on(async move {
             let ops = OrderOperations::new(pool2).await;
-            ops.order_actions(&order_id_val, "cancelled")
+            ops.order_actions(&order_id_val, "cancelled", fixtures.canteen_id)
         })
     });
 

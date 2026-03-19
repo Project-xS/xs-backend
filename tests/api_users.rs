@@ -48,7 +48,7 @@ async fn get_past_orders_after_delivery() {
 
     // Mark the order delivered (moves it to past_orders)
     order_ops
-        .order_actions(&order_id_val, "delivered")
+        .order_actions(&order_id_val, "delivered", fixtures.canteen_id)
         .expect("deliver order");
 
     let req = test::TestRequest::get()

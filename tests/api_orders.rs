@@ -6,8 +6,27 @@ use actix_web::test;
 use common::auth_header;
 use diesel::prelude::*;
 use proj_xs::db::{DbConnection, OrderOperations};
-use proj_xs::test_utils::build_test_pool;
+use proj_xs::test_utils::{build_test_pool, insert_canteen, seed_menu_item};
 use serde_json::Value;
+
+fn seed_other_canteen_item(db_url: &str) -> (i32, i32) {
+    let pool = build_test_pool(db_url);
+    let mut conn = DbConnection::new(&pool).expect("db connection");
+    let other_canteen_id =
+        insert_canteen(conn.connection(), "Other Canteen", "Block Z").expect("insert canteen");
+    let other_item_id = seed_menu_item(
+        conn.connection(),
+        other_canteen_id,
+        "Other Canteen Item",
+        199,
+        8,
+        true,
+        true,
+        Some("owned by another canteen"),
+    )
+    .expect("insert menu item");
+    (other_canteen_id, other_item_id)
+}
 
 #[actix_rt::test]
 async fn put_order_actions_and_invalid_action() {
@@ -153,6 +172,39 @@ async fn get_order_by_id_admin() {
 }
 
 #[actix_rt::test]
+async fn get_order_by_id_other_canteen_returns_null() {
+    let (app, fixtures, db_url) = common::setup_api_app().await;
+    let pool = build_test_pool(&db_url);
+    let order_ops = OrderOperations::new(pool.clone()).await;
+    let (other_canteen_id, other_item_id) = seed_other_canteen_item(&db_url);
+
+    order_ops
+        .create_order(fixtures.user_id, vec![other_item_id], None)
+        .expect("create order for other canteen");
+
+    let mut conn = DbConnection::new(&pool).expect("db connection");
+    use proj_xs::db::schema::active_orders::dsl as ao;
+    let order_id_val = ao::active_orders
+        .filter(ao::canteen_id.eq(other_canteen_id))
+        .select(ao::order_id)
+        .first::<i32>(conn.connection())
+        .expect("order id for other canteen");
+
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/orders/{}?as=admin-{}",
+            order_id_val, fixtures.canteen_id
+        ))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: Value = test::read_body_json(resp).await;
+    assert_eq!(body["status"], "ok");
+    assert!(body["data"].is_null());
+}
+
+#[actix_rt::test]
 async fn user_cannot_get_all_orders() {
     let (app, fixtures, _db_url) = common::setup_api_app().await;
 
@@ -249,6 +301,43 @@ async fn order_actions_nonexistent_order() {
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), StatusCode::CONFLICT);
+}
+
+#[actix_rt::test]
+async fn order_actions_other_canteen_order_conflict_and_order_remains() {
+    let (app, fixtures, db_url) = common::setup_api_app().await;
+    let pool = build_test_pool(&db_url);
+    let order_ops = OrderOperations::new(pool.clone()).await;
+    let (other_canteen_id, other_item_id) = seed_other_canteen_item(&db_url);
+
+    order_ops
+        .create_order(fixtures.user_id, vec![other_item_id], None)
+        .expect("create order for other canteen");
+
+    let mut conn = DbConnection::new(&pool).expect("db connection");
+    use proj_xs::db::schema::active_orders::dsl as ao;
+    let order_id_val = ao::active_orders
+        .filter(ao::canteen_id.eq(other_canteen_id))
+        .select(ao::order_id)
+        .first::<i32>(conn.connection())
+        .expect("order id for other canteen");
+
+    let req = test::TestRequest::put()
+        .uri(&format!(
+            "/orders/{}/delivered?as=admin-{}",
+            order_id_val, fixtures.canteen_id
+        ))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::CONFLICT);
+
+    let still_active = ao::active_orders
+        .filter(ao::order_id.eq(order_id_val))
+        .count()
+        .get_result::<i64>(conn.connection())
+        .expect("count active order");
+    assert_eq!(still_active, 1, "order should remain active");
 }
 
 #[actix_rt::test]
@@ -494,4 +583,62 @@ async fn get_orders_by_user_unknown_rfid_empty() {
         data.is_empty(),
         "unknown rfid should return empty order list"
     );
+}
+
+#[actix_rt::test]
+async fn get_orders_by_user_admin_scoped_to_canteen() {
+    let (app, fixtures, db_url) = common::setup_api_app().await;
+    let pool = build_test_pool(&db_url);
+    let order_ops = OrderOperations::new(pool.clone()).await;
+    let (_other_canteen_id, other_item_id) = seed_other_canteen_item(&db_url);
+
+    order_ops
+        .create_order(fixtures.user_id, vec![fixtures.menu_item_ids[0]], None)
+        .expect("create own-canteen order");
+    order_ops
+        .create_order(fixtures.user_id, vec![other_item_id], None)
+        .expect("create other-canteen order");
+
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/orders/by_user?as=admin-{}&user_id={}",
+            fixtures.canteen_id, fixtures.user_id
+        ))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: Value = test::read_body_json(resp).await;
+    assert_eq!(body["status"], "ok");
+    let data = body["data"].as_array().expect("data should be array");
+    assert_eq!(data.len(), 1, "admin should only see own canteen orders");
+}
+
+#[actix_rt::test]
+async fn get_orders_by_rfid_admin_scoped_to_canteen() {
+    let (app, fixtures, db_url) = common::setup_api_app().await;
+    let pool = build_test_pool(&db_url);
+    let order_ops = OrderOperations::new(pool.clone()).await;
+    let (_other_canteen_id, other_item_id) = seed_other_canteen_item(&db_url);
+
+    order_ops
+        .create_order(fixtures.user_id, vec![fixtures.menu_item_ids[0]], None)
+        .expect("create own-canteen order");
+    order_ops
+        .create_order(fixtures.user_id, vec![other_item_id], None)
+        .expect("create other-canteen order");
+
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/orders/by_user?as=admin-{}&rfid=rfid-1",
+            fixtures.canteen_id
+        ))
+        .insert_header(auth_header())
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body: Value = test::read_body_json(resp).await;
+    assert_eq!(body["status"], "ok");
+    let data = body["data"].as_array().expect("data should be array");
+    assert_eq!(data.len(), 1, "admin should only see own canteen orders");
 }

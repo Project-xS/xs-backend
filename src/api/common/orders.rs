@@ -56,12 +56,14 @@ pub(super) async fn get_all_orders(
 )]
 #[get("/{id}")]
 pub(super) async fn get_order_by_orderid(
-    _admin: AdminPrincipal,
+    admin: AdminPrincipal,
     order_ops: web::Data<OrderOperations>,
     path: web::Path<(i32,)>,
 ) -> actix_web::Result<impl Responder> {
     let search_order_id = path.into_inner().0;
-    let result = order_ops.get_orders_by_orderid(&search_order_id).await;
+    let result = order_ops
+        .get_orders_by_orderid(&search_order_id, admin.canteen_id)
+        .await;
     match result {
         Ok(data) => {
             if let Some(ref order) = data {
@@ -119,7 +121,7 @@ pub(super) async fn get_orders_by_user(
     let params = params.into_inner();
 
     match principal.0 {
-        Principal::Admin { .. } => {
+        Principal::Admin { canteen_id } => {
             if params.user_id.is_some() && params.rfid.is_some() {
                 return Ok(HttpResponse::BadRequest().json(OrdersItemsResponse {
                     status: "error".to_string(),
@@ -129,7 +131,9 @@ pub(super) async fn get_orders_by_user(
             }
 
             if let Some(search_user_id) = params.user_id {
-                let result = order_ops.get_orders_by_userid(&search_user_id).await;
+                let result = order_ops
+                    .get_orders_by_userid_for_canteen(&search_user_id, canteen_id)
+                    .await;
                 match result {
                     Ok(data) => {
                         debug!(
@@ -158,7 +162,9 @@ pub(super) async fn get_orders_by_user(
                     }
                 }
             } else if let Some(search_rfid) = params.rfid {
-                let result = order_ops.get_orders_by_rfid(&search_rfid).await;
+                let result = order_ops
+                    .get_orders_by_rfid_for_canteen(&search_rfid, canteen_id)
+                    .await;
                 match result {
                     Ok(data) => {
                         debug!(
@@ -243,7 +249,7 @@ pub(super) async fn get_orders_by_user(
 pub(super) async fn order_actions(
     order_ops: web::Data<OrderOperations>,
     broker: web::Data<SseBroker>,
-    _admin: AdminPrincipal,
+    admin: AdminPrincipal,
     path: web::Path<(i32, String)>,
 ) -> actix_web::Result<impl Responder> {
     let (order_id, status) = path.into_inner();
@@ -261,7 +267,9 @@ pub(super) async fn order_actions(
     }
     let status_cl = status.clone();
     let status_for_db = status_cl.clone();
-    let result = web::block(move || order_ops.order_actions(&order_id, &status_for_db)).await?;
+    let canteen_id = admin.canteen_id;
+    let result =
+        web::block(move || order_ops.order_actions(&order_id, &status_for_db, canteen_id)).await?;
     match result {
         Ok(user_id) => {
             debug!(

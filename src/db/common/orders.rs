@@ -362,6 +362,23 @@ impl OrderOperations {
         &self,
         search_rfid: &str,
     ) -> Result<Vec<OrderItemContainer>, RepositoryError> {
+        self.get_orders_by_rfid_internal(search_rfid, None).await
+    }
+
+    pub async fn get_orders_by_rfid_for_canteen(
+        &self,
+        search_rfid: &str,
+        owner_canteen_id: i32,
+    ) -> Result<Vec<OrderItemContainer>, RepositoryError> {
+        self.get_orders_by_rfid_internal(search_rfid, Some(owner_canteen_id))
+            .await
+    }
+
+    async fn get_orders_by_rfid_internal(
+        &self,
+        search_rfid: &str,
+        canteen_id_filter: Option<i32>,
+    ) -> Result<Vec<OrderItemContainer>, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!(
                 "get_orders_by_rfid: failed to acquire DB connection for rfid '{}': {}",
@@ -370,7 +387,7 @@ impl OrderOperations {
             e
         })?;
         use crate::db::schema::*;
-        let order_items = users::table
+        let mut query = users::table
             .inner_join(active_orders::table.on(users::user_id.eq(active_orders::user_id)))
             .inner_join(
                 active_order_items::table
@@ -379,6 +396,13 @@ impl OrderOperations {
             .inner_join(canteens::table.on(active_orders::canteen_id.eq(canteens::canteen_id)))
             .inner_join(menu_items::table.on(active_order_items::item_id.eq(menu_items::item_id)))
             .filter(users::rfid.eq(&search_rfid))
+            .into_boxed();
+
+        if let Some(owner_canteen_id) = canteen_id_filter {
+            query = query.filter(active_orders::canteen_id.eq(owner_canteen_id));
+        }
+
+        let order_items = query
             .select((
                 active_orders::order_id,
                 active_orders::canteen_id,
@@ -427,6 +451,24 @@ impl OrderOperations {
         &self,
         search_user_id: &i32,
     ) -> Result<Vec<OrderItemContainer>, RepositoryError> {
+        self.get_orders_by_userid_internal(search_user_id, None)
+            .await
+    }
+
+    pub async fn get_orders_by_userid_for_canteen(
+        &self,
+        search_user_id: &i32,
+        owner_canteen_id: i32,
+    ) -> Result<Vec<OrderItemContainer>, RepositoryError> {
+        self.get_orders_by_userid_internal(search_user_id, Some(owner_canteen_id))
+            .await
+    }
+
+    async fn get_orders_by_userid_internal(
+        &self,
+        search_user_id: &i32,
+        canteen_id_filter: Option<i32>,
+    ) -> Result<Vec<OrderItemContainer>, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!(
                 "get_orders_by_userid: failed to acquire DB connection for user_id {}: {}",
@@ -435,7 +477,7 @@ impl OrderOperations {
             e
         })?;
         use crate::db::schema::*;
-        let order_items = active_orders::table
+        let mut query = active_orders::table
             .inner_join(
                 active_order_items::table
                     .on(active_orders::order_id.eq(active_order_items::order_id)),
@@ -443,6 +485,13 @@ impl OrderOperations {
             .inner_join(menu_items::table.on(active_order_items::item_id.eq(menu_items::item_id)))
             .inner_join(canteens::table.on(menu_items::canteen_id.eq(canteens::canteen_id)))
             .filter(active_orders::user_id.eq(search_user_id))
+            .into_boxed();
+
+        if let Some(owner_canteen_id) = canteen_id_filter {
+            query = query.filter(active_orders::canteen_id.eq(owner_canteen_id));
+        }
+
+        let order_items = query
             .select((
                 active_orders::order_id,
                 active_orders::canteen_id,
@@ -489,17 +538,22 @@ impl OrderOperations {
     pub async fn get_orders_by_orderid(
         &self,
         search_order_id: &i32,
+        owner_canteen_id: i32,
     ) -> Result<Option<OrderItemContainer>, RepositoryError> {
-        self.get_orders_by_orderid_internal_with_canteen_id(search_order_id, true)
-            .await
-            .map(|resp| resp.map(|(_, data)| data))
+        self.get_orders_by_orderid_internal_with_canteen_id(
+            search_order_id,
+            true,
+            Some(owner_canteen_id),
+        )
+        .await
+        .map(|resp| resp.map(|(_, data)| data))
     }
 
     pub async fn get_orders_by_orderid_no_pics(
         &self,
         search_order_id: &i32,
     ) -> Result<Option<OrderItemContainer>, RepositoryError> {
-        self.get_orders_by_orderid_internal_with_canteen_id(search_order_id, false)
+        self.get_orders_by_orderid_internal_with_canteen_id(search_order_id, false, None)
             .await
             .map(|resp| resp.map(|(_, data)| data))
     }
@@ -508,7 +562,7 @@ impl OrderOperations {
         &self,
         search_order_id: &i32,
     ) -> Result<Option<(i32, OrderItemContainer)>, RepositoryError> {
-        self.get_orders_by_orderid_internal_with_canteen_id(search_order_id, false)
+        self.get_orders_by_orderid_internal_with_canteen_id(search_order_id, false, None)
             .await
     }
 
@@ -595,6 +649,7 @@ impl OrderOperations {
         &self,
         search_order_id: &i32,
         include_pics: bool,
+        canteen_id_filter: Option<i32>,
     ) -> Result<Option<(i32, OrderItemContainer)>, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!(
@@ -604,13 +659,20 @@ impl OrderOperations {
             e
         })?;
         use crate::db::schema::*;
-        let order_items = active_order_items::table
+        let mut query = active_order_items::table
             .inner_join(menu_items::table.on(active_order_items::item_id.eq(menu_items::item_id)))
             .inner_join(canteens::table.on(menu_items::canteen_id.eq(canteens::canteen_id)))
             .inner_join(
                 active_orders::table.on(active_order_items::order_id.eq(active_orders::order_id)),
             )
             .filter(active_order_items::order_id.eq(search_order_id))
+            .into_boxed();
+
+        if let Some(owner_canteen_id) = canteen_id_filter {
+            query = query.filter(active_orders::canteen_id.eq(owner_canteen_id));
+        }
+
+        let order_items = query
             .select((
                 active_order_items::order_id,
                 active_orders::canteen_id,
@@ -672,6 +734,7 @@ impl OrderOperations {
         &self,
         search_order_id: &i32,
         deliver_status: &str,
+        owner_canteen_id: i32,
     ) -> Result<i32, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!("order_actions: get_orders_by_orderid: failed to acquire DB connection for order_id {}: {}", search_order_id, e);
@@ -694,6 +757,7 @@ impl OrderOperations {
                         active_orders::ordered_at
                     ))
                     .filter(active_orders::order_id.eq(search_order_id))
+                    .filter(active_orders::canteen_id.eq(owner_canteen_id))
                     .load::<OrderDeliverItems>(conn)
                     .map_err(|e| {
                         error!("order_actions: error fetching order items for order_id {}: {}", search_order_id, e);
@@ -731,7 +795,8 @@ impl OrderOperations {
             {
                 use crate::db::schema::*;
                 diesel::delete(active_orders::table
-                    .filter(active_orders::order_id.eq(search_order_id)))
+                    .filter(active_orders::order_id.eq(search_order_id))
+                    .filter(active_orders::canteen_id.eq(owner_canteen_id)))
                     .execute(conn)
                     .map_err(|e| {
                         error!("order_actions: error fetching order items for order_id during delete: {}: {}", search_order_id, e);
