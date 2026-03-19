@@ -19,7 +19,7 @@ chrono = {version = "0.4", features = ["serde"]}
 
 jsonwebtoken = { version = "10.3", features = ["rust_crypto"] }
 reqwest = { version = "0.13", default-features = false, features = ["rustls"] }
-tokio = { version = "1.49", features = ["rt-multi-thread", "macros", "sync", "time"] }
+tokio = { version = "1.50", features = ["rt-multi-thread", "macros", "sync", "time"] }
 
 utoipa = { version = "5.4", features = ["actix_extras"] }
 utoipa-actix-web = "0.1.2"
@@ -27,12 +27,12 @@ utoipa-swagger-ui = { version = "9.0", features = ["actix-web", "vendored"] }
 
 # SQL
 diesel = {version = "2.3", features = ["postgres", "r2d2", "chrono"]}
-pq-sys = { version = "0.7.5", features = ["bundled"] }
-openssl-sys = { version = "0.9.111", features = ["vendored"] }
+pq-sys = { version = "0.7", features = ["bundled"] }
+openssl-sys = { version = "0.9", features = ["vendored"] }
 diesel_migrations = { version = "2.3", features = ["postgres"] }
 
 # Image stuff
-aws-sdk-s3 = "1.126"
+aws-sdk-s3 = "1.127"
 aws-config = { version = "1.8", features = ["behavior-version-latest"] }
 with_pic_macro = { path = "with_pic_macro" }
 
@@ -51,7 +51,7 @@ futures = "0.3.32"
 log = "0.4"
 pretty_env_logger = "0.5"
 thiserror = "2.0"
-uuid = { version = "1.18", features = ["v4", "v7"] }
+uuid = { version = "1.22", features = ["v4", "v7"] }
 
 [dev-dependencies]
 testcontainers = { version = "0.27.0", features = ["blocking"] }
