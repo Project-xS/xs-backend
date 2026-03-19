@@ -80,6 +80,8 @@ pub fn config(
         scope::scope("/assets")
             .wrap(NormalizePath::trim())
             .app_data(web::Data::new(asset_ops.clone()))
+            .app_data(web::Data::new(menu_ops.clone()))
+            .app_data(web::Data::new(canteen_ops.clone()))
             .service(upload_image_handler)
             .service(get_image_handler),
     );

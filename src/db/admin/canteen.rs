@@ -288,6 +288,36 @@ impl CanteenOperations {
             })
     }
 
+    pub fn canteen_owns_canteen_pic_key(
+        &self,
+        owner_canteen_id: i32,
+        search_pic_key: &str,
+    ) -> Result<bool, RepositoryError> {
+        let mut conn = DbConnection::new(&self.pool).map_err(|e| {
+            error!(
+                "canteen_owns_canteen_pic_key: failed to acquire DB connection for canteen {} and key '{}': {}",
+                owner_canteen_id, search_pic_key, e
+            );
+            e
+        })?;
+
+        let found = canteens
+            .filter(canteen_id.eq(owner_canteen_id))
+            .filter(pic_key.eq(Some(search_pic_key.to_string())))
+            .select(canteen_id)
+            .first::<i32>(conn.connection())
+            .optional()
+            .map_err(|e| {
+                error!(
+                    "canteen_owns_canteen_pic_key: error checking key '{}' for canteen {}: {}",
+                    search_pic_key, owner_canteen_id, e
+                );
+                RepositoryError::DatabaseError(e)
+            })?;
+
+        Ok(found.is_some())
+    }
+
     // pub fn delete_canteen(&self, id: i32) -> Result<usize, RepositoryError> {
     //     todo!()
     // }
