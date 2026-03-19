@@ -254,12 +254,9 @@ pub(super) async fn order_actions(
         );
         return Ok(HttpResponse::BadRequest().json(OrderResponse {
             status: "error".to_string(),
-            error: Option::from(
-                format!(
-                    "status cannot be {status}, must be either \"delivered\" or \"cancelled\"."
-                )
-                .to_string(),
-            ),
+            error: Option::from(format!(
+                "status cannot be {status}, must be either \"delivered\" or \"cancelled\"."
+            )),
         }));
     }
     let status_cl = status.clone();
@@ -275,7 +272,7 @@ pub(super) async fn order_actions(
                 user_id,
                 &SseEvent::UserOrderUpdate {
                     //-> send the user a sse event as update for order
-                    order_id: order_id.clone(),
+                    order_id,
                     status: status_cl,
                 },
             );

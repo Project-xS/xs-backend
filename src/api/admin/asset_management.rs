@@ -29,7 +29,7 @@ pub async fn upload_image_handler(
             );
             HttpResponse::Ok().json(ItemUploadResponse {
                 status: "ok".to_string(),
-                url: url.to_string(),
+                url,
                 item_id: item_id_val,
                 error: None,
             })
@@ -77,7 +77,7 @@ pub async fn get_image_handler(
             );
             HttpResponse::Ok().json(ItemUploadResponse {
                 status: "ok".to_string(),
-                url: url.to_string(),
+                url,
                 item_id: -1,
                 error: None,
             })

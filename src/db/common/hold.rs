@@ -12,6 +12,13 @@ use log::{debug, error, info, warn};
 use std::cmp::max;
 use std::collections::HashMap;
 
+/// (hold_id, expires_at_epoch, (canteen_id, inventory_updates))
+type HoldOrderResult = (i32, i64, (i32, Vec<InventoryUpdateItems>));
+/// (order_id, user_id, canteen_id, (time_band, [(item_id, num_ordered)]))
+type ConfirmOrderResult = (i32, i32, i32, (String, Vec<(i32, i32)>));
+/// (expired_count, [(canteen_id, inventory_updates)])
+type CleanupResult = (usize, Vec<(i32, Vec<InventoryUpdateItems>)>);
+
 #[derive(Insertable, Debug)]
 #[diesel(table_name = crate::db::schema::held_order_items)]
 struct HeldOrderItemInsert {
@@ -72,7 +79,7 @@ impl HoldOperations {
         userid: i32,
         itemids: Vec<i32>,
         order_deliver_at: Option<String>,
-    ) -> Result<(i32, i64, (i32, Vec<InventoryUpdateItems>)), RepositoryError> {
+    ) -> Result<HoldOrderResult, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!("hold_order: failed to acquire DB connection: {}", e);
             e
@@ -284,7 +291,7 @@ impl HoldOperations {
         &self,
         search_hold_id: i32,
         requesting_user_id: i32,
-    ) -> Result<(i32, i32, i32, (String, Vec<(i32, i32)>)), RepositoryError> {
+    ) -> Result<ConfirmOrderResult, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!("confirm_held_order: failed to acquire DB connection: {}", e);
             e
@@ -525,9 +532,7 @@ impl HoldOperations {
 
     /// Clean up all expired holds: restore stock and delete.
     /// Returns the number of expired holds cleaned up and stock updates for SSE.
-    pub fn cleanup_expired_holds(
-        &self,
-    ) -> Result<(usize, Vec<(i32, Vec<InventoryUpdateItems>)>), RepositoryError> {
+    pub fn cleanup_expired_holds(&self) -> Result<CleanupResult, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!(
                 "cleanup_expired_holds: failed to acquire DB connection: {}",
