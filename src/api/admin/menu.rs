@@ -5,6 +5,7 @@ use crate::enums::admin::{
     ItemResponse, MenuItemWithPic, UpdateItemRequest, UploadMenuItemPicPresignedResponse,
 };
 use crate::models::admin::NewMenuItem;
+use crate::sse::{InventoryUpdateItems, SseBroker, SseEvent};
 use actix_web::http::StatusCode;
 use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
 use log::{debug, error};
@@ -237,7 +238,6 @@ pub(super) async fn set_menu_pic_link(
     request_body = UpdateItemRequest,
     responses(
         (status = 200, description = "Menu item updated successfully", body = GeneralMenuResponse),
-        (status = 403, description = "Item not found", body = GeneralMenuResponse),
         (status = 409, description = "Failed to update menu item due to conflict", body = GeneralMenuResponse)
     ),
     summary = "Modify an existing menu item"
@@ -246,6 +246,7 @@ pub(super) async fn set_menu_pic_link(
 pub(super) async fn update_menu_item(
     menu_ops: web::Data<MenuOperations>,
     admin: AdminPrincipal,
+    broker: web::Data<SseBroker>,
     req_data: web::Json<UpdateItemRequest>,
 ) -> actix_web::Result<impl Responder> {
     let req_data = req_data.into_inner();
@@ -268,6 +269,17 @@ pub(super) async fn update_menu_item(
             debug!(
                 "update_menu_item: successfully updated menu item '{}' with changes: {:?}",
                 x.name, update_data
+            );
+            broker.publish_canteen_subscription_event(
+                x.canteen_id,
+                &SseEvent::InventoryUpdate {
+                    items: vec![InventoryUpdateItems {
+                        item_id: x.item_id,
+                        stock: x.stock,
+                        is_available: x.is_available,
+                        price: x.price,
+                    }],
+                },
             );
             Ok(HttpResponse::Ok().json(GeneralMenuResponse {
                 status: "ok".to_string(),

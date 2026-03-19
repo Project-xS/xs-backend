@@ -1,7 +1,9 @@
 use crate::db::{DbConnection, RepositoryError};
 use crate::models::admin::MenuItemCheck;
 use crate::models::common::{NewHeldOrder, TimeBandEnum};
+use crate::sse::InventoryUpdateItems;
 use chrono::{Duration, Utc};
+use diesel::dsl::sum;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::result::Error;
@@ -19,8 +21,18 @@ struct HeldOrderItemInsert {
     price: i32,
 }
 
+#[derive(Insertable, Debug)]
+#[diesel(table_name = crate::db::schema::active_order_items)]
+struct ActiveOrderItemInsert {
+    order_id: i32,
+    item_id: i32,
+    quantity: i16,
+    price: i32,
+}
+
 #[derive(Queryable, Debug)]
 struct HeldItemRestore {
+    canteen_id: i32,
     item_id: i32,
     quantity: i16,
 }
@@ -33,6 +45,7 @@ struct HeldOrderWithItems {
     canteen_id: i32,
     total_price: i32,
     deliver_at: Option<TimeBandEnum>,
+    expires_at: chrono::DateTime<chrono::Utc>,
     item_id: i32,
     quantity: i16,
     price: i32,
@@ -53,13 +66,13 @@ impl HoldOperations {
     }
 
     /// Hold (reserve) an order: validate items, decrement stock, insert into held tables.
-    /// Returns (hold_id, expires_at_epoch).
+    /// Returns (hold_id, expires_at_epoch, (canteen_id, inventory_updates)).
     pub fn hold_order(
         &self,
         userid: i32,
         itemids: Vec<i32>,
         order_deliver_at: Option<String>,
-    ) -> Result<(i32, i64), RepositoryError> {
+    ) -> Result<(i32, i64, (i32, Vec<InventoryUpdateItems>)), RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!("hold_order: failed to acquire DB connection: {}", e);
             e
@@ -135,6 +148,7 @@ impl HoldOperations {
                     }
                 }
 
+                // Check if order contains items from multiple canteens
                 for item in &items_in_order {
                     item_prices.insert(item.item_id, item.price);
                     if canteen_id_in_order != item.canteen_id {
@@ -143,6 +157,8 @@ impl HoldOperations {
                             &itemids, userid
                         )));
                     }
+
+                    // Check if item is available
                     if !item.is_available {
                         return Err(RepositoryError::NotAvailable(
                             item.item_id,
@@ -161,6 +177,7 @@ impl HoldOperations {
                 }
             }
 
+            // Order total price calc
             let order_total_price = items_in_order
                 .iter()
                 .map(|e| e.price * *ordered_qty.get(&e.item_id).unwrap_or(&1) as i32)
@@ -209,6 +226,7 @@ impl HoldOperations {
             }
 
             // Decrement stock
+            let mut inventory_updates = Vec::new();
             {
                 let mut updated_stock: HashMap<i32, i64> = HashMap::new();
                 for item in &items_in_order {
@@ -222,20 +240,28 @@ impl HoldOperations {
                 }
 
                 use crate::db::schema::menu_items::dsl::*;
-                for (item, new_stock) in updated_stock {
-                    diesel::update(menu_items.filter(item_id.eq(item)))
+                for (item_id_val, new_stock) in updated_stock {
+                    let is_available_val = new_stock > 0 || new_stock == -1;
+                    diesel::update(menu_items.filter(item_id.eq(item_id_val)))
                         .set((
                             stock.eq(new_stock as i32),
-                            is_available.eq(new_stock > 0 || new_stock == -1),
+                            is_available.eq(is_available_val),
                         ))
                         .execute(conn)
                         .map_err(|e| {
                             error!(
                                 "hold_order: error updating stock for item id {}: {}",
-                                item, e
+                                item_id_val, e
                             );
                             RepositoryError::DatabaseError(e)
                         })?;
+
+                    inventory_updates.push(InventoryUpdateItems {
+                        item_id: item_id_val,
+                        stock: new_stock as i32,
+                        is_available: is_available_val,
+                        price: *item_prices.get(&item_id_val).unwrap(),
+                    });
                 }
             }
 
@@ -244,24 +270,28 @@ impl HoldOperations {
                 new_hold_id, userid, itemids, expires_at
             );
 
-            Ok((new_hold_id, expires_at.timestamp()))
+            Ok((
+                new_hold_id,
+                expires_at.timestamp(),
+                (canteen_id_in_order, inventory_updates),
+            ))
         })
     }
 
     /// Confirm a held order: move to active_orders, delete from held tables.
-    /// Returns the new order_id.
+    /// Returns (order_id, user_id, canteen_id, (time_band, [(item_id, num_ordered)])).
     pub fn confirm_held_order(
         &self,
         search_hold_id: i32,
         requesting_user_id: i32,
-    ) -> Result<i32, RepositoryError> {
+    ) -> Result<(i32, i32, i32, (String, Vec<(i32, i32)>)), RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!("confirm_held_order: failed to acquire DB connection: {}", e);
             e
         })?;
 
         enum ConfirmOutcome {
-            Confirmed(i32),
+            Confirmed(i32, i32, i32, (String, Vec<(i32, i32)>)),
             Expired,
         }
 
@@ -282,6 +312,7 @@ impl HoldOperations {
                         held_orders::canteen_id,
                         held_orders::total_price,
                         held_orders::deliver_at,
+                        held_orders::expires_at,
                         held_order_items::item_id,
                         held_order_items::quantity,
                         held_order_items::price,
@@ -312,23 +343,15 @@ impl HoldOperations {
                 ));
             }
 
-            // Expiry check — fetch expires_at
-            {
+            // Expiry check
+            if Utc::now() > first.expires_at {
                 use crate::db::schema::held_orders::dsl::*;
-                let hold_expires: chrono::DateTime<chrono::Utc> = held_orders
-                    .filter(hold_id.eq(search_hold_id))
-                    .select(expires_at)
-                    .first::<chrono::DateTime<chrono::Utc>>(conn)
+                // Hold has expired — clean it up but allow commit.
+                let _ = Self::restore_stock_for_hold(conn, search_hold_id)?;
+                diesel::delete(held_orders.filter(hold_id.eq(search_hold_id)))
+                    .execute(conn)
                     .map_err(RepositoryError::DatabaseError)?;
-
-                if Utc::now() > hold_expires {
-                    // Hold has expired — clean it up but allow commit.
-                    Self::restore_stock_for_hold(conn, search_hold_id)?;
-                    diesel::delete(held_orders.filter(hold_id.eq(search_hold_id)))
-                        .execute(conn)
-                        .map_err(RepositoryError::DatabaseError)?;
-                    return Ok(ConfirmOutcome::Expired);
-                }
+                return Ok(ConfirmOutcome::Expired);
             }
 
             // Create active order
@@ -350,18 +373,70 @@ impl HoldOperations {
             // Create active order items
             {
                 use crate::db::schema::active_order_items::dsl::*;
-                for row in &held_data {
-                    diesel::insert_into(active_order_items)
-                        .values((
-                            order_id.eq(new_order_id),
-                            item_id.eq(row.item_id),
-                            quantity.eq(row.quantity),
-                            price.eq(row.price),
-                        ))
-                        .execute(conn)
-                        .map_err(RepositoryError::DatabaseError)?;
-                }
+                let active_items = held_data
+                    .iter()
+                    .map(|row| ActiveOrderItemInsert {
+                        order_id: new_order_id,
+                        item_id: row.item_id,
+                        quantity: row.quantity,
+                        price: row.price,
+                    })
+                    .collect::<Vec<ActiveOrderItemInsert>>();
+                diesel::insert_into(active_order_items)
+                    .values(&active_items)
+                    .execute(conn)
+                    .map_err(RepositoryError::DatabaseError)?;
             }
+
+            let deliver_time_string = first
+                .deliver_at
+                .as_ref()
+                .map(|deliver_at| deliver_at.human_readable().to_string())
+                .unwrap_or_else(|| "Instant".to_string());
+
+            // Snapshot aggregated active order counts for this canteen/time-band
+            // inside the same transaction so publish data is transactionally consistent.
+            let aggregated_updates = {
+                use crate::db::schema::{active_order_items, active_orders};
+                let snapshot_rows = if let Some(deliver_time) = first.deliver_at.clone() {
+                    active_order_items::table
+                        .inner_join(
+                            active_orders::table
+                                .on(active_order_items::order_id.eq(active_orders::order_id)),
+                        )
+                        .filter(active_orders::canteen_id.eq(first.canteen_id))
+                        .filter(active_orders::deliver_at.eq(Some(deliver_time)))
+                        .group_by(active_order_items::item_id)
+                        .select((
+                            active_order_items::item_id,
+                            sum(active_order_items::quantity),
+                        ))
+                        .order(active_order_items::item_id.asc())
+                        .load::<(i32, Option<i64>)>(conn)
+                        .map_err(RepositoryError::DatabaseError)?
+                } else {
+                    active_order_items::table
+                        .inner_join(
+                            active_orders::table
+                                .on(active_order_items::order_id.eq(active_orders::order_id)),
+                        )
+                        .filter(active_orders::canteen_id.eq(first.canteen_id))
+                        .filter(active_orders::deliver_at.is_null())
+                        .group_by(active_order_items::item_id)
+                        .select((
+                            active_order_items::item_id,
+                            sum(active_order_items::quantity),
+                        ))
+                        .order(active_order_items::item_id.asc())
+                        .load::<(i32, Option<i64>)>(conn)
+                        .map_err(RepositoryError::DatabaseError)?
+                };
+
+                snapshot_rows
+                    .into_iter()
+                    .map(|(item_id, num_ordered)| (item_id, num_ordered.unwrap_or(0) as i32))
+                    .collect::<Vec<(i32, i32)>>()
+            };
 
             // Delete held order (cascade deletes items)
             {
@@ -376,11 +451,18 @@ impl HoldOperations {
                 search_hold_id, new_order_id, requesting_user_id
             );
 
-            Ok(ConfirmOutcome::Confirmed(new_order_id))
+            Ok(ConfirmOutcome::Confirmed(
+                new_order_id,
+                first.user_id,
+                first.canteen_id,
+                (deliver_time_string, aggregated_updates),
+            ))
         });
 
         match outcome? {
-            ConfirmOutcome::Confirmed(order_id) => Ok(order_id),
+            ConfirmOutcome::Confirmed(order_id, user_id, canteen_id, aggregated_update) => {
+                Ok((order_id, user_id, canteen_id, aggregated_update))
+            }
             ConfirmOutcome::Expired => Err(RepositoryError::ValidationError(
                 "Hold has expired. Items have been released.".to_string(),
             )),
@@ -388,11 +470,12 @@ impl HoldOperations {
     }
 
     /// Release a held order: restore stock, delete from held tables.
+    /// Returns (canteen_id, inventory_updates).
     pub fn release_held_order(
         &self,
         search_hold_id: i32,
         requesting_user_id: i32,
-    ) -> Result<(), RepositoryError> {
+    ) -> Result<(i32, Vec<InventoryUpdateItems>), RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!("release_held_order: failed to acquire DB connection: {}", e);
             e
@@ -421,7 +504,7 @@ impl HoldOperations {
             }
 
             // Restore stock
-            Self::restore_stock_for_hold(conn, search_hold_id)?;
+            let restored_inventory = Self::restore_stock_for_hold(conn, search_hold_id)?;
 
             // Delete held order (cascade deletes items)
             {
@@ -436,13 +519,15 @@ impl HoldOperations {
                 search_hold_id, requesting_user_id
             );
 
-            Ok(())
+            Ok(restored_inventory)
         })
     }
 
     /// Clean up all expired holds: restore stock and delete.
-    /// Returns the number of expired holds cleaned up.
-    pub fn cleanup_expired_holds(&self) -> Result<usize, RepositoryError> {
+    /// Returns the number of expired holds cleaned up and stock updates for SSE.
+    pub fn cleanup_expired_holds(
+        &self,
+    ) -> Result<(usize, Vec<(i32, Vec<InventoryUpdateItems>)>), RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!(
                 "cleanup_expired_holds: failed to acquire DB connection: {}",
@@ -463,19 +548,21 @@ impl HoldOperations {
         }
 
         if expired_hold_ids.is_empty() {
-            return Ok(0);
+            return Ok((0, Vec::new()));
         }
 
         let count = expired_hold_ids.len();
+        let mut restored_inventory_updates: Vec<(i32, Vec<InventoryUpdateItems>)> = Vec::new();
         info!(
             "cleanup_expired_holds: found {} expired holds to clean up",
             count
         );
 
         for expired_id in &expired_hold_ids {
-            conn.connection()
-                .transaction::<(), RepositoryError, _>(|conn| {
-                    Self::restore_stock_for_hold(conn, *expired_id)?;
+            let restored_inventory = conn
+                .connection()
+                .transaction::<(i32, Vec<InventoryUpdateItems>), RepositoryError, _>(|conn| {
+                    let restored_inventory = Self::restore_stock_for_hold(conn, *expired_id)?;
 
                     use crate::db::schema::held_orders::dsl::*;
                     diesel::delete(held_orders.filter(hold_id.eq(expired_id)))
@@ -486,45 +573,65 @@ impl HoldOperations {
                         "cleanup_expired_holds: cleaned up expired hold {}",
                         expired_id
                     );
-                    Ok(())
+                    Ok(restored_inventory)
                 })?;
+
+            if !restored_inventory.1.is_empty() {
+                restored_inventory_updates.push(restored_inventory);
+            }
         }
 
         warn!("cleanup_expired_holds: released {} expired holds", count);
-        Ok(count)
+        Ok((count, restored_inventory_updates))
     }
 
     /// Restore stock for all items in a held order. Must be called within a transaction.
     fn restore_stock_for_hold(
         conn: &mut PgConnection,
         search_hold_id: i32,
-    ) -> Result<(), RepositoryError> {
+    ) -> Result<(i32, Vec<InventoryUpdateItems>), RepositoryError> {
         let items: Vec<HeldItemRestore>;
         {
-            use crate::db::schema::held_order_items::dsl::*;
-            items = held_order_items
-                .filter(hold_id.eq(search_hold_id))
-                .select((item_id, quantity))
+            use crate::db::schema::{held_order_items, held_orders};
+            items = held_orders::table
+                .inner_join(
+                    held_order_items::table.on(held_orders::hold_id.eq(held_order_items::hold_id)),
+                )
+                .filter(held_orders::hold_id.eq(search_hold_id))
+                .select((
+                    held_orders::canteen_id,
+                    held_order_items::item_id,
+                    held_order_items::quantity,
+                ))
                 .load::<HeldItemRestore>(conn)
                 .map_err(RepositoryError::DatabaseError)?;
         }
+        if items.is_empty() {
+            return Err(RepositoryError::NotFound(format!(
+                "Hold {} not found",
+                search_hold_id
+            )));
+        }
+        let canteen_id_for_hold = items[0].canteen_id;
 
         use crate::db::schema::menu_items;
+        let mut inventory_updates = Vec::new();
         for item in &items {
             // Only restore stock for items that don't have unlimited stock (-1)
-            let current_stock: i32 = menu_items::table
+            let (current_stock, current_price): (i32, i32) = menu_items::table
                 .filter(menu_items::item_id.eq(item.item_id))
                 .for_update()
-                .select(menu_items::stock)
-                .first::<i32>(conn)
+                .select((menu_items::stock, menu_items::price))
+                .first::<(i32, i32)>(conn)
                 .map_err(RepositoryError::DatabaseError)?;
 
             if current_stock != -1 {
                 let new_stock = current_stock + item.quantity as i32;
+                let is_available_val = new_stock > 0 || new_stock == -1;
                 diesel::update(menu_items::table.filter(menu_items::item_id.eq(item.item_id)))
                     .set((
                         menu_items::stock.eq(new_stock),
-                        menu_items::is_available.eq(true),
+                        menu_items::is_available.eq(is_available_val),
                     ))
                     .execute(conn)
                     .map_err(|e| {
@@ -534,9 +641,16 @@ impl HoldOperations {
                         );
                         RepositoryError::DatabaseError(e)
                     })?;
+
+                inventory_updates.push(InventoryUpdateItems {
+                    item_id: item.item_id,
+                    stock: new_stock,
+                    is_available: is_available_val,
+                    price: current_price,
+                });
             }
         }
 
-        Ok(())
+        Ok((canteen_id_for_hold, inventory_updates))
     }
 }

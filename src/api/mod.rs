@@ -65,15 +65,17 @@ pub fn configure(cfg: &mut ServiceConfig, state: &AppState, qr_cfg: QrConfig) {
                 &state.canteen_ops,
                 &state.asset_ops,
                 &state.canteen_scheduler,
+                &state.sse_broker,
             )
         })
-        .configure(|cfg| users::config(cfg, &state.user_ops))
+        .configure(|cfg| users::config(cfg, &state.user_ops, &state.sse_broker))
         .configure(|cfg| {
             common::config(
                 cfg,
                 &state.order_ops,
                 &state.hold_ops,
                 &state.search_ops,
+                &state.sse_broker,
                 qr_cfg,
             )
         });

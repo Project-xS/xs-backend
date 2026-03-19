@@ -1,15 +1,18 @@
 use crate::api::ContentTypeHeader;
 use crate::db::{AssetOperations, CanteenOperations, MenuOperations};
 use crate::services::canteen_scheduler::CanteenSchedulerNotifier;
+use crate::sse::SseBroker;
 use actix_web::middleware::NormalizePath;
 use actix_web::web;
 use asset_management::*;
 use canteen::*;
+use events::*;
 use menu::*;
 use utoipa_actix_web::{scope, service_config::ServiceConfig};
 
 mod asset_management;
 mod canteen;
+mod events;
 mod menu;
 
 pub fn config(
@@ -18,11 +21,19 @@ pub fn config(
     canteen_ops: &CanteenOperations,
     asset_ops: &AssetOperations,
     scheduler: &CanteenSchedulerNotifier,
+    sse_broker: &SseBroker,
 ) {
     cfg.service(
         scope::scope("/menu")
             .wrap(NormalizePath::trim())
             .app_data(web::Data::new(menu_ops.clone()))
+            .app_data(web::Data::new(sse_broker.clone()))
+            .service(
+                scope::scope("/events")
+                    .app_data(web::Data::new(sse_broker.clone()))
+                    .wrap(NormalizePath::trim())
+                    .service(inventory_update_events),
+            )
             .service(
                 scope::scope("")
                     .guard(ContentTypeHeader)
@@ -41,6 +52,12 @@ pub fn config(
     .service(
         scope::scope("/canteen")
             .wrap(NormalizePath::trim())
+            .service(
+                scope::scope("/events")
+                    .app_data(web::Data::new(sse_broker.clone()))
+                    .wrap(NormalizePath::trim())
+                    .service(canteen_aggregated_order_events),
+            )
             .app_data(web::Data::new(canteen_ops.clone()))
             .app_data(web::Data::new(scheduler.clone()))
             .service(

@@ -5,10 +5,12 @@
 //! - Seed fixtures through `proj_xs::test_utils` and keep `pic_key = null`.
 
 use std::env;
+use std::pin::Pin;
 use std::sync::OnceLock;
 
 use actix_http::Request;
 use actix_web::body::BoxBody;
+use actix_web::body::MessageBody;
 use actix_web::dev::{Service, ServiceResponse};
 use actix_web::http::header;
 use actix_web::http::StatusCode;
@@ -16,14 +18,17 @@ use actix_web::{test, web, App, Error};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::PgConnection;
+use futures::future::poll_fn;
 use proj_xs::auth::{AdminJwtConfig, AuthLayer, FirebaseAuthConfig, JwksCache};
 use proj_xs::test_utils::{
     build_test_pool, init_test_env, reset_db, seed_basic_fixtures, TestFixtures,
 };
 use proj_xs::{api, AppState};
+use serde_json::Value;
 use testcontainers::core::IntoContainerPort;
 use testcontainers::runners::AsyncRunner;
 use testcontainers::{ContainerAsync, GenericImage, ImageExt};
+use tokio::time::{timeout, Duration};
 use utoipa_actix_web::AppExt;
 
 pub struct TestDb {
@@ -50,6 +55,87 @@ where
 pub fn auth_header() -> (header::HeaderName, String) {
     let token = std::env::var("DEV_BYPASS_TOKEN").expect("DEV_BYPASS_TOKEN");
     (header::AUTHORIZATION, format!("Bearer {}", token))
+}
+
+#[derive(Debug, Clone)]
+pub struct SseFrame {
+    pub id: Option<String>,
+    pub event: Option<String>,
+    pub data: Option<String>,
+    pub retry_ms: Option<u64>,
+    pub raw: String,
+}
+
+fn parse_sse_frame(raw: &str) -> SseFrame {
+    let mut id = None;
+    let mut event = None;
+    let mut retry_ms = None;
+    let mut data_lines: Vec<String> = Vec::new();
+
+    for line in raw.lines() {
+        if let Some(value) = line.strip_prefix("id: ") {
+            id = Some(value.to_string());
+        } else if let Some(value) = line.strip_prefix("event: ") {
+            event = Some(value.to_string());
+        } else if let Some(value) = line.strip_prefix("retry: ") {
+            retry_ms = value.parse::<u64>().ok();
+        } else if let Some(value) = line.strip_prefix("data: ") {
+            data_lines.push(value.to_string());
+        }
+    }
+
+    let data = if data_lines.is_empty() {
+        None
+    } else {
+        Some(data_lines.join("\n"))
+    };
+
+    SseFrame {
+        id,
+        event,
+        data,
+        retry_ms,
+        raw: raw.to_string(),
+    }
+}
+
+pub async fn read_sse_frame(body: &mut BoxBody) -> SseFrame {
+    let chunk = timeout(
+        Duration::from_secs(3),
+        poll_fn(|cx| Pin::new(&mut *body).poll_next(cx)),
+    )
+    .await
+    .expect("timed out waiting for SSE chunk")
+    .expect("SSE stream ended unexpectedly")
+    .expect("SSE chunk error");
+
+    let raw = String::from_utf8(chunk.to_vec()).expect("SSE chunk must be utf8");
+    parse_sse_frame(&raw)
+}
+
+pub async fn wait_for_sse_event(body: &mut BoxBody, expected_event: &str) -> SseFrame {
+    for _ in 0..12 {
+        let frame = read_sse_frame(body).await;
+        if frame.event.as_deref() == Some(expected_event) {
+            return frame;
+        }
+    }
+    panic!("did not receive expected SSE event: {expected_event}");
+}
+
+pub async fn wait_for_connected_event(body: &mut BoxBody) -> SseFrame {
+    for _ in 0..12 {
+        let frame = read_sse_frame(body).await;
+        if frame.event.as_deref() == Some("status") && frame.data.as_deref() == Some("connected") {
+            return frame;
+        }
+    }
+    panic!("did not receive initial connected status SSE event");
+}
+
+pub fn sse_frame_data_json(frame: &SseFrame) -> Value {
+    let data = frame.data.as_deref().expect("SSE frame missing data");
+    serde_json::from_str(data).expect("SSE data should be valid JSON")
 }
 
 pub fn active_orders_count(conn: &mut PgConnection) -> i64 {
