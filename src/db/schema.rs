@@ -96,6 +96,23 @@ diesel::table! {
 }
 
 diesel::table! {
+    payment_orders (payment_id) {
+        payment_id -> Int4,
+        hold_id -> Int4,
+        user_id -> Int4,
+        merchant_order_id -> Varchar,
+        phonepe_order_id -> Varchar,
+        sdk_token -> Text,
+        amount -> Int4,
+        payment_state -> Varchar,
+        phonepe_expires_at -> Nullable<Timestamptz>,
+        app_order_id -> Nullable<Int4>,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
     users (user_id) {
         user_id -> Int4,
         rfid -> Nullable<Varchar>,
@@ -120,6 +137,7 @@ diesel::joinable!(held_orders -> canteens (canteen_id));
 diesel::joinable!(held_orders -> users (user_id));
 diesel::joinable!(menu_items -> canteens (canteen_id));
 diesel::joinable!(past_orders -> users (user_id));
+diesel::joinable!(payment_orders -> users (user_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     active_order_items,
@@ -129,5 +147,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     held_orders,
     menu_items,
     past_orders,
+    payment_orders,
     users,
 );

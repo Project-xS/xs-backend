@@ -13,6 +13,7 @@ pub use admin::canteen::CanteenOperations;
 pub use admin::menu::MenuOperations;
 pub use common::hold::HoldOperations;
 pub use common::orders::{OrderOperations, QrGenerationLookup, QrScanLookup};
+pub use common::payments::PaymentOperations;
 pub use common::search::SearchOperations;
 pub use errors::RepositoryError;
 pub use errors::S3Error;

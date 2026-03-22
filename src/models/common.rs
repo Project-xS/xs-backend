@@ -145,3 +145,34 @@ pub struct HeldOrderItem {
     pub quantity: i16,
     pub price: i32,
 }
+
+#[derive(Queryable, Selectable, Debug, Clone)]
+#[diesel(table_name = crate::db::schema::payment_orders)]
+pub struct PaymentOrder {
+    pub payment_id: i32,
+    pub hold_id: i32,
+    pub user_id: i32,
+    pub merchant_order_id: String,
+    pub phonepe_order_id: String,
+    pub sdk_token: String,
+    pub amount: i32,
+    pub payment_state: String,
+    pub phonepe_expires_at: Option<DateTime<Utc>>,
+    pub app_order_id: Option<i32>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Insertable, Debug, Clone)]
+#[diesel(table_name = crate::db::schema::payment_orders)]
+pub struct NewPaymentOrder {
+    pub hold_id: i32,
+    pub user_id: i32,
+    pub merchant_order_id: String,
+    pub phonepe_order_id: String,
+    pub sdk_token: String,
+    pub amount: i32,
+    pub payment_state: String,
+    pub phonepe_expires_at: Option<DateTime<Utc>>,
+    pub app_order_id: Option<i32>,
+}
