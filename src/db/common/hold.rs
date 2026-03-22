@@ -292,6 +292,22 @@ impl HoldOperations {
         search_hold_id: i32,
         requesting_user_id: i32,
     ) -> Result<ConfirmOrderResult, RepositoryError> {
+        self.confirm_held_order_impl(search_hold_id, Some(requesting_user_id))
+    }
+
+    /// Confirm a held order without ownership checks (internal/admin-only path).
+    pub fn confirm_held_order_internal(
+        &self,
+        search_hold_id: i32,
+    ) -> Result<ConfirmOrderResult, RepositoryError> {
+        self.confirm_held_order_impl(search_hold_id, None)
+    }
+
+    fn confirm_held_order_impl(
+        &self,
+        search_hold_id: i32,
+        requesting_user_id: Option<i32>,
+    ) -> Result<ConfirmOrderResult, RepositoryError> {
         let mut conn = DbConnection::new(&self.pool).map_err(|e| {
             error!("confirm_held_order: failed to acquire DB connection: {}", e);
             e
@@ -344,10 +360,12 @@ impl HoldOperations {
             let first = &held_data[0];
 
             // Ownership check
-            if first.user_id != requesting_user_id {
-                return Err(RepositoryError::ValidationError(
-                    "You do not own this hold".to_string(),
-                ));
+            if let Some(requesting_uid) = requesting_user_id {
+                if first.user_id != requesting_uid {
+                    return Err(RepositoryError::ValidationError(
+                        "You do not own this hold".to_string(),
+                    ));
+                }
             }
 
             // Expiry check
@@ -455,7 +473,7 @@ impl HoldOperations {
 
             debug!(
                 "confirm_held_order: hold {} confirmed as order {} for user {}",
-                search_hold_id, new_order_id, requesting_user_id
+                search_hold_id, new_order_id, first.user_id
             );
 
             Ok(ConfirmOutcome::Confirmed(

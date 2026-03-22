@@ -74,8 +74,10 @@ pub fn configure(cfg: &mut ServiceConfig, state: &AppState, qr_cfg: QrConfig) {
                 cfg,
                 &state.order_ops,
                 &state.hold_ops,
+                &state.payment_ops,
                 &state.search_ops,
                 &state.sse_broker,
+                &state.phonepe_client,
                 qr_cfg,
             )
         });

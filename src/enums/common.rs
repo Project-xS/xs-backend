@@ -113,3 +113,38 @@ pub struct ScanQrResponse {
     pub data: Option<OrderItemContainer>,
     pub error: Option<String>,
 }
+
+#[derive(Deserialize, ToSchema)]
+pub struct InitiatePaymentRequest {
+    pub hold_id: i32,
+    pub amount: i32,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct InitiatePaymentResponse {
+    pub status: String,
+    pub order_id: Option<String>,
+    pub token: Option<String>,
+    pub merchant_id: Option<String>,
+    pub merchant_order_id: Option<String>,
+    pub error: Option<String>,
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct VerifyPaymentRequest {
+    pub merchant_order_id: String,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct VerifyPaymentResponse {
+    pub status: String,
+    pub order_id: Option<i32>,
+    pub payment_state: Option<String>,
+    pub error: Option<String>,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct WebhookPaymentResponse {
+    pub status: String,
+    pub error: Option<String>,
+}

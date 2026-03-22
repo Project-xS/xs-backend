@@ -31,6 +31,12 @@ pub enum SseEvent {
         order_id: i32,
         status: String, // "delivered" or "cancelled" or "placed"
     },
+    PaymentUpdate {
+        // only to user
+        hold_id: i32,
+        merchant_order_id: String,
+        payment_state: String, // "PENDING" | "COMPLETED" | "FAILED"
+    },
     CanteenAggregatedOrderUpdate {
         // only to canteen
         time_band: String,
@@ -46,6 +52,9 @@ impl SseEvent {
             }
             SseEvent::UserOrderUpdate { .. } => {
                 ("user_order_update", serde_json::to_string(self).unwrap())
+            }
+            SseEvent::PaymentUpdate { .. } => {
+                ("payment_update", serde_json::to_string(self).unwrap())
             }
             SseEvent::CanteenAggregatedOrderUpdate { .. } => (
                 "canteen_aggregated_order_update",

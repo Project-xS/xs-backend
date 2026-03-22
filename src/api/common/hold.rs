@@ -1,4 +1,4 @@
-use crate::auth::UserPrincipal;
+use crate::auth::{AdminPrincipal, UserPrincipal};
 use crate::db::HoldOperations;
 use crate::enums::common::{ConfirmHoldResponse, HoldOrderResponse, OrderRequest, OrderResponse};
 use crate::sse::{CanteenAggregatedOrderUpdateItem, SseEvent};
@@ -95,42 +95,26 @@ pub(super) async fn hold_order(
 pub(super) async fn confirm_hold(
     hold_ops: web::Data<HoldOperations>,
     broker: web::Data<crate::sse::SseBroker>,
-    user: UserPrincipal,
+    admin: AdminPrincipal,
     path: web::Path<(i32,)>,
 ) -> actix_web::Result<impl Responder> {
     let hold_id = path.into_inner().0;
-    let uid = user.user_id();
-    let result = web::block(move || hold_ops.confirm_held_order(hold_id, uid)).await?;
+    let canteen_id = admin.canteen_id;
+    let result = web::block(move || hold_ops.confirm_held_order_internal(hold_id)).await?;
 
     match result {
         Ok((order_id, user_id, canteen_id, (time_band, aggregated_updates))) => {
             debug!(
-                "confirm_hold: hold {} confirmed as order {} for user {}",
-                hold_id, order_id, uid
+                "confirm_hold: admin canteen {} confirmed hold {} as order {} for user {}",
+                canteen_id, hold_id, order_id, user_id
             );
-            // Publish canteen aggregated sse
-            let aggregated_items = aggregated_updates
-                .into_iter()
-                .map(|(item_id, num_ordered)| CanteenAggregatedOrderUpdateItem {
-                    item_id,
-                    num_ordered,
-                })
-                .collect::<Vec<CanteenAggregatedOrderUpdateItem>>();
-            broker.publish_canteen_event(
-                canteen_id,
-                &SseEvent::CanteenAggregatedOrderUpdate {
-                    time_band,
-                    items: aggregated_items,
-                },
-            );
-
-            // Publish user order placed sse
-            broker.publish_user_event(
+            publish_confirmed_order_events(
+                &broker,
+                order_id,
                 user_id,
-                &SseEvent::UserOrderUpdate {
-                    order_id,
-                    status: "placed".to_string(),
-                },
+                canteen_id,
+                time_band,
+                aggregated_updates,
             );
 
             Ok(HttpResponse::Ok().json(ConfirmHoldResponse {
@@ -141,8 +125,8 @@ pub(super) async fn confirm_hold(
         }
         Err(e) => {
             error!(
-                "confirm_hold: failed to confirm hold {} for user {}: {}",
-                hold_id, uid, e
+                "confirm_hold: admin canteen {} failed to confirm hold {}: {}",
+                canteen_id, hold_id, e
             );
             Ok(HttpResponse::Conflict().json(ConfirmHoldResponse {
                 status: "error".to_string(),
@@ -178,14 +162,7 @@ pub(super) async fn cancel_hold(
     match result {
         Ok((canteen_id, inventory_updates)) => {
             debug!("cancel_hold: hold {} cancelled for user {}", hold_id, uid);
-            if !inventory_updates.is_empty() {
-                broker.publish_canteen_subscription_event(
-                    canteen_id,
-                    &SseEvent::InventoryUpdate {
-                        items: inventory_updates,
-                    },
-                );
-            }
+            publish_cancel_hold_inventory_event(&broker, canteen_id, inventory_updates);
             Ok(HttpResponse::Ok().json(OrderResponse {
                 status: "ok".to_string(),
                 error: None,
@@ -202,4 +179,51 @@ pub(super) async fn cancel_hold(
             }))
         }
     }
+}
+
+pub(super) fn publish_confirmed_order_events(
+    broker: &crate::sse::SseBroker,
+    order_id: i32,
+    user_id: i32,
+    canteen_id: i32,
+    time_band: String,
+    aggregated_updates: Vec<(i32, i32)>,
+) {
+    let aggregated_items = aggregated_updates
+        .into_iter()
+        .map(|(item_id, num_ordered)| CanteenAggregatedOrderUpdateItem {
+            item_id,
+            num_ordered,
+        })
+        .collect::<Vec<CanteenAggregatedOrderUpdateItem>>();
+    broker.publish_canteen_event(
+        canteen_id,
+        &SseEvent::CanteenAggregatedOrderUpdate {
+            time_band,
+            items: aggregated_items,
+        },
+    );
+    broker.publish_user_event(
+        user_id,
+        &SseEvent::UserOrderUpdate {
+            order_id,
+            status: "placed".to_string(),
+        },
+    );
+}
+
+pub(super) fn publish_cancel_hold_inventory_event(
+    broker: &crate::sse::SseBroker,
+    canteen_id: i32,
+    inventory_updates: Vec<crate::sse::InventoryUpdateItems>,
+) {
+    if inventory_updates.is_empty() {
+        return;
+    }
+    broker.publish_canteen_subscription_event(
+        canteen_id,
+        &SseEvent::InventoryUpdate {
+            items: inventory_updates,
+        },
+    );
 }

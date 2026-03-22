@@ -3301,6 +3301,7 @@ dependencies = [
  "testcontainers",
  "thiserror 2.0.18",
  "tokio",
+ "urlencoding",
  "utoipa",
  "utoipa-actix-web",
  "utoipa-swagger-ui",

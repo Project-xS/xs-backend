@@ -1,6 +1,7 @@
 use crate::api::common::qr::QrConfig;
 use crate::api::ContentTypeHeader;
-use crate::db::{HoldOperations, OrderOperations, SearchOperations};
+use crate::db::{HoldOperations, OrderOperations, PaymentOperations, SearchOperations};
+use crate::services::phonepe::PhonePeClient;
 use crate::sse::SseBroker;
 use actix_web::middleware::NormalizePath;
 use actix_web::web;
@@ -13,15 +14,19 @@ use utoipa_actix_web::service_config::ServiceConfig;
 
 mod hold;
 mod orders;
+mod payments;
 pub mod qr;
 mod search;
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn config(
     cfg: &mut ServiceConfig,
     order_ops: &OrderOperations,
     hold_ops: &HoldOperations,
+    payment_ops: &PaymentOperations,
     search_ops: &SearchOperations,
     sse_broker: &SseBroker,
+    phonepe_client: &PhonePeClient,
     qr_cfg: QrConfig,
 ) {
     cfg.service(
@@ -51,6 +56,21 @@ pub(super) fn config(
             .service(get_orders_by_user)
             .service(get_order_by_orderid)
             .service(order_actions),
+    )
+    .service(
+        scope::scope("/payments")
+            .wrap(NormalizePath::trim())
+            .app_data(web::Data::new(hold_ops.clone()))
+            .app_data(web::Data::new(payment_ops.clone()))
+            .app_data(web::Data::new(sse_broker.clone()))
+            .app_data(web::Data::new(phonepe_client.clone()))
+            .service(
+                scope::scope("")
+                    .guard(ContentTypeHeader)
+                    .service(payments::initiate_payment)
+                    .service(payments::verify_payment)
+                    .service(payments::webhook_payment),
+            ),
     )
     // Search Routes
     .service(

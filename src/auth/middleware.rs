@@ -72,7 +72,11 @@ where
     fn call(&self, req: ServiceRequest) -> Self::Future {
         // Bypass only '/', '/health', and '/canteen/login'
         let path = req.path().to_string();
-        if path == "/" || path == "/health" || path == "/canteen/login" {
+        if path == "/"
+            || path == "/health"
+            || path == "/canteen/login"
+            || path == "/payments/webhook"
+        {
             let fut = self.service.call(req);
             #[allow(clippy::redundant_async_block)]
             return Box::pin(async move { fut.await });

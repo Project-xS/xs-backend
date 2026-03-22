@@ -13,9 +13,11 @@ pub mod traits;
 
 use crate::db::{
     establish_connection_pool, run_db_migrations, AssetOperations, CanteenOperations,
-    HoldOperations, MenuOperations, OrderOperations, SearchOperations, UserOperations,
+    HoldOperations, MenuOperations, OrderOperations, PaymentOperations, SearchOperations,
+    UserOperations,
 };
 use crate::services::canteen_scheduler::CanteenSchedulerNotifier;
+use crate::services::phonepe::PhonePeClient;
 use crate::sse::SseBroker;
 
 #[derive(Clone)]
@@ -25,10 +27,12 @@ pub struct AppState {
     pub canteen_ops: CanteenOperations,
     pub order_ops: OrderOperations,
     pub hold_ops: HoldOperations,
+    pub payment_ops: PaymentOperations,
     pub search_ops: SearchOperations,
     pub asset_ops: AssetOperations,
     pub canteen_scheduler: CanteenSchedulerNotifier,
     pub sse_broker: SseBroker,
+    pub phonepe_client: PhonePeClient,
 }
 
 impl AppState {
@@ -50,19 +54,23 @@ impl AppState {
         let canteen_ops = CanteenOperations::new(db.clone(), asset_ops.clone()).await;
         let order_ops = OrderOperations::new(db.clone()).await;
         let hold_ops = HoldOperations::new(db.clone(), hold_ttl_secs);
+        let payment_ops = PaymentOperations::new(db.clone()).await;
         let search_ops = SearchOperations::new(db.clone()).await;
         let canteen_scheduler = CanteenSchedulerNotifier::new();
         let sse_broker = SseBroker::new();
+        let phonepe_client = PhonePeClient::from_env().expect("Unable to create PhonePe client");
         AppState {
             user_ops,
             menu_ops,
             canteen_ops,
             order_ops,
             hold_ops,
+            payment_ops,
             search_ops,
             asset_ops,
             canteen_scheduler,
             sse_broker,
+            phonepe_client,
         }
     }
 }
