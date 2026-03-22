@@ -124,8 +124,8 @@ async fn confirm_hold_emits_user_and_canteen_sse_events() {
 
     let confirm_req = test::TestRequest::post()
         .uri(&format!(
-            "/orders/hold/{}/confirm?as=user-{}",
-            hold_id, fixtures.user_id
+            "/orders/hold/{}/confirm?as=admin-{}",
+            hold_id, fixtures.canteen_id
         ))
         .insert_header(auth_header())
         .to_request();

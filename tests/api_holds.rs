@@ -92,8 +92,8 @@ async fn confirm_hold_success_and_expired() {
 
     let req = test::TestRequest::post()
         .uri(&format!(
-            "/orders/hold/{}/confirm?as=user-{}",
-            hold_id, fixtures.user_id
+            "/orders/hold/{}/confirm?as=admin-{}",
+            hold_id, fixtures.canteen_id
         ))
         .insert_header(auth_header())
         .to_request();
@@ -110,8 +110,8 @@ async fn confirm_hold_success_and_expired() {
 
     let req = test::TestRequest::post()
         .uri(&format!(
-            "/orders/hold/{}/confirm?as=user-{}",
-            expired_id, fixtures.user_id
+            "/orders/hold/{}/confirm?as=admin-{}",
+            expired_id, fixtures.canteen_id
         ))
         .insert_header(auth_header())
         .to_request();
@@ -122,7 +122,7 @@ async fn confirm_hold_success_and_expired() {
 }
 
 #[actix_rt::test]
-async fn confirm_hold_wrong_owner_conflict() {
+async fn confirm_hold_user_forbidden() {
     let (app, fixtures, _db_url) = common::setup_api_app().await;
 
     let req = test::TestRequest::post()
@@ -143,7 +143,7 @@ async fn confirm_hold_wrong_owner_conflict() {
         .insert_header(auth_header())
         .to_request();
     let resp = test::call_service(&app, req).await;
-    assert_eq!(resp.status(), StatusCode::CONFLICT);
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 }
 
 #[actix_rt::test]
@@ -422,8 +422,8 @@ async fn confirm_hold_nonexistent_id() {
 
     let req = test::TestRequest::post()
         .uri(&format!(
-            "/orders/hold/99999/confirm?as=user-{}",
-            fixtures.user_id
+            "/orders/hold/99999/confirm?as=admin-{}",
+            fixtures.canteen_id
         ))
         .insert_header(auth_header())
         .to_request();
@@ -453,8 +453,8 @@ async fn confirm_hold_already_confirmed() {
     // First confirm succeeds
     let req = test::TestRequest::post()
         .uri(&format!(
-            "/orders/hold/{}/confirm?as=user-{}",
-            hold_id, fixtures.user_id
+            "/orders/hold/{}/confirm?as=admin-{}",
+            hold_id, fixtures.canteen_id
         ))
         .insert_header(auth_header())
         .to_request();
@@ -464,8 +464,8 @@ async fn confirm_hold_already_confirmed() {
     // Second confirm on same hold id should conflict
     let req = test::TestRequest::post()
         .uri(&format!(
-            "/orders/hold/{}/confirm?as=user-{}",
-            hold_id, fixtures.user_id
+            "/orders/hold/{}/confirm?as=admin-{}",
+            hold_id, fixtures.canteen_id
         ))
         .insert_header(auth_header())
         .to_request();
@@ -526,7 +526,7 @@ async fn admin_cannot_post_hold() {
 }
 
 #[actix_rt::test]
-async fn admin_cannot_confirm_hold() {
+async fn admin_can_confirm_hold() {
     let (app, fixtures, _db_url) = common::setup_api_app().await;
 
     let req = test::TestRequest::post()
@@ -537,7 +537,7 @@ async fn admin_cannot_confirm_hold() {
         .insert_header(auth_header())
         .to_request();
     let resp = test::call_service(&app, req).await;
-    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    assert_eq!(resp.status(), StatusCode::CONFLICT);
 }
 
 #[actix_rt::test]

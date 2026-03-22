@@ -411,8 +411,8 @@ async fn full_lifecycle_hold_confirm_deliver_past_orders() {
     // Step 2: Confirm hold
     let req = test::TestRequest::post()
         .uri(&format!(
-            "/orders/hold/{}/confirm?as=user-{}",
-            hold_id, fixtures.user_id
+            "/orders/hold/{}/confirm?as=admin-{}",
+            hold_id, fixtures.canteen_id
         ))
         .insert_header(auth_header())
         .to_request();

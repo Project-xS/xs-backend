@@ -17,6 +17,13 @@ const TEST_DEV_BYPASS_TOKEN: &str = "test-bypass-token";
 const TEST_FIREBASE_PROJECT_ID: &str = "test-project";
 const TEST_ADMIN_JWT_SECRET: &str = "test-admin-secret";
 const TEST_QR_HASH_SECRET: &str = "test-qr-secret";
+const TEST_PHONEPE_MODE: &str = "sandbox";
+const TEST_PHONEPE_CLIENT_ID: &str = "test-phonepe-client-id";
+const TEST_PHONEPE_CLIENT_SECRET: &str = "test-phonepe-client-secret";
+const TEST_PHONEPE_MERCHANT_ID: &str = "test-phonepe-merchant-id";
+const TEST_PHONEPE_CLIENT_VERSION: &str = "1";
+const TEST_PHONEPE_WEBHOOK_USERNAME: &str = "test-phonepe-webhook-user";
+const TEST_PHONEPE_WEBHOOK_PASSWORD: &str = "test-phonepe-webhook-password";
 static TEST_THREADS_GUARD: Once = Once::new();
 
 fn ensure_single_threaded_tests() {
@@ -61,6 +68,14 @@ pub fn init_test_env() {
     set_env_if_unset("FIREBASE_PROJECT_ID", TEST_FIREBASE_PROJECT_ID);
     set_env_if_unset("ADMIN_JWT_SECRET", TEST_ADMIN_JWT_SECRET);
     set_env_if_unset("DELIVER_QR_HASH_SECRET", TEST_QR_HASH_SECRET);
+    set_env_if_unset("PHONEPE_ENABLED", "true");
+    set_env_if_unset("PHONEPE_MODE", TEST_PHONEPE_MODE);
+    set_env_if_unset("PHONEPE_CLIENT_ID", TEST_PHONEPE_CLIENT_ID);
+    set_env_if_unset("PHONEPE_CLIENT_SECRET", TEST_PHONEPE_CLIENT_SECRET);
+    set_env_if_unset("PHONEPE_MERCHANT_ID", TEST_PHONEPE_MERCHANT_ID);
+    set_env_if_unset("PHONEPE_CLIENT_VERSION", TEST_PHONEPE_CLIENT_VERSION);
+    set_env_if_unset("PHONEPE_WEBHOOK_USERNAME", TEST_PHONEPE_WEBHOOK_USERNAME);
+    set_env_if_unset("PHONEPE_WEBHOOK_PASSWORD", TEST_PHONEPE_WEBHOOK_PASSWORD);
 }
 
 pub fn build_test_pool(database_url: &str) -> Pool<ConnectionManager<PgConnection>> {
@@ -73,7 +88,7 @@ pub fn reset_db(pool: &Pool<ConnectionManager<PgConnection>>) -> Result<(), Repo
     let mut conn = DbConnection::new(pool)?;
     diesel::sql_query(
         "TRUNCATE TABLE active_order_items, active_orders, held_order_items, held_orders, \
-         menu_items, past_orders, users, canteens RESTART IDENTITY CASCADE",
+         payment_orders, menu_items, past_orders, users, canteens RESTART IDENTITY CASCADE",
     )
     .execute(conn.connection())
     .map_err(RepositoryError::DatabaseError)?;
