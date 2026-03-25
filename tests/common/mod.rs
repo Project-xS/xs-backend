@@ -220,6 +220,7 @@ pub fn setup_test_db() -> &'static TestDb {
                     .with_env_var("POSTGRES_USER", "postgres")
                     .with_env_var("POSTGRES_PASSWORD", "postgres")
                     .with_env_var("POSTGRES_DB", "proj_xs_test")
+                    .with_cmd(vec!["-c", "max_connections=1000"])
                     .start()
                     .await
                     .expect("start postgres container");
