@@ -55,7 +55,12 @@ pub(super) async fn initiate_payment(
         Err(e) => return Ok(conflict_initiate_response(e)),
     };
 
+    // Client and hold totals are in rupees. Convert to paisa only for PhonePe calls/storage.
     if amount != hold_snapshot.total_price {
+        debug!(
+            "Amount mismatch detected: hold total {} INR, requested amount {} INR",
+            hold_snapshot.total_price, amount
+        );
         return Ok(HttpResponse::Conflict().json(InitiatePaymentResponse {
             status: "error".to_string(),
             order_id: None,
@@ -65,6 +70,7 @@ pub(super) async fn initiate_payment(
             error: Some("Amount mismatch with held order total.".to_string()),
         }));
     }
+    let amount_paisa = amount.saturating_mul(100);
 
     let existing_mapping = match payment_ops.find_active_mapping_by_hold_id(hold_id) {
         Ok(mapping) => mapping,
@@ -86,7 +92,7 @@ pub(super) async fn initiate_payment(
         }
     };
     if let Some(existing_mapping) = existing_mapping {
-        if existing_mapping.amount != amount {
+        if existing_mapping.amount != amount_paisa {
             return Ok(HttpResponse::Conflict().json(InitiatePaymentResponse {
                 status: "error".to_string(),
                 order_id: None,
@@ -133,7 +139,7 @@ pub(super) async fn initiate_payment(
 
     let merchant_order_id = format!("TXN_{}_{}", hold_id, Utc::now().timestamp_millis());
     let create_result = match phonepe_client
-        .create_sdk_order(&merchant_order_id, amount, expire_after)
+        .create_sdk_order(&merchant_order_id, amount_paisa, expire_after)
         .await
     {
         Ok(res) => res,
@@ -159,7 +165,7 @@ pub(super) async fn initiate_payment(
         merchant_order_id: merchant_order_id.clone(),
         phonepe_order_id: create_result.phonepe_order_id.clone(),
         sdk_token: create_result.sdk_token.clone(),
-        amount,
+        amount: amount_paisa,
         payment_state: PAYMENT_STATE_CREATED.to_string(),
         phonepe_expires_at: Some(Utc::now() + Duration::seconds(expire_after)),
         app_order_id: None,
