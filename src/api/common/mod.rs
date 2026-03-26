@@ -64,12 +64,12 @@ pub(super) fn config(
             .app_data(web::Data::new(payment_ops.clone()))
             .app_data(web::Data::new(sse_broker.clone()))
             .app_data(web::Data::new(phonepe_client.clone()))
+            .service(payments::webhook_payment)
             .service(
                 scope::scope("")
                     .guard(ContentTypeHeader)
                     .service(payments::initiate_payment)
-                    .service(payments::verify_payment)
-                    .service(payments::webhook_payment),
+                    .service(payments::verify_payment),
             ),
     )
     // Search Routes

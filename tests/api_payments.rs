@@ -320,13 +320,26 @@ async fn payments_webhook_auth_and_idempotency() {
         }))
         .to_request();
     let bad_webhook_resp = test::call_service(&app, bad_webhook_req).await;
-    assert_eq!(bad_webhook_resp.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(bad_webhook_resp.status(), StatusCode::EXPECTATION_FAILED);
 
     let good_auth = webhook_hash_header_value();
+    let validation_req = test::TestRequest::post()
+        .uri("/payments/webhook")
+        .insert_header((
+            header::AUTHORIZATION,
+            format!("SHA256({})", good_auth.clone()),
+        ))
+        .to_request();
+    let validation_resp = test::call_service(&app, validation_req).await;
+    assert_eq!(validation_resp.status(), StatusCode::BAD_REQUEST);
+
     let webhook_req = test::TestRequest::post()
         .uri("/payments/webhook")
         .insert_header((header::CONTENT_TYPE, "application/json"))
-        .insert_header((header::AUTHORIZATION, good_auth.clone()))
+        .insert_header((
+            header::AUTHORIZATION,
+            format!("SHA256({})", good_auth.clone()),
+        ))
         .set_json(&serde_json::json!({
             "event": "checkout.order.completed",
             "payload": {

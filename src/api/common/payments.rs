@@ -3,7 +3,6 @@ use crate::auth::UserPrincipal;
 use crate::db::{HoldOperations, PaymentOperations, RepositoryError};
 use crate::enums::common::{
     InitiatePaymentRequest, InitiatePaymentResponse, VerifyPaymentRequest, VerifyPaymentResponse,
-    WebhookPaymentResponse,
 };
 use crate::models::common::NewPaymentOrder;
 use crate::services::phonepe::PhonePeClient;
@@ -12,6 +11,7 @@ use actix_web::http::header::AUTHORIZATION;
 use actix_web::{post, web, HttpRequest, HttpResponse, Responder};
 use chrono::{Duration, Utc};
 use log::{debug, error, warn};
+use serde_json::json;
 
 const PAYMENT_STATE_CREATED: &str = "CREATED";
 const PAYMENT_STATE_PENDING: &str = "PENDING";
@@ -393,8 +393,9 @@ pub(super) async fn verify_payment(
     tag = "Payments",
     request_body = serde_json::Value,
     responses(
-        (status = 200, description = "Webhook accepted", body = WebhookPaymentResponse),
-        (status = 401, description = "Webhook authorization failed", body = WebhookPaymentResponse)
+        (status = 200, description = "Webhook accepted", body = serde_json::Value),
+        (status = 400, description = "Webhook payload parsing failed", body = serde_json::Value),
+        (status = 417, description = "Webhook authorization failed", body = serde_json::Value)
     ),
     summary = "PhonePe payment webhook callback"
 )]
@@ -405,33 +406,78 @@ pub(super) async fn webhook_payment(
     hold_ops: web::Data<HoldOperations>,
     broker: web::Data<SseBroker>,
     phonepe_client: web::Data<PhonePeClient>,
-    payload: web::Json<serde_json::Value>,
+    raw_body: web::Bytes,
 ) -> actix_web::Result<impl Responder> {
     let auth_header = req
         .headers()
         .get(AUTHORIZATION)
         .and_then(|v| v.to_str().ok());
     if !phonepe_client.verify_webhook_header(auth_header) {
-        return Ok(HttpResponse::Unauthorized().json(WebhookPaymentResponse {
-            status: "error".to_string(),
-            error: Some("Invalid webhook authorization.".to_string()),
-        }));
+        return Ok(HttpResponse::ExpectationFailed().json(json!({
+            "message": "Invalid Callback",
+            "http_status_code": 417
+        })));
     }
 
-    let body = payload.into_inner();
+    let body: serde_json::Value = if raw_body.is_empty() {
+        return Ok(HttpResponse::BadRequest().json(json!({
+            "message": "Invalid Callback Payload"
+        })));
+    } else {
+        match serde_json::from_slice(raw_body.as_ref()) {
+            Ok(parsed) => parsed,
+            Err(e) => {
+                warn!(
+                    "webhook_payment: invalid JSON body, acknowledging no-op: {}",
+                    e
+                );
+                return Ok(HttpResponse::BadRequest().json(json!({
+                    "message": "Invalid Callback Payload"
+                })));
+            }
+        }
+    };
     let event = body
         .get("event")
         .and_then(|v| v.as_str())
         .unwrap_or_default()
         .to_lowercase();
-    let merchant_order_id = extract_webhook_merchant_order_id(&body);
-    let remote_state = extract_webhook_state(&body);
 
+    if !event.starts_with("checkout.order") {
+        debug!(
+            "webhook_payment: ignoring non-checkout event '{}', acknowledging with no-op",
+            event
+        );
+        return Ok(HttpResponse::Ok().json(body.clone()));
+    }
+
+    let remote_state = extract_webhook_state(&body);
+    let final_state = match remote_state.as_deref() {
+        Some("COMPLETED") => PAYMENT_STATE_COMPLETED,
+        Some("FAILED") => PAYMENT_STATE_FAILED,
+        Some(other) => {
+            debug!(
+                "webhook_payment: ignoring unsupported or non-terminal state '{}' for event '{}', acknowledging with no-op",
+                other, event
+            );
+            return Ok(HttpResponse::Ok().json(body.clone()));
+        }
+        None => {
+            warn!(
+                "webhook_payment: missing payload.state for event '{}', acknowledging with no-op",
+                event
+            );
+            return Ok(HttpResponse::Ok().json(body.clone()));
+        }
+    };
+
+    let merchant_order_id = extract_webhook_merchant_order_id(&body);
     let Some(merchant_order_id) = merchant_order_id else {
-        return Ok(HttpResponse::BadRequest().json(WebhookPaymentResponse {
-            status: "error".to_string(),
-            error: Some("Webhook payload missing merchantOrderId.".to_string()),
-        }));
+        warn!(
+            "webhook_payment: missing merchantOrderId for event '{}', acknowledging with no-op",
+            event
+        );
+        return Ok(HttpResponse::Ok().json(body.clone()));
     };
 
     let mapping_lookup = match payment_ops.get_mapping_by_merchant_order_id(&merchant_order_id) {
@@ -441,12 +487,9 @@ pub(super) async fn webhook_payment(
                 "webhook_payment: failed to lookup merchant_order_id {}: {}",
                 merchant_order_id, e
             );
-            return Ok(
-                HttpResponse::InternalServerError().json(WebhookPaymentResponse {
-                    status: "error".to_string(),
-                    error: Some("Internal server error.".to_string()),
-                }),
-            );
+            return Ok(HttpResponse::InternalServerError().json(json!({
+                "message": "Internal server error."
+            })));
         }
     };
     let Some(mapping) = mapping_lookup else {
@@ -454,10 +497,7 @@ pub(super) async fn webhook_payment(
             "webhook_payment: unknown merchant_order_id {}, acknowledging with no-op",
             merchant_order_id
         );
-        return Ok(HttpResponse::Ok().json(WebhookPaymentResponse {
-            status: "ok".to_string(),
-            error: None,
-        }));
+        return Ok(HttpResponse::Ok().json(body.clone()));
     };
 
     if PaymentOperations::is_terminal_state(&mapping.payment_state) {
@@ -465,30 +505,8 @@ pub(super) async fn webhook_payment(
             "webhook_payment: merchant_order_id {} already terminal in state {}",
             merchant_order_id, mapping.payment_state
         );
-        return Ok(HttpResponse::Ok().json(WebhookPaymentResponse {
-            status: "ok".to_string(),
-            error: None,
-        }));
+        return Ok(HttpResponse::Ok().json(body.clone()));
     }
-
-    let final_state = if event == "checkout.order.completed"
-        || remote_state.as_deref() == Some(PAYMENT_STATE_COMPLETED)
-    {
-        PAYMENT_STATE_COMPLETED
-    } else if event == "checkout.order.failed"
-        || remote_state.as_deref() == Some(PAYMENT_STATE_FAILED)
-    {
-        PAYMENT_STATE_FAILED
-    } else {
-        debug!(
-            "webhook_payment: ignoring unsupported event '{}' for merchant_order_id {}",
-            event, merchant_order_id
-        );
-        return Ok(HttpResponse::Ok().json(WebhookPaymentResponse {
-            status: "ok".to_string(),
-            error: None,
-        }));
-    };
 
     if final_state == PAYMENT_STATE_COMPLETED {
         let hold_id = mapping.hold_id;
@@ -554,10 +572,7 @@ pub(super) async fn webhook_payment(
         );
     }
 
-    Ok(HttpResponse::Ok().json(WebhookPaymentResponse {
-        status: "ok".to_string(),
-        error: None,
-    }))
+    Ok(HttpResponse::Ok().json(body))
 }
 
 fn conflict_initiate_response(e: RepositoryError) -> HttpResponse {
@@ -621,10 +636,4 @@ fn extract_webhook_state(value: &serde_json::Value) -> Option<String> {
         .pointer("/payload/state")
         .and_then(|v| v.as_str())
         .map(|s| s.to_uppercase())
-        .or_else(|| {
-            value
-                .get("state")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_uppercase())
-        })
 }

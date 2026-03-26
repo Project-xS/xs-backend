@@ -203,7 +203,7 @@ impl PhonePeClient {
             authorization_header.map(|v| v.trim()),
             self.cfg.webhook_auth_hash_hex.as_deref(),
         ) {
-            (Some(provided), Some(expected)) => provided.eq_ignore_ascii_case(expected),
+            (Some(provided), Some(expected)) => matches_expected_webhook_hash(provided, expected),
             _ => false,
         }
     }
@@ -503,4 +503,39 @@ fn hash_sha256_hex(input: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(input.as_bytes());
     hex::encode(hasher.finalize())
+}
+
+fn matches_expected_webhook_hash(provided: &str, expected_hex: &str) -> bool {
+    let value = provided.trim();
+    if value.eq_ignore_ascii_case(expected_hex) {
+        return true;
+    }
+
+    let lower = value.to_ascii_lowercase();
+
+    if lower.starts_with("sha256(") && value.ends_with(')') && value.len() > 8 {
+        let inner = &value[7..value.len() - 1];
+        if inner.eq_ignore_ascii_case(expected_hex) {
+            return true;
+        }
+        return hash_sha256_hex(inner).eq_ignore_ascii_case(expected_hex);
+    }
+
+    for prefix in ["sha256 ", "sha256=", "sha256:"] {
+        if lower.starts_with(prefix) && value.len() > prefix.len() {
+            let tail = value[prefix.len()..].trim();
+            if tail.eq_ignore_ascii_case(expected_hex) {
+                return true;
+            }
+            if tail.starts_with('(') && tail.ends_with(')') && tail.len() > 2 {
+                let inner = &tail[1..tail.len() - 1];
+                if inner.eq_ignore_ascii_case(expected_hex) {
+                    return true;
+                }
+                return hash_sha256_hex(inner).eq_ignore_ascii_case(expected_hex);
+            }
+        }
+    }
+
+    false
 }
