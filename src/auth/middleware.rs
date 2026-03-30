@@ -2,7 +2,7 @@ use std::future::{ready, Ready};
 use std::rc::Rc;
 
 use actix_web::dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform};
-use actix_web::{error::ErrorUnauthorized, http::header, Error, HttpMessage};
+use actix_web::{error::ErrorUnauthorized, http::header, http::Method, Error, HttpMessage};
 use futures::future::LocalBoxFuture;
 
 use crate::auth::admin_jwt::verify_admin_jwt;
@@ -70,6 +70,12 @@ where
     forward_ready!(service);
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
+        if req.method() == Method::OPTIONS {
+            let fut = self.service.call(req);
+            #[allow(clippy::redundant_async_block)]
+            return Box::pin(async move { fut.await });
+        }
+
         // Bypass only '/', '/health', and '/canteen/login'
         let path = req.path().to_string();
         if path == "/"

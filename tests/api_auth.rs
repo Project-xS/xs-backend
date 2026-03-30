@@ -1,6 +1,7 @@
 mod common;
 
 use actix_web::http::header;
+use actix_web::http::Method;
 use actix_web::http::StatusCode;
 use actix_web::test;
 
@@ -76,4 +77,23 @@ async fn user_on_admin_endpoint_returns_forbidden() {
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+}
+
+#[actix_rt::test]
+async fn preflight_options_without_auth_is_not_unauthorized() {
+    let (app, fixtures, _db_url) = common::setup_api_app().await;
+
+    let req = test::TestRequest::default()
+        .method(Method::OPTIONS)
+        .uri(&format!("/orders/by_user?as=user-{}", fixtures.user_id))
+        .insert_header((header::ORIGIN, "http://localhost:3000"))
+        .insert_header((header::ACCESS_CONTROL_REQUEST_METHOD, "GET"))
+        .insert_header((
+            header::ACCESS_CONTROL_REQUEST_HEADERS,
+            "authorization,content-type",
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+
+    assert_ne!(resp.status(), StatusCode::UNAUTHORIZED);
 }
