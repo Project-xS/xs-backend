@@ -1,5 +1,6 @@
 pub mod admin;
 pub mod common;
+pub mod cors;
 pub mod errors;
 pub mod users;
 

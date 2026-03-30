@@ -133,6 +133,7 @@ async fn main() -> std::io::Result<()> {
                     jwks_cache.clone(),
                     state.user_ops.clone(),
                 ))
+                .wrap(api::cors::cors_middleware())
                 .wrap(middleware::Logger::new("%r - %s - %Dms"))
             })
             .app_data(web::Data::new(fb_cfg.clone()))
