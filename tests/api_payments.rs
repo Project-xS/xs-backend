@@ -14,6 +14,14 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 fn configure_phonepe_mock_env(base_url: &str) {
     std::env::set_var("PHONEPE_AUTH_BASE_URL", base_url);
     std::env::set_var("PHONEPE_PG_BASE_URL", base_url);
+    std::env::set_var(
+        "PHONEPE_WEB_REDIRECT_URL",
+        "https://pwa.example/phonepe-return",
+    );
+    std::env::set_var(
+        "PHONEPE_WEB_PAYMENT_URL_TEMPLATE",
+        "https://pwa.example/pay?merchantOrderId={merchant_order_id_urlencoded}&orderId={order_id_urlencoded}&token={token_urlencoded}",
+    );
 }
 
 fn webhook_hash_header_value() -> String {
@@ -68,7 +76,8 @@ async fn payments_initiate_success_and_reuse_existing_mapping() {
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
             "orderId": "O12345678",
             "token": "sdk_token_abc",
-            "merchantId": "MERCHANT_ID_TEST"
+            "merchantId": "MERCHANT_ID_TEST",
+            "paymentUrl": "phonepe://pay?orderId=O12345678"
         })))
         .expect(1)
         .mount(&mock_server)
@@ -78,7 +87,10 @@ async fn payments_initiate_success_and_reuse_existing_mapping() {
     let hold_id = create_hold(&app, fixtures.user_id, fixtures.menu_item_ids[0]).await;
 
     let initiate_req = test::TestRequest::post()
-        .uri(&format!("/payments/initiate?as=user-{}", fixtures.user_id))
+        .uri(&format!(
+            "/payments/initiate/app?as=user-{}",
+            fixtures.user_id
+        ))
         .insert_header(auth_header())
         .insert_header((header::CONTENT_TYPE, "application/json"))
         .set_json(&serde_json::json!({
@@ -92,9 +104,14 @@ async fn payments_initiate_success_and_reuse_existing_mapping() {
     assert_eq!(first_body["status"], "ok");
     assert_eq!(first_body["order_id"], "O12345678");
     assert_eq!(first_body["token"], "sdk_token_abc");
+    assert_eq!(first_body["payment_url"], "phonepe://pay?orderId=O12345678");
+    assert_eq!(first_body["payment_mode"], "UPI_INTENT");
 
     let initiate_req_2 = test::TestRequest::post()
-        .uri(&format!("/payments/initiate?as=user-{}", fixtures.user_id))
+        .uri(&format!(
+            "/payments/initiate/app?as=user-{}",
+            fixtures.user_id
+        ))
         .insert_header(auth_header())
         .insert_header((header::CONTENT_TYPE, "application/json"))
         .set_json(&serde_json::json!({
@@ -112,6 +129,55 @@ async fn payments_initiate_success_and_reuse_existing_mapping() {
     );
     assert_eq!(second_body["order_id"], first_body["order_id"]);
     assert_eq!(second_body["token"], first_body["token"]);
+    assert!(second_body["payment_url"]
+        .as_str()
+        .expect("payment_url")
+        .starts_with("https://pwa.example/pay?"));
+    assert_eq!(second_body["payment_mode"], "UPI_INTENT");
+}
+
+#[actix_rt::test]
+async fn payments_initiate_web_route_uses_checkout_pay() {
+    let mock_server = MockServer::start().await;
+    configure_phonepe_mock_env(&mock_server.uri());
+    mock_phonepe_oauth(&mock_server).await;
+
+    Mock::given(method("POST"))
+        .and(path("/checkout/v2/pay"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "orderId": "OWEB1234",
+            "state": "PENDING",
+            "redirectUrl": "https://mercury-uat.phonepe.com/transact/uat_v2?token=token_from_redirect"
+        })))
+        .expect(1)
+        .mount(&mock_server)
+        .await;
+
+    let (app, fixtures, _db_url) = common::setup_api_app().await;
+    let hold_id = create_hold(&app, fixtures.user_id, fixtures.menu_item_ids[0]).await;
+
+    let initiate_req = test::TestRequest::post()
+        .uri(&format!(
+            "/payments/initiate/web?as=user-{}",
+            fixtures.user_id
+        ))
+        .insert_header(auth_header())
+        .insert_header((header::CONTENT_TYPE, "application/json"))
+        .set_json(&serde_json::json!({
+            "hold_id": hold_id,
+            "amount": 120
+        }))
+        .to_request();
+    let initiate_resp = test::call_service(&app, initiate_req).await;
+    assert_eq!(initiate_resp.status(), StatusCode::OK);
+    let body: Value = test::read_body_json(initiate_resp).await;
+    assert_eq!(body["status"], "ok");
+    assert_eq!(body["order_id"], "OWEB1234");
+    assert_eq!(body["token"], "token_from_redirect");
+    assert_eq!(
+        body["payment_url"],
+        "https://mercury-uat.phonepe.com/transact/uat_v2?token=token_from_redirect"
+    );
 }
 
 #[actix_rt::test]
@@ -142,7 +208,10 @@ async fn payments_verify_completed_confirms_hold_and_creates_order() {
     let hold_id = create_hold(&app, fixtures.user_id, fixtures.menu_item_ids[0]).await;
 
     let initiate_req = test::TestRequest::post()
-        .uri(&format!("/payments/initiate?as=user-{}", fixtures.user_id))
+        .uri(&format!(
+            "/payments/initiate/app?as=user-{}",
+            fixtures.user_id
+        ))
         .insert_header(auth_header())
         .insert_header((header::CONTENT_TYPE, "application/json"))
         .set_json(&serde_json::json!({
@@ -219,7 +288,10 @@ async fn payments_verify_pending_and_failed_paths() {
     let hold_id = create_hold(&app, fixtures.user_id, fixtures.menu_item_ids[0]).await;
 
     let initiate_req = test::TestRequest::post()
-        .uri(&format!("/payments/initiate?as=user-{}", fixtures.user_id))
+        .uri(&format!(
+            "/payments/initiate/app?as=user-{}",
+            fixtures.user_id
+        ))
         .insert_header(auth_header())
         .insert_header((header::CONTENT_TYPE, "application/json"))
         .set_json(&serde_json::json!({
@@ -291,7 +363,10 @@ async fn payments_webhook_auth_and_idempotency() {
     let hold_id = create_hold(&app, fixtures.user_id, fixtures.menu_item_ids[0]).await;
 
     let initiate_req = test::TestRequest::post()
-        .uri(&format!("/payments/initiate?as=user-{}", fixtures.user_id))
+        .uri(&format!(
+            "/payments/initiate/app?as=user-{}",
+            fixtures.user_id
+        ))
         .insert_header(auth_header())
         .insert_header((header::CONTENT_TYPE, "application/json"))
         .set_json(&serde_json::json!({

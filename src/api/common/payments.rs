@@ -22,18 +22,61 @@ const PAYMENT_STATE_FAILED: &str = "FAILED";
     tag = "Payments",
     request_body = InitiatePaymentRequest,
     responses(
-        (status = 200, description = "PhonePe SDK order token created/reused", body = InitiatePaymentResponse),
+        (status = 200, description = "PhonePe app payment order created/reused", body = InitiatePaymentResponse),
         (status = 409, description = "Hold validation failed", body = InitiatePaymentResponse)
     ),
-    summary = "Initiate PhonePe SDK payment for a held order"
+    summary = "Initiate PhonePe app payment for a held order"
 )]
-#[post("/initiate")]
-pub(super) async fn initiate_payment(
+#[post("/initiate/app")]
+pub(super) async fn initiate_app_payment(
     payment_ops: web::Data<PaymentOperations>,
     phonepe_client: web::Data<PhonePeClient>,
     user: UserPrincipal,
     req_data: web::Json<InitiatePaymentRequest>,
 ) -> actix_web::Result<impl Responder> {
+    initiate_payment_with_api(
+        payment_ops,
+        phonepe_client,
+        user,
+        req_data,
+        CreateApi::SdkOrder,
+    )
+    .await
+}
+
+#[utoipa::path(
+    tag = "Payments",
+    request_body = InitiatePaymentRequest,
+    responses(
+        (status = 200, description = "PhonePe website payment order created/reused", body = InitiatePaymentResponse),
+        (status = 409, description = "Hold validation failed", body = InitiatePaymentResponse)
+    ),
+    summary = "Initiate PhonePe website payment for a held order"
+)]
+#[post("/initiate/web")]
+pub(super) async fn initiate_web_payment(
+    payment_ops: web::Data<PaymentOperations>,
+    phonepe_client: web::Data<PhonePeClient>,
+    user: UserPrincipal,
+    req_data: web::Json<InitiatePaymentRequest>,
+) -> actix_web::Result<impl Responder> {
+    initiate_payment_with_api(
+        payment_ops,
+        phonepe_client,
+        user,
+        req_data,
+        CreateApi::WebsitePay,
+    )
+    .await
+}
+
+async fn initiate_payment_with_api(
+    payment_ops: web::Data<PaymentOperations>,
+    phonepe_client: web::Data<PhonePeClient>,
+    user: UserPrincipal,
+    req_data: web::Json<InitiatePaymentRequest>,
+    create_api: CreateApi,
+) -> actix_web::Result<HttpResponse> {
     if let Err(e) = phonepe_client.ensure_enabled() {
         return Ok(
             HttpResponse::InternalServerError().json(InitiatePaymentResponse {
@@ -42,6 +85,8 @@ pub(super) async fn initiate_payment(
                 token: None,
                 merchant_id: None,
                 merchant_order_id: None,
+                payment_url: None,
+                payment_mode: None,
                 error: Some(e),
             }),
         );
@@ -49,6 +94,13 @@ pub(super) async fn initiate_payment(
 
     let InitiatePaymentRequest { hold_id, amount } = req_data.into_inner();
     let uid = user.user_id();
+    debug!(
+        "initiate_payment: hold {} user {} strategy={} endpoint={}",
+        hold_id,
+        uid,
+        create_api.strategy_name(),
+        create_api.path()
+    );
 
     let hold_snapshot = match payment_ops.get_hold_snapshot_for_user(hold_id, uid) {
         Ok(snapshot) => snapshot,
@@ -67,6 +119,8 @@ pub(super) async fn initiate_payment(
             token: None,
             merchant_id: None,
             merchant_order_id: None,
+            payment_url: None,
+            payment_mode: None,
             error: Some("Amount mismatch with held order total.".to_string()),
         }));
     }
@@ -86,6 +140,8 @@ pub(super) async fn initiate_payment(
                     token: None,
                     merchant_id: None,
                     merchant_order_id: None,
+                    payment_url: None,
+                    payment_mode: None,
                     error: Some("Internal server error.".to_string()),
                 }),
             );
@@ -99,6 +155,8 @@ pub(super) async fn initiate_payment(
                 token: None,
                 merchant_id: None,
                 merchant_order_id: None,
+                payment_url: None,
+                payment_mode: None,
                 error: Some("Amount mismatch with existing payment mapping.".to_string()),
             }));
         }
@@ -107,12 +165,54 @@ pub(super) async fn initiate_payment(
             "initiate_payment: reusing payment mapping for hold {} merchant_order_id {}",
             hold_id, existing_mapping.merchant_order_id
         );
+
+        let payment_url = phonepe_client.build_web_payment_url(
+            &existing_mapping.merchant_order_id,
+            &existing_mapping.phonepe_order_id,
+            &existing_mapping.sdk_token,
+        );
+        if payment_url.is_none() && create_api.requires_payment_url() {
+            error!(
+                "initiate_payment: reused mapping missing payment_url for hold {} user {} merchant_order_id {}; template_present={}",
+                hold_id,
+                uid,
+                existing_mapping.merchant_order_id,
+                phonepe_client
+                    .config()
+                    .web_payment_url_template
+                    .as_ref()
+                    .map(|s| !s.is_empty())
+                    .unwrap_or(false)
+            );
+            return Ok(
+                HttpResponse::InternalServerError().json(InitiatePaymentResponse {
+                    status: "error".to_string(),
+                    order_id: None,
+                    token: None,
+                    merchant_id: None,
+                    merchant_order_id: None,
+                    payment_url: None,
+                    payment_mode: None,
+                    error: Some(
+                        "Unable to resolve payment URL. Configure PHONEPE_WEB_PAYMENT_URL_TEMPLATE."
+                            .to_string(),
+                    ),
+                }),
+            );
+        }
+        debug!(
+            "initiate_payment: reused mapping resolved payment_url for hold {} user {} merchant_order_id {}",
+            hold_id, uid, existing_mapping.merchant_order_id
+        );
+
         return Ok(HttpResponse::Ok().json(InitiatePaymentResponse {
             status: "ok".to_string(),
             order_id: Some(existing_mapping.phonepe_order_id),
             token: Some(existing_mapping.sdk_token),
             merchant_id: Some(phonepe_client.config().merchant_id.clone()),
             merchant_order_id: Some(existing_mapping.merchant_order_id),
+            payment_url,
+            payment_mode: Some("UPI_INTENT".to_string()),
             error: None,
         }));
     }
@@ -133,20 +233,34 @@ pub(super) async fn initiate_payment(
             token: None,
             merchant_id: None,
             merchant_order_id: None,
+            payment_url: None,
+            payment_mode: None,
             error: Some("Hold expired or does not belong to user.".to_string()),
         }));
     }
 
     let merchant_order_id = format!("TXN_{}_{}", hold_id, Utc::now().timestamp_millis());
-    let create_result = match phonepe_client
-        .create_sdk_order(&merchant_order_id, amount_paisa, expire_after)
-        .await
-    {
+    let create_result = match create_api {
+        CreateApi::SdkOrder => {
+            phonepe_client
+                .create_sdk_order(&merchant_order_id, amount_paisa, expire_after)
+                .await
+        }
+        CreateApi::WebsitePay => {
+            phonepe_client
+                .create_website_payment(&merchant_order_id, amount_paisa, expire_after)
+                .await
+        }
+    };
+    let create_result = match create_result {
         Ok(res) => res,
         Err(e) => {
             error!(
-                "initiate_payment: failed to create PhonePe order for hold {} user {}: {}",
-                hold_id, uid, e
+                "initiate_payment: failed to create PhonePe order for hold {} user {} using strategy {}: {}",
+                hold_id,
+                uid,
+                create_api.strategy_name(),
+                e
             );
             return Ok(HttpResponse::Conflict().json(InitiatePaymentResponse {
                 status: "error".to_string(),
@@ -154,6 +268,8 @@ pub(super) async fn initiate_payment(
                 token: None,
                 merchant_id: None,
                 merchant_order_id: None,
+                payment_url: None,
+                payment_mode: None,
                 error: Some("Failed to initiate payment order.".to_string()),
             }));
         }
@@ -184,11 +300,51 @@ pub(super) async fn initiate_payment(
                     token: None,
                     merchant_id: None,
                     merchant_order_id: None,
+                    payment_url: None,
+                    payment_mode: None,
                     error: Some("Failed to persist payment mapping.".to_string()),
                 }),
             );
         }
     };
+
+    if create_result.payment_url.is_none() && create_api.requires_payment_url() {
+        error!(
+            "initiate_payment: create-order returned no payment_url for hold {} user {} merchant_order_id {} strategy {}; template_present={}",
+            hold_id,
+            uid,
+            merchant_order_id,
+            create_api.strategy_name(),
+            phonepe_client
+                .config()
+                .web_payment_url_template
+                .as_ref()
+                .map(|s| !s.is_empty())
+                .unwrap_or(false)
+        );
+        return Ok(
+            HttpResponse::InternalServerError().json(InitiatePaymentResponse {
+                status: "error".to_string(),
+                order_id: None,
+                token: None,
+                merchant_id: None,
+                merchant_order_id: None,
+                payment_url: None,
+                payment_mode: None,
+                error: Some(
+                    "Unable to resolve payment URL. Configure PHONEPE_WEB_PAYMENT_URL_TEMPLATE."
+                        .to_string(),
+                ),
+            }),
+        );
+    }
+    debug!(
+        "initiate_payment: create-order resolved payment_url for hold {} user {} merchant_order_id {} strategy {}",
+        hold_id,
+        uid,
+        merchant_order_id,
+        create_api.strategy_name()
+    );
 
     Ok(HttpResponse::Ok().json(InitiatePaymentResponse {
         status: "ok".to_string(),
@@ -196,8 +352,36 @@ pub(super) async fn initiate_payment(
         token: Some(stored_mapping.sdk_token),
         merchant_id: Some(create_result.merchant_id),
         merchant_order_id: Some(stored_mapping.merchant_order_id),
+        payment_url: create_result.payment_url,
+        payment_mode: create_result.payment_mode,
         error: None,
     }))
+}
+
+#[derive(Clone, Copy)]
+enum CreateApi {
+    SdkOrder,
+    WebsitePay,
+}
+
+impl CreateApi {
+    fn strategy_name(self) -> &'static str {
+        match self {
+            Self::SdkOrder => "sdk",
+            Self::WebsitePay => "web_pay",
+        }
+    }
+
+    fn path(self) -> &'static str {
+        match self {
+            Self::SdkOrder => "/checkout/v2/sdk/order",
+            Self::WebsitePay => "/checkout/v2/pay",
+        }
+    }
+
+    fn requires_payment_url(self) -> bool {
+        matches!(self, Self::WebsitePay)
+    }
 }
 
 #[utoipa::path(
@@ -584,6 +768,8 @@ fn conflict_initiate_response(e: RepositoryError) -> HttpResponse {
                 token: None,
                 merchant_id: None,
                 merchant_order_id: None,
+                payment_url: None,
+                payment_mode: None,
                 error: Some("Hold expired or does not belong to user.".to_string()),
             })
         }
@@ -595,6 +781,8 @@ fn conflict_initiate_response(e: RepositoryError) -> HttpResponse {
                 token: None,
                 merchant_id: None,
                 merchant_order_id: None,
+                payment_url: None,
+                payment_mode: None,
                 error: Some("Internal server error.".to_string()),
             })
         }

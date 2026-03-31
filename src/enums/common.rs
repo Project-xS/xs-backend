@@ -127,6 +127,8 @@ pub struct InitiatePaymentResponse {
     pub token: Option<String>,
     pub merchant_id: Option<String>,
     pub merchant_order_id: Option<String>,
+    pub payment_url: Option<String>,
+    pub payment_mode: Option<String>,
     pub error: Option<String>,
 }
 

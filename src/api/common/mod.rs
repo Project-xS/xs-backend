@@ -68,7 +68,8 @@ pub(super) fn config(
             .service(
                 scope::scope("")
                     .guard(ContentTypeHeader)
-                    .service(payments::initiate_payment)
+                    .service(payments::initiate_app_payment)
+                    .service(payments::initiate_web_payment)
                     .service(payments::verify_payment),
             ),
     )

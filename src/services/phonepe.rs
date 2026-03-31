@@ -1,4 +1,5 @@
 use chrono::{DateTime, TimeZone, Utc};
+use log::{debug, warn};
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -26,6 +27,8 @@ pub struct PhonePeConfig {
     pub http_timeout_secs: u64,
     pub auth_base_url: String,
     pub pg_base_url: String,
+    pub web_redirect_url: Option<String>,
+    pub web_payment_url_template: Option<String>,
     webhook_auth_hash_hex: Option<String>,
 }
 
@@ -47,6 +50,8 @@ pub struct PhonePeCreateOrderResult {
     pub phonepe_order_id: String,
     pub sdk_token: String,
     pub merchant_id: String,
+    pub payment_url: Option<String>,
+    pub payment_mode: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -69,6 +74,36 @@ struct PaymentFlow {
 struct EnabledPaymentMode {
     #[serde(rename = "type")]
     kind: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CreateWebsitePaymentRequest<'a> {
+    merchant_order_id: &'a str,
+    amount: i32,
+    expire_after: i64,
+    payment_flow: WebsitePaymentFlow<'a>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WebsitePaymentFlow<'a> {
+    #[serde(rename = "type")]
+    kind: &'a str,
+    merchant_urls: WebsiteMerchantUrls<'a>,
+    payment_mode_config: WebsitePaymentModeConfig,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WebsiteMerchantUrls<'a> {
+    redirect_url: &'a str,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WebsitePaymentModeConfig {
+    enabled_payment_modes: Vec<EnabledPaymentMode>,
 }
 
 impl PhonePeConfig {
@@ -110,6 +145,14 @@ impl PhonePeConfig {
             .ok()
             .and_then(|v| v.parse::<u64>().ok())
             .unwrap_or(15);
+        let web_payment_url_template = std::env::var("PHONEPE_WEB_PAYMENT_URL_TEMPLATE")
+            .ok()
+            .map(|v| v.trim().to_string())
+            .filter(|v| !v.is_empty());
+        let web_redirect_url = std::env::var("PHONEPE_WEB_REDIRECT_URL")
+            .ok()
+            .map(|v| v.trim().to_string())
+            .filter(|v| !v.is_empty());
 
         if !enabled {
             return Ok(Self {
@@ -123,6 +166,8 @@ impl PhonePeConfig {
                 http_timeout_secs,
                 auth_base_url,
                 pg_base_url,
+                web_redirect_url,
+                web_payment_url_template,
                 webhook_auth_hash_hex: None,
             });
         }
@@ -158,6 +203,8 @@ impl PhonePeConfig {
             http_timeout_secs,
             auth_base_url,
             pg_base_url,
+            web_redirect_url,
+            web_payment_url_template,
             webhook_auth_hash_hex,
         })
     }
@@ -194,6 +241,53 @@ impl PhonePeClient {
         }
     }
 
+    pub fn build_web_payment_url(
+        &self,
+        merchant_order_id: &str,
+        phonepe_order_id: &str,
+        sdk_token: &str,
+    ) -> Option<String> {
+        let Some(template) = self.cfg.web_payment_url_template.as_deref() else {
+            debug!(
+                "build_web_payment_url: no PHONEPE_WEB_PAYMENT_URL_TEMPLATE configured for merchant_order_id {}",
+                merchant_order_id
+            );
+            return None;
+        };
+        let built = template
+            .replace("{merchant_order_id}", merchant_order_id)
+            .replace("{order_id}", phonepe_order_id)
+            .replace("{token}", sdk_token)
+            .replace(
+                "{merchant_order_id_urlencoded}",
+                &urlencoding::encode(merchant_order_id),
+            )
+            .replace(
+                "{order_id_urlencoded}",
+                &urlencoding::encode(phonepe_order_id),
+            )
+            .replace("{token_urlencoded}", &urlencoding::encode(sdk_token));
+
+        let lower = built.to_ascii_lowercase();
+        if lower.starts_with("https://")
+            || lower.starts_with("phonepe://")
+            || lower.starts_with("intent://")
+        {
+            debug!(
+                "build_web_payment_url: generated URL for merchant_order_id {} with scheme {}",
+                merchant_order_id,
+                detect_scheme(&built)
+            );
+            return Some(built);
+        }
+        warn!(
+            "build_web_payment_url: rejected template output for merchant_order_id {} due to unsupported scheme; got {}",
+            merchant_order_id,
+            detect_scheme(&built)
+        );
+        None
+    }
+
     pub fn verify_webhook_header(&self, authorization_header: Option<&str>) -> bool {
         if !self.cfg.enabled {
             return false;
@@ -220,6 +314,10 @@ impl PhonePeClient {
         let url = format!(
             "{}/checkout/v2/sdk/order",
             PhonePeConfig::trim_base(&self.cfg.pg_base_url)
+        );
+        debug!(
+            "create_sdk_order: dispatching PhonePe create-order request to {} (path=/checkout/v2/sdk/order)",
+            url
         );
 
         let req = CreateOrderRequest {
@@ -297,10 +395,180 @@ impl PhonePeClient {
         )
         .unwrap_or_else(|| self.cfg.merchant_id.clone());
 
+        let gateway_payment_url = extract_string_from_paths(
+            &value,
+            &[
+                &["paymentUrl"],
+                &["paymentURL"],
+                &["redirectUrl"],
+                &["redirectURL"],
+                &["data", "paymentUrl"],
+                &["data", "paymentURL"],
+                &["data", "redirectUrl"],
+                &["data", "redirectURL"],
+                &["payload", "paymentUrl"],
+                &["payload", "redirectUrl"],
+                &["instrumentResponse", "redirectInfo", "url"],
+                &["data", "instrumentResponse", "redirectInfo", "url"],
+                &["payload", "instrumentResponse", "redirectInfo", "url"],
+            ],
+        );
+        let payment_url = gateway_payment_url.clone().or_else(|| {
+            self.build_web_payment_url(merchant_order_id, &phonepe_order_id, &sdk_token)
+        });
+        let payment_url_source = if gateway_payment_url.is_some() {
+            "gateway"
+        } else if payment_url.is_some() {
+            "template"
+        } else {
+            "none"
+        };
+        debug!(
+            "create_sdk_order: merchant_order_id {} phonepe_order_id {} payment_url_source {} payment_url_scheme {} token_len {}",
+            merchant_order_id,
+            phonepe_order_id,
+            payment_url_source,
+            payment_url
+                .as_ref()
+                .map(|u| detect_scheme(u))
+                .unwrap_or("none"),
+            sdk_token.len()
+        );
+
         Ok(PhonePeCreateOrderResult {
             phonepe_order_id,
             sdk_token,
             merchant_id,
+            payment_url,
+            payment_mode: Some("UPI_INTENT".to_string()),
+        })
+    }
+
+    pub async fn create_website_payment(
+        &self,
+        merchant_order_id: &str,
+        amount: i32,
+        expire_after_secs: i64,
+    ) -> Result<PhonePeCreateOrderResult, String> {
+        self.ensure_enabled()?;
+
+        let Some(redirect_url) = self.cfg.web_redirect_url.as_deref() else {
+            return Err(
+                "PHONEPE_WEB_REDIRECT_URL must be configured for website /checkout/v2/pay flow."
+                    .to_string(),
+            );
+        };
+
+        let token = self.get_oauth_token().await?;
+        let url = format!(
+            "{}/checkout/v2/pay",
+            PhonePeConfig::trim_base(&self.cfg.pg_base_url)
+        );
+        debug!(
+            "create_website_payment: dispatching PhonePe create-payment request to {} (path=/checkout/v2/pay)",
+            url
+        );
+
+        // Restrict website checkout to UPI-only instruments.
+        let req = CreateWebsitePaymentRequest {
+            merchant_order_id,
+            amount,
+            expire_after: expire_after_secs,
+            payment_flow: WebsitePaymentFlow {
+                kind: "PG_CHECKOUT",
+                merchant_urls: WebsiteMerchantUrls { redirect_url },
+                payment_mode_config: WebsitePaymentModeConfig {
+                    enabled_payment_modes: vec![
+                        EnabledPaymentMode {
+                            kind: "UPI_INTENT".to_string(),
+                        },
+                        EnabledPaymentMode {
+                            kind: "UPI_QR".to_string(),
+                        },
+                    ],
+                },
+            },
+        };
+
+        let body = serde_json::to_string(&req)
+            .map_err(|e| format!("failed to serialize create payment payload: {}", e))?;
+        let resp = self
+            .http
+            .post(url)
+            .header(AUTHORIZATION, format!("O-Bearer {}", token))
+            .header(CONTENT_TYPE, "application/json")
+            .body(body)
+            .send()
+            .await
+            .map_err(|e| format!("PhonePe create-payment request failed: {}", e))?;
+
+        let status = resp.status();
+        let resp_text = resp
+            .text()
+            .await
+            .map_err(|e| format!("failed to read create-payment response: {}", e))?;
+        if !status.is_success() {
+            return Err(format!(
+                "PhonePe create-payment returned {}: {}",
+                status, resp_text
+            ));
+        }
+
+        let value: serde_json::Value = serde_json::from_str(&resp_text)
+            .map_err(|e| format!("invalid create-payment response JSON: {}", e))?;
+
+        let phonepe_order_id = extract_string_from_paths(
+            &value,
+            &[
+                &["orderId"],
+                &["order_id"],
+                &["data", "orderId"],
+                &["data", "order_id"],
+                &["payload", "orderId"],
+                &["payload", "order_id"],
+            ],
+        )
+        .ok_or_else(|| "PhonePe create-payment response missing orderId".to_string())?;
+
+        let payment_url = extract_string_from_paths(
+            &value,
+            &[
+                &["redirectUrl"],
+                &["redirectURL"],
+                &["paymentUrl"],
+                &["data", "redirectUrl"],
+                &["data", "redirectURL"],
+                &["data", "paymentUrl"],
+                &["payload", "redirectUrl"],
+                &["payload", "paymentUrl"],
+                &["instrumentResponse", "redirectInfo", "url"],
+                &["data", "instrumentResponse", "redirectInfo", "url"],
+                &["payload", "instrumentResponse", "redirectInfo", "url"],
+            ],
+        )
+        .ok_or_else(|| "PhonePe create-payment response missing redirectUrl".to_string())?;
+
+        let sdk_token = extract_string_from_paths(
+            &value,
+            &[&["token"], &["data", "token"], &["payload", "token"]],
+        )
+        .or_else(|| extract_query_param(&payment_url, "token"))
+        .ok_or_else(|| "Unable to extract token from create-payment response".to_string())?;
+
+        debug!(
+            "create_website_payment: merchant_order_id {} phonepe_order_id {} payment_url_scheme {} token_len {}",
+            merchant_order_id,
+            phonepe_order_id,
+            detect_scheme(&payment_url),
+            sdk_token.len()
+        );
+
+        Ok(PhonePeCreateOrderResult {
+            phonepe_order_id,
+            sdk_token,
+            merchant_id: self.cfg.merchant_id.clone(),
+            payment_url: Some(payment_url),
+            payment_mode: Some("UPI_INTENT".to_string()),
         })
     }
 
@@ -434,6 +702,27 @@ impl PhonePeClient {
 
         Ok(CachedOAuthToken { token, expires_at })
     }
+}
+
+fn detect_scheme(url: &str) -> &str {
+    if url.to_ascii_lowercase().starts_with("https://") {
+        "https"
+    } else if url.to_ascii_lowercase().starts_with("phonepe://") {
+        "phonepe"
+    } else if url.to_ascii_lowercase().starts_with("intent://") {
+        "intent"
+    } else if url.contains("://") {
+        "other"
+    } else {
+        "missing"
+    }
+}
+
+fn extract_query_param(raw_url: &str, key: &str) -> Option<String> {
+    let parsed = reqwest::Url::parse(raw_url).ok()?;
+    parsed
+        .query_pairs()
+        .find_map(|(k, v)| (k == key).then(|| v.into_owned()))
 }
 
 /// TODO: Serde over whatever this mess is. we can use serde alias if we don't have the concrete path.
