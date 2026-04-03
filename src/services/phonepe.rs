@@ -61,7 +61,7 @@ struct CreateOrderRequest<'a> {
     amount: i32,
     expire_after: i64,
     payment_flow: PaymentFlow,
-    enabled_payment_modes: Vec<EnabledPaymentMode>,
+    // enabled_payment_modes: Vec<EnabledPaymentMode>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -70,11 +70,11 @@ struct PaymentFlow {
     kind: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
-struct EnabledPaymentMode {
-    #[serde(rename = "type")]
-    kind: String,
-}
+// #[derive(Debug, Clone, Serialize)]
+// struct EnabledPaymentMode {
+//     #[serde(rename = "type")]
+//     kind: String,
+// }
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -91,7 +91,7 @@ struct WebsitePaymentFlow<'a> {
     #[serde(rename = "type")]
     kind: &'a str,
     merchant_urls: WebsiteMerchantUrls<'a>,
-    payment_mode_config: WebsitePaymentModeConfig,
+    // payment_mode_config: WebsitePaymentModeConfig,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -100,11 +100,11 @@ struct WebsiteMerchantUrls<'a> {
     redirect_url: &'a str,
 }
 
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct WebsitePaymentModeConfig {
-    enabled_payment_modes: Vec<EnabledPaymentMode>,
-}
+// #[derive(Debug, Clone, Serialize)]
+// #[serde(rename_all = "camelCase")]
+// struct WebsitePaymentModeConfig {
+//     enabled_payment_modes: Vec<EnabledPaymentMode>,
+// }
 
 impl PhonePeConfig {
     pub fn from_env() -> Result<Self, String> {
@@ -327,9 +327,9 @@ impl PhonePeClient {
             payment_flow: PaymentFlow {
                 kind: "PG_CHECKOUT".to_string(),
             },
-            enabled_payment_modes: vec![EnabledPaymentMode {
-                kind: "UPI_INTENT".to_string(),
-            }],
+            // enabled_payment_modes: vec![EnabledPaymentMode {
+            //     kind: "UPI_INTENT".to_string(),
+            // }],
         };
 
         let body = serde_json::to_string(&req)
@@ -440,7 +440,8 @@ impl PhonePeClient {
             sdk_token,
             merchant_id,
             payment_url,
-            payment_mode: Some("UPI_INTENT".to_string()),
+            // payment_mode: Some("UPI_INTENT".to_string()),
+            payment_mode: None,
         })
     }
 
@@ -477,16 +478,16 @@ impl PhonePeClient {
             payment_flow: WebsitePaymentFlow {
                 kind: "PG_CHECKOUT",
                 merchant_urls: WebsiteMerchantUrls { redirect_url },
-                payment_mode_config: WebsitePaymentModeConfig {
-                    enabled_payment_modes: vec![
-                        EnabledPaymentMode {
-                            kind: "UPI_INTENT".to_string(),
-                        },
-                        EnabledPaymentMode {
-                            kind: "UPI_QR".to_string(),
-                        },
-                    ],
-                },
+                // payment_mode_config: WebsitePaymentModeConfig {
+                //     enabled_payment_modes: vec![
+                //         EnabledPaymentMode {
+                //             kind: "UPI_INTENT".to_string(),
+                //         },
+                //         EnabledPaymentMode {
+                //             kind: "UPI_QR".to_string(),
+                //         },
+                //     ],
+                // },
             },
         };
 
@@ -568,7 +569,8 @@ impl PhonePeClient {
             sdk_token,
             merchant_id: self.cfg.merchant_id.clone(),
             payment_url: Some(payment_url),
-            payment_mode: Some("UPI_INTENT".to_string()),
+            // payment_mode: Some("UPI_INTENT".to_string()),
+            payment_mode: None,
         })
     }
 

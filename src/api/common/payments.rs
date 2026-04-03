@@ -212,7 +212,8 @@ async fn initiate_payment_with_api(
             merchant_id: Some(phonepe_client.config().merchant_id.clone()),
             merchant_order_id: Some(existing_mapping.merchant_order_id),
             payment_url,
-            payment_mode: Some("UPI_INTENT".to_string()),
+            // payment_mode: Some("UPI_INTENT".to_string()),
+            payment_mode: None,
             error: None,
         }));
     }
